@@ -1,0 +1,5418 @@
+{
+ "meta": {
+  "k_gram": 12,
+  "min_run": 20,
+  "occ_cap": 40,
+  "module_code_instr": {
+   "cc1": 2970,
+   "c.prep": 4035,
+   "c.opt": 4259,
+   "c.link": 5479,
+   "make": 5782,
+   "c_asm": 7599,
+   "c.pass2": 9804,
+   "c.pass1": 12408,
+   "c.comp": 17830
+  },
+  "note": "Structural fingerprint match: labels/addresses/DP-offsets abstracted to @; os9 syscalls and register lists kept verbatim. Line numbers are 1-based into each <module>.asm. instr_len = matched run length in instructions."
+ },
+ "groups": [
+  {
+   "id": 0,
+   "label": "MulFull",
+   "instr_len": 29,
+   "module_count": 9,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19527,
+     19555
+    ],
+    "c.link": [
+     5602,
+     5630
+    ],
+    "c.opt": [
+     4370,
+     4398
+    ],
+    "c.pass1": [
+     13309,
+     13337
+    ],
+    "c.pass2": [
+     10660,
+     10688
+    ],
+    "c.prep": [
+     4157,
+     4185
+    ],
+    "c_asm": [
+     8512,
+     8540
+    ],
+    "cc1": [
+     2934,
+     2962
+    ],
+    "make": [
+     6397,
+     6425
+    ]
+   }
+  },
+  {
+   "id": 1,
+   "label": "AllocRegSlot",
+   "instr_len": 22,
+   "module_count": 9,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17498,
+     17522
+    ],
+    "c.link": [
+     3646,
+     3670
+    ],
+    "c.opt": [
+     2971,
+     2995
+    ],
+    "c.pass1": [
+     12300,
+     12324
+    ],
+    "c.pass2": [
+     8709,
+     8733
+    ],
+    "c.prep": [
+     2766,
+     2790
+    ],
+    "c_asm": [
+     6790,
+     6814
+    ],
+    "cc1": [
+     1749,
+     1773
+    ],
+    "make": [
+     4017,
+     4041
+    ]
+   }
+  },
+  {
+   "id": 2,
+   "label": "ClrBssLoop",
+   "instr_len": 68,
+   "module_count": 8,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     69,
+     141
+    ],
+    "c.link": [
+     108,
+     180
+    ],
+    "c.opt": [
+     82,
+     154
+    ],
+    "c.pass1": [
+     119,
+     191
+    ],
+    "c.pass2": [
+     84,
+     156
+    ],
+    "c.prep": [
+     90,
+     162
+    ],
+    "c_asm": [
+     269,
+     365
+    ],
+    "cc1": [
+     81,
+     153
+    ]
+   }
+  },
+  {
+   "id": 3,
+   "label": "ResolveStorage",
+   "instr_len": 33,
+   "module_count": 8,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18299,
+     18334
+    ],
+    "c.link": [
+     5107,
+     5142
+    ],
+    "c.opt": [
+     4174,
+     4209
+    ],
+    "c.pass1": [
+     12927,
+     12962
+    ],
+    "c.pass2": [
+     9485,
+     9520
+    ],
+    "c_asm": [
+     8219,
+     8254
+    ],
+    "cc1": [
+     2749,
+     2784
+    ],
+    "make": [
+     5473,
+     5508
+    ]
+   }
+  },
+  {
+   "id": 4,
+   "label": "CreateOk",
+   "instr_len": 28,
+   "module_count": 8,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19780,
+     19810
+    ],
+    "c.link": [
+     5855,
+     5885
+    ],
+    "c.opt": [
+     4592,
+     4622
+    ],
+    "c.pass1": [
+     13562,
+     13592
+    ],
+    "c.pass2": [
+     10913,
+     10943
+    ],
+    "c.prep": [
+     4296,
+     4325
+    ],
+    "c_asm": [
+     8757,
+     8786
+    ],
+    "cc1": [
+     3074,
+     3104
+    ]
+   }
+  },
+  {
+   "id": 5,
+   "label": "AllocRegSlot",
+   "instr_len": 26,
+   "module_count": 8,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17497,
+     17526
+    ],
+    "c.link": [
+     3645,
+     3674
+    ],
+    "c.opt": [
+     2970,
+     2999
+    ],
+    "c.pass1": [
+     12299,
+     12328
+    ],
+    "c.pass2": [
+     8708,
+     8737
+    ],
+    "c.prep": [
+     2765,
+     2794
+    ],
+    "c_asm": [
+     6789,
+     6818
+    ],
+    "cc1": [
+     1748,
+     1777
+    ]
+   }
+  },
+  {
+   "id": 6,
+   "label": "UtoaDecimal",
+   "instr_len": 20,
+   "module_count": 8,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17136,
+     17157
+    ],
+    "c.link": [
+     4187,
+     4208
+    ],
+    "c.pass1": [
+     9286,
+     9307
+    ],
+    "c.pass2": [
+     5331,
+     5352
+    ],
+    "c.prep": [
+     3199,
+     3220
+    ],
+    "c_asm": [
+     7296,
+     7317
+    ],
+    "cc1": [
+     2209,
+     2230
+    ],
+    "make": [
+     4564,
+     4585
+    ]
+   }
+  },
+  {
+   "id": 7,
+   "label": "WriteWhole",
+   "instr_len": 20,
+   "module_count": 8,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18095,
+     18116
+    ],
+    "c.link": [
+     4900,
+     4921
+    ],
+    "c.opt": [
+     3964,
+     3985
+    ],
+    "c.pass1": [
+     12720,
+     12741
+    ],
+    "c.pass2": [
+     9281,
+     9302
+    ],
+    "c.prep": [
+     3698,
+     3719
+    ],
+    "cc1": [
+     2705,
+     2726
+    ],
+    "make": [
+     5249,
+     5270
+    ]
+   }
+  },
+  {
+   "id": 8,
+   "label": "PutBuffered",
+   "instr_len": 51,
+   "module_count": 7,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17881,
+     17934
+    ],
+    "c.link": [
+     4687,
+     4740
+    ],
+    "c.opt": [
+     3753,
+     3806
+    ],
+    "c.pass1": [
+     12506,
+     12559
+    ],
+    "c.pass2": [
+     9067,
+     9120
+    ],
+    "c.prep": [
+     3483,
+     3537
+    ],
+    "cc1": [
+     2492,
+     2545
+    ]
+   }
+  },
+  {
+   "id": 9,
+   "label": "copybytes",
+   "instr_len": 42,
+   "module_count": 7,
+   "region": "cstart-head",
+   "members": {
+    "c.link": [
+     81,
+     124
+    ],
+    "c.opt": [
+     55,
+     98
+    ],
+    "c.pass1": [
+     92,
+     135
+    ],
+    "c.pass2": [
+     57,
+     100
+    ],
+    "c_asm": [
+     235,
+     289
+    ],
+    "cc1": [
+     54,
+     97
+    ],
+    "make": [
+     58,
+     101
+    ]
+   }
+  },
+  {
+   "id": 10,
+   "label": "PutByte",
+   "instr_len": 30,
+   "module_count": 7,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17862,
+     17892
+    ],
+    "c.link": [
+     4668,
+     4698
+    ],
+    "c.opt": [
+     3734,
+     3764
+    ],
+    "c.pass1": [
+     12487,
+     12517
+    ],
+    "c.pass2": [
+     9048,
+     9078
+    ],
+    "c_asm": [
+     7780,
+     7810
+    ],
+    "cc1": [
+     2473,
+     2503
+    ]
+   }
+  },
+  {
+   "id": 11,
+   "label": "WriteWhole",
+   "instr_len": 24,
+   "module_count": 7,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18095,
+     18120
+    ],
+    "c.link": [
+     4900,
+     4925
+    ],
+    "c.opt": [
+     3964,
+     3989
+    ],
+    "c.pass1": [
+     12720,
+     12745
+    ],
+    "c.pass2": [
+     9281,
+     9306
+    ],
+    "cc1": [
+     2705,
+     2730
+    ],
+    "make": [
+     5249,
+     5274
+    ]
+   }
+  },
+  {
+   "id": 12,
+   "label": "FlushBuf",
+   "instr_len": 22,
+   "module_count": 7,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     18047,
+     18069
+    ],
+    "c.link": [
+     4852,
+     4874
+    ],
+    "c.pass1": [
+     12672,
+     12694
+    ],
+    "c.pass2": [
+     9233,
+     9255
+    ],
+    "c_asm": [
+     7964,
+     7986
+    ],
+    "cc1": [
+     2657,
+     2679
+    ],
+    "make": [
+     5203,
+     5225
+    ]
+   }
+  },
+  {
+   "id": 13,
+   "label": "CreatePath",
+   "instr_len": 117,
+   "module_count": 6,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19776,
+     19906
+    ],
+    "c.link": [
+     5851,
+     5981
+    ],
+    "c.opt": [
+     4588,
+     4718
+    ],
+    "c.pass1": [
+     13558,
+     13688
+    ],
+    "c.pass2": [
+     10909,
+     11039
+    ],
+    "cc1": [
+     3070,
+     3199
+    ]
+   }
+  },
+  {
+   "id": 14,
+   "label": "copybytes",
+   "instr_len": 105,
+   "module_count": 6,
+   "region": "cstart-head",
+   "members": {
+    "c.link": [
+     81,
+     191
+    ],
+    "c.opt": [
+     55,
+     165
+    ],
+    "c.pass1": [
+     92,
+     202
+    ],
+    "c.pass2": [
+     57,
+     167
+    ],
+    "c_asm": [
+     235,
+     381
+    ],
+    "cc1": [
+     54,
+     164
+    ]
+   }
+  },
+  {
+   "id": 15,
+   "label": "ClassifyBySize",
+   "instr_len": 61,
+   "module_count": 6,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17396,
+     17467
+    ],
+    "c.link": [
+     3544,
+     3615
+    ],
+    "c.opt": [
+     2867,
+     2938
+    ],
+    "c.pass1": [
+     12198,
+     12269
+    ],
+    "c.pass2": [
+     8607,
+     8678
+    ],
+    "c.prep": [
+     2664,
+     2735
+    ]
+   }
+  },
+  {
+   "id": 16,
+   "label": "AddressOperand",
+   "instr_len": 61,
+   "module_count": 6,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17474,
+     17541
+    ],
+    "c.link": [
+     3622,
+     3689
+    ],
+    "c.pass1": [
+     12276,
+     12343
+    ],
+    "c.pass2": [
+     8685,
+     8752
+    ],
+    "c_asm": [
+     6766,
+     6833
+    ],
+    "cc1": [
+     1725,
+     1792
+    ]
+   }
+  },
+  {
+   "id": 17,
+   "label": "SbrkGrow",
+   "instr_len": 36,
+   "module_count": 6,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19921,
+     19959
+    ],
+    "c.link": [
+     6022,
+     6060
+    ],
+    "c.opt": [
+     4733,
+     4771
+    ],
+    "c.pass2": [
+     11054,
+     11092
+    ],
+    "c_asm": [
+     8896,
+     8933
+    ],
+    "cc1": [
+     3244,
+     3282
+    ]
+   }
+  },
+  {
+   "id": 18,
+   "label": "RefillAndGet",
+   "instr_len": 36,
+   "module_count": 6,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18151,
+     18189
+    ],
+    "c.link": [
+     4957,
+     4995
+    ],
+    "c.opt": [
+     4024,
+     4062
+    ],
+    "c.pass1": [
+     12779,
+     12817
+    ],
+    "c.pass2": [
+     9337,
+     9375
+    ],
+    "c.prep": [
+     3758,
+     3796
+    ]
+   }
+  },
+  {
+   "id": 19,
+   "label": "stkcheck",
+   "instr_len": 34,
+   "module_count": 6,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     154,
+     191
+    ],
+    "c.link": [
+     193,
+     230
+    ],
+    "c.opt": [
+     167,
+     204
+    ],
+    "c.pass1": [
+     204,
+     241
+    ],
+    "c_asm": [
+     385,
+     450
+    ],
+    "cc1": [
+     166,
+     203
+    ]
+   }
+  },
+  {
+   "id": 20,
+   "label": "WriteLoop",
+   "instr_len": 29,
+   "module_count": 6,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18075,
+     18106
+    ],
+    "c.link": [
+     4880,
+     4911
+    ],
+    "c.pass1": [
+     12700,
+     12731
+    ],
+    "c.pass2": [
+     9261,
+     9292
+    ],
+    "c_asm": [
+     7992,
+     8023
+    ],
+    "cc1": [
+     2685,
+     2716
+    ]
+   }
+  },
+  {
+   "id": 21,
+   "label": "WriteLoop",
+   "instr_len": 21,
+   "module_count": 6,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     18071,
+     18093
+    ],
+    "c.link": [
+     4876,
+     4898
+    ],
+    "c.pass1": [
+     12696,
+     12718
+    ],
+    "c.pass2": [
+     9257,
+     9279
+    ],
+    "cc1": [
+     2681,
+     2703
+    ],
+    "make": [
+     5226,
+     5248
+    ]
+   }
+  },
+  {
+   "id": 22,
+   "label": "ClrBssLoop",
+   "instr_len": 115,
+   "module_count": 5,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     69,
+     193
+    ],
+    "c.link": [
+     108,
+     232
+    ],
+    "c.opt": [
+     82,
+     206
+    ],
+    "c.pass1": [
+     119,
+     243
+    ],
+    "cc1": [
+     81,
+     205
+    ]
+   }
+  },
+  {
+   "id": 23,
+   "label": "copybytes",
+   "instr_len": 112,
+   "module_count": 5,
+   "region": "cstart-head",
+   "members": {
+    "c.link": [
+     81,
+     198
+    ],
+    "c.opt": [
+     55,
+     172
+    ],
+    "c.pass1": [
+     92,
+     209
+    ],
+    "c.pass2": [
+     57,
+     174
+    ],
+    "cc1": [
+     54,
+     171
+    ]
+   }
+  },
+  {
+   "id": 24,
+   "label": "GetSizeLetter",
+   "instr_len": 107,
+   "module_count": 5,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17459,
+     17577
+    ],
+    "c.link": [
+     3607,
+     3725
+    ],
+    "c.pass1": [
+     12261,
+     12379
+    ],
+    "c.pass2": [
+     8670,
+     8788
+    ],
+    "cc1": [
+     1710,
+     1828
+    ]
+   }
+  },
+  {
+   "id": 25,
+   "label": "SbrkGrow",
+   "instr_len": 51,
+   "module_count": 5,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19908,
+     19962
+    ],
+    "c.link": [
+     6009,
+     6063
+    ],
+    "c.opt": [
+     4720,
+     4774
+    ],
+    "c.pass2": [
+     11041,
+     11095
+    ],
+    "cc1": [
+     3231,
+     3285
+    ]
+   }
+  },
+  {
+   "id": 26,
+   "label": "SeekErr",
+   "instr_len": 40,
+   "module_count": 5,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19877,
+     19919
+    ],
+    "c.opt": [
+     4689,
+     4731
+    ],
+    "c.pass1": [
+     13659,
+     13701
+    ],
+    "c.pass2": [
+     11010,
+     11052
+    ],
+    "c_asm": [
+     8852,
+     8894
+    ]
+   }
+  },
+  {
+   "id": 27,
+   "label": "RangeCompare2",
+   "instr_len": 37,
+   "module_count": 5,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17730,
+     17768
+    ],
+    "c.link": [
+     4536,
+     4574
+    ],
+    "c.pass2": [
+     8916,
+     8954
+    ],
+    "c_asm": [
+     7646,
+     7684
+    ],
+    "make": [
+     4900,
+     4938
+    ]
+   }
+  },
+  {
+   "id": 28,
+   "label": "ConvOctal",
+   "instr_len": 33,
+   "module_count": 5,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4241,
+     4274
+    ],
+    "c.prep": [
+     3253,
+     3286
+    ],
+    "c_asm": [
+     7350,
+     7383
+    ],
+    "cc1": [
+     2263,
+     2296
+    ],
+    "make": [
+     4618,
+     4651
+    ]
+   }
+  },
+  {
+   "id": 29,
+   "label": "EmitOneChar",
+   "instr_len": 32,
+   "module_count": 5,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4111,
+     4144
+    ],
+    "c.opt": [
+     3392,
+     3425
+    ],
+    "c.prep": [
+     3123,
+     3156
+    ],
+    "c_asm": [
+     7220,
+     7253
+    ],
+    "cc1": [
+     2133,
+     2166
+    ]
+   }
+  },
+  {
+   "id": 30,
+   "label": "EmitOneChar",
+   "instr_len": 31,
+   "module_count": 5,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4113,
+     4146
+    ],
+    "c.opt": [
+     3394,
+     3427
+    ],
+    "c_asm": [
+     7222,
+     7255
+    ],
+    "cc1": [
+     2135,
+     2168
+    ],
+    "make": [
+     4493,
+     4526
+    ]
+   }
+  },
+  {
+   "id": 31,
+   "label": "StrLenLoop2",
+   "instr_len": 25,
+   "module_count": 5,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     5220,
+     5246
+    ],
+    "c.opt": [
+     4287,
+     4313
+    ],
+    "c.prep": [
+     4012,
+     4038
+    ],
+    "c_asm": [
+     8321,
+     8347
+    ],
+    "cc1": [
+     2851,
+     2877
+    ]
+   }
+  },
+  {
+   "id": 32,
+   "label": "FormatScanLoop",
+   "instr_len": 24,
+   "module_count": 5,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     3889,
+     3914
+    ],
+    "c.opt": [
+     3172,
+     3197
+    ],
+    "c_asm": [
+     6998,
+     7023
+    ],
+    "cc1": [
+     1911,
+     1936
+    ],
+    "make": [
+     4279,
+     4304
+    ]
+   }
+  },
+  {
+   "id": 33,
+   "label": "ConvSignedDec",
+   "instr_len": 23,
+   "module_count": 5,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4147,
+     4170
+    ],
+    "c.opt": [
+     3428,
+     3451
+    ],
+    "c.prep": [
+     3159,
+     3182
+    ],
+    "c_asm": [
+     7256,
+     7279
+    ],
+    "cc1": [
+     2169,
+     2192
+    ]
+   }
+  },
+  {
+   "id": 34,
+   "label": "CheckRegBit",
+   "instr_len": 22,
+   "module_count": 5,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17669,
+     17692
+    ],
+    "c.link": [
+     4475,
+     4498
+    ],
+    "c.pass2": [
+     8855,
+     8878
+    ],
+    "c_asm": [
+     7584,
+     7607
+    ],
+    "make": [
+     4842,
+     4865
+    ]
+   }
+  },
+  {
+   "id": 35,
+   "label": "QueryFilePos",
+   "instr_len": 20,
+   "module_count": 5,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17834,
+     17854
+    ],
+    "c.link": [
+     4640,
+     4660
+    ],
+    "c.pass2": [
+     9020,
+     9040
+    ],
+    "c_asm": [
+     7752,
+     7772
+    ],
+    "make": [
+     5002,
+     5022
+    ]
+   }
+  },
+  {
+   "id": 36,
+   "label": "PutCharDone2",
+   "instr_len": 200,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17352,
+     17579
+    ],
+    "c.link": [
+     3500,
+     3727
+    ],
+    "c.pass1": [
+     12140,
+     12381
+    ],
+    "c.pass2": [
+     8523,
+     8790
+    ]
+   }
+  },
+  {
+   "id": 37,
+   "label": "copybytes",
+   "instr_len": 141,
+   "module_count": 4,
+   "region": "cstart-head",
+   "members": {
+    "c.link": [
+     81,
+     232
+    ],
+    "c.opt": [
+     55,
+     206
+    ],
+    "c.pass1": [
+     92,
+     243
+    ],
+    "cc1": [
+     54,
+     205
+    ]
+   }
+  },
+  {
+   "id": 38,
+   "label": "EvalDone",
+   "instr_len": 71,
+   "module_count": 4,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18283,
+     18359
+    ],
+    "c.pass1": [
+     12911,
+     12987
+    ],
+    "c.pass2": [
+     9469,
+     9545
+    ],
+    "cc1": [
+     2733,
+     2809
+    ]
+   }
+  },
+  {
+   "id": 39,
+   "label": "PutCharFileDone",
+   "instr_len": 68,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17351,
+     17427
+    ],
+    "c.opt": [
+     2820,
+     2898
+    ],
+    "c.pass1": [
+     12139,
+     12229
+    ],
+    "cc1": [
+     1601,
+     1678
+    ]
+   }
+  },
+  {
+   "id": 40,
+   "label": "CompareRanges",
+   "instr_len": 63,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17711,
+     17776
+    ],
+    "c.link": [
+     4517,
+     4582
+    ],
+    "c.pass2": [
+     8897,
+     8962
+    ],
+    "c_asm": [
+     7627,
+     7692
+    ]
+   }
+  },
+  {
+   "id": 41,
+   "label": "ReturnNoOp",
+   "instr_len": 57,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17649,
+     17709
+    ],
+    "c.link": [
+     4455,
+     4515
+    ],
+    "c.pass2": [
+     8835,
+     8895
+    ],
+    "c_asm": [
+     7564,
+     7624
+    ]
+   }
+  },
+  {
+   "id": 42,
+   "label": "ConvUnsignedDec",
+   "instr_len": 53,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4184,
+     4238
+    ],
+    "c.prep": [
+     3196,
+     3250
+    ],
+    "c_asm": [
+     7293,
+     7347
+    ],
+    "cc1": [
+     2206,
+     2260
+    ]
+   }
+  },
+  {
+   "id": 43,
+   "label": "ReportBufErr",
+   "instr_len": 46,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17812,
+     17860
+    ],
+    "c.link": [
+     4618,
+     4666
+    ],
+    "c.pass2": [
+     8998,
+     9046
+    ],
+    "c_asm": [
+     7730,
+     7778
+    ]
+   }
+  },
+  {
+   "id": 44,
+   "label": "ConvOctal",
+   "instr_len": 34,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4241,
+     4275
+    ],
+    "c.prep": [
+     3253,
+     3287
+    ],
+    "c_asm": [
+     7350,
+     7384
+    ],
+    "cc1": [
+     2263,
+     2297
+    ]
+   }
+  },
+  {
+   "id": 45,
+   "label": "StackOverflowErr",
+   "instr_len": 30,
+   "module_count": 4,
+   "region": "cstart-head",
+   "members": {
+    "c.link": [
+     203,
+     234
+    ],
+    "c.pass2": [
+     179,
+     210
+    ],
+    "c.prep": [
+     185,
+     218
+    ],
+    "cc1": [
+     176,
+     207
+    ]
+   }
+  },
+  {
+   "id": 46,
+   "label": "DecSubLoop",
+   "instr_len": 30,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4210,
+     4240
+    ],
+    "c_asm": [
+     7319,
+     7349
+    ],
+    "cc1": [
+     2232,
+     2262
+    ],
+    "make": [
+     4586,
+     4616
+    ]
+   }
+  },
+  {
+   "id": 47,
+   "label": "EmitBranch",
+   "instr_len": 29,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     16282,
+     16311
+    ],
+    "c.pass1": [
+     978,
+     1007
+    ],
+    "c.pass2": [
+     3669,
+     3698
+    ],
+    "cc1": [
+     415,
+     444
+    ]
+   }
+  },
+  {
+   "id": 48,
+   "label": "FloatConvert",
+   "instr_len": 29,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4038,
+     4069
+    ],
+    "c.prep": [
+     3050,
+     3081
+    ],
+    "cc1": [
+     2060,
+     2091
+    ],
+    "make": [
+     4423,
+     4454
+    ]
+   }
+  },
+  {
+   "id": 49,
+   "label": "CloseNull",
+   "instr_len": 29,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4782,
+     4813
+    ],
+    "c.opt": [
+     3848,
+     3879
+    ],
+    "c_asm": [
+     7894,
+     7925
+    ],
+    "cc1": [
+     2587,
+     2618
+    ]
+   }
+  },
+  {
+   "id": 50,
+   "label": "EmitIndexedRef2",
+   "instr_len": 28,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17696,
+     17725
+    ],
+    "c.link": [
+     4502,
+     4531
+    ],
+    "c.pass2": [
+     8882,
+     8911
+    ],
+    "make": [
+     4868,
+     4897
+    ]
+   }
+  },
+  {
+   "id": 51,
+   "label": "PrecDigitTest",
+   "instr_len": 27,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     3964,
+     3993
+    ],
+    "c.opt": [
+     3245,
+     3274
+    ],
+    "c.pass1": [
+     9148,
+     9177
+    ],
+    "cc1": [
+     1986,
+     2015
+    ]
+   }
+  },
+  {
+   "id": 52,
+   "label": "DecPowerTest",
+   "instr_len": 27,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4230,
+     4257
+    ],
+    "c.opt": [
+     3513,
+     3540
+    ],
+    "c_asm": [
+     7339,
+     7366
+    ],
+    "cc1": [
+     2252,
+     2279
+    ]
+   }
+  },
+  {
+   "id": 53,
+   "label": "CheckSeekResult",
+   "instr_len": 26,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17782,
+     17810
+    ],
+    "c.link": [
+     4588,
+     4616
+    ],
+    "c.pass2": [
+     8968,
+     8996
+    ],
+    "c_asm": [
+     7699,
+     7727
+    ]
+   }
+  },
+  {
+   "id": 54,
+   "label": "EvalInline",
+   "instr_len": 24,
+   "module_count": 4,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18255,
+     18280
+    ],
+    "c.pass1": [
+     12883,
+     12908
+    ],
+    "c.pass2": [
+     9441,
+     9466
+    ],
+    "make": [
+     5431,
+     5456
+    ]
+   }
+  },
+  {
+   "id": 55,
+   "label": "StrCat",
+   "instr_len": 22,
+   "module_count": 4,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18382,
+     18404
+    ],
+    "c.pass1": [
+     13010,
+     13032
+    ],
+    "c.pass2": [
+     9639,
+     9661
+    ],
+    "make": [
+     5591,
+     5613
+    ]
+   }
+  },
+  {
+   "id": 56,
+   "label": "StrCatScan",
+   "instr_len": 22,
+   "module_count": 4,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     5248,
+     5272
+    ],
+    "c.prep": [
+     4040,
+     4064
+    ],
+    "c_asm": [
+     8349,
+     8373
+    ],
+    "cc1": [
+     2879,
+     2903
+    ]
+   }
+  },
+  {
+   "id": 57,
+   "label": "MulInt32",
+   "instr_len": 401,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19517,
+     19958
+    ],
+    "c.pass1": [
+     13299,
+     13740
+    ],
+    "c.pass2": [
+     10650,
+     11091
+    ]
+   }
+  },
+  {
+   "id": 58,
+   "label": "SubstDone",
+   "instr_len": 307,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17635,
+     17965
+    ],
+    "c.link": [
+     4441,
+     4771
+    ],
+    "c.pass2": [
+     8823,
+     9151
+    ]
+   }
+  },
+  {
+   "id": 59,
+   "label": "ShiftRightDone",
+   "instr_len": 255,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19492,
+     19772
+    ],
+    "c.pass2": [
+     10625,
+     10905
+    ],
+    "c_asm": [
+     8480,
+     8751
+    ]
+   }
+  },
+  {
+   "id": 60,
+   "label": "EmitSeekDelta",
+   "instr_len": 251,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     17854,
+     18122
+    ],
+    "c.pass1": [
+     12479,
+     12747
+    ],
+    "c.pass2": [
+     9040,
+     9308
+    ]
+   }
+  },
+  {
+   "id": 61,
+   "label": "OutputCharField",
+   "instr_len": 129,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17077,
+     17214
+    ],
+    "c.pass1": [
+     9227,
+     9364
+    ],
+    "c.pass2": [
+     5272,
+     5409
+    ]
+   }
+  },
+  {
+   "id": 62,
+   "label": "FlushBuf",
+   "instr_len": 110,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18024,
+     18139
+    ],
+    "c.link": [
+     4829,
+     4944
+    ],
+    "c.pass2": [
+     9210,
+     9325
+    ]
+   }
+  },
+  {
+   "id": 63,
+   "label": "FlushNext",
+   "instr_len": 90,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4772,
+     4867
+    ],
+    "c.opt": [
+     3838,
+     3933
+    ],
+    "cc1": [
+     2577,
+     2672
+    ]
+   }
+  },
+  {
+   "id": 64,
+   "label": "PutCallWrite",
+   "instr_len": 76,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4700,
+     4780
+    ],
+    "c_asm": [
+     7812,
+     7892
+    ],
+    "cc1": [
+     2505,
+     2585
+    ]
+   }
+  },
+  {
+   "id": 65,
+   "label": "GetConvChar",
+   "instr_len": 64,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17005,
+     17075
+    ],
+    "c.pass1": [
+     9155,
+     9225
+    ],
+    "c.pass2": [
+     5200,
+     5270
+    ]
+   }
+  },
+  {
+   "id": 66,
+   "label": "RetNegOne",
+   "instr_len": 61,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4815,
+     4878
+    ],
+    "c_asm": [
+     7927,
+     7990
+    ],
+    "cc1": [
+     2620,
+     2683
+    ]
+   }
+  },
+  {
+   "id": 67,
+   "label": "FillBuf",
+   "instr_len": 59,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     5017,
+     5079
+    ],
+    "c.opt": [
+     4084,
+     4146
+    ],
+    "c_asm": [
+     8129,
+     8191
+    ]
+   }
+  },
+  {
+   "id": 68,
+   "label": "SetEndPtr",
+   "instr_len": 56,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18357,
+     18418
+    ],
+    "c.pass1": [
+     12985,
+     13046
+    ],
+    "c.pass2": [
+     9614,
+     9675
+    ]
+   }
+  },
+  {
+   "id": 69,
+   "label": "HexDigitLoop",
+   "instr_len": 51,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4286,
+     4341
+    ],
+    "c.prep": [
+     3298,
+     3353
+    ],
+    "cc1": [
+     2308,
+     2363
+    ]
+   }
+  },
+  {
+   "id": 70,
+   "label": "StoreHexChar",
+   "instr_len": 51,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17216,
+     17270
+    ],
+    "c.pass1": [
+     9366,
+     9420
+    ],
+    "c.pass2": [
+     5411,
+     5465
+    ]
+   }
+  },
+  {
+   "id": 71,
+   "label": "EmitInlineArgs",
+   "instr_len": 51,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     8847,
+     8901
+    ],
+    "c.pass1": [
+     8915,
+     8969
+    ],
+    "c.pass2": [
+     6915,
+     6969
+    ]
+   }
+  },
+  {
+   "id": 72,
+   "label": "ConvHex",
+   "instr_len": 49,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4278,
+     4329
+    ],
+    "cc1": [
+     2300,
+     2351
+    ],
+    "make": [
+     4657,
+     4708
+    ]
+   }
+  },
+  {
+   "id": 73,
+   "label": "HexAlphaAdj",
+   "instr_len": 46,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4296,
+     4345
+    ],
+    "c_asm": [
+     7405,
+     7454
+    ],
+    "cc1": [
+     2318,
+     2367
+    ]
+   }
+  },
+  {
+   "id": 74,
+   "label": "LongNeg",
+   "instr_len": 42,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.link": [
+     5525,
+     5569
+    ],
+    "c.pass1": [
+     13201,
+     13245
+    ],
+    "make": [
+     6321,
+     6364
+    ]
+   }
+  },
+  {
+   "id": 75,
+   "label": "FWriteDone",
+   "instr_len": 41,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     3831,
+     3875
+    ],
+    "c.opt": [
+     3114,
+     3158
+    ],
+    "c_asm": [
+     6940,
+     6984
+    ]
+   }
+  },
+  {
+   "id": 76,
+   "label": "OctCopyTest",
+   "instr_len": 40,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4270,
+     4312
+    ],
+    "c.opt": [
+     3553,
+     3595
+    ],
+    "cc1": [
+     2292,
+     2334
+    ]
+   }
+  },
+  {
+   "id": 77,
+   "label": "OpenForMode",
+   "instr_len": 39,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c_asm": [
+     6714,
+     6760
+    ],
+    "cc1": [
+     1673,
+     1719
+    ],
+    "make": [
+     3942,
+     3988
+    ]
+   }
+  },
+  {
+   "id": 78,
+   "label": "CntStrLoop",
+   "instr_len": 39,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17311,
+     17352
+    ],
+    "c.pass1": [
+     9461,
+     9502
+    ],
+    "c.pass2": [
+     5506,
+     5547
+    ]
+   }
+  },
+  {
+   "id": 79,
+   "label": "EmitLiteral",
+   "instr_len": 38,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     3882,
+     3922
+    ],
+    "c_asm": [
+     6991,
+     7031
+    ],
+    "cc1": [
+     1904,
+     1944
+    ]
+   }
+  },
+  {
+   "id": 80,
+   "label": "OutputLiteralChar",
+   "instr_len": 38,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     16918,
+     16958
+    ],
+    "c.pass1": [
+     9068,
+     9108
+    ],
+    "c.pass2": [
+     5111,
+     5151
+    ]
+   }
+  },
+  {
+   "id": 81,
+   "label": "FloatConvert",
+   "instr_len": 36,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4038,
+     4076
+    ],
+    "cc1": [
+     2060,
+     2098
+    ],
+    "make": [
+     4423,
+     4461
+    ]
+   }
+  },
+  {
+   "id": 82,
+   "label": "PadStrNext",
+   "instr_len": 34,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17272,
+     17309
+    ],
+    "c.pass1": [
+     9422,
+     9459
+    ],
+    "c.pass2": [
+     5467,
+     5504
+    ]
+   }
+  },
+  {
+   "id": 83,
+   "label": "EmitBranch",
+   "instr_len": 33,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     16284,
+     16317
+    ],
+    "c.pass1": [
+     8648,
+     8681
+    ],
+    "c.pass2": [
+     3671,
+     3704
+    ]
+   }
+  },
+  {
+   "id": 84,
+   "label": "ArenaAllocFail",
+   "instr_len": 33,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19962,
+     19999
+    ],
+    "c.pass1": [
+     13744,
+     13781
+    ],
+    "cc1": [
+     3333,
+     3370
+    ]
+   }
+  },
+  {
+   "id": 85,
+   "label": "StrNCmpDiff",
+   "instr_len": 32,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18501,
+     18533
+    ],
+    "c.link": [
+     5356,
+     5388
+    ],
+    "c.pass1": [
+     13129,
+     13161
+    ]
+   }
+  },
+  {
+   "id": 86,
+   "label": "StackOverflowErr",
+   "instr_len": 31,
+   "module_count": 3,
+   "region": "cstart-head",
+   "members": {
+    "c.link": [
+     203,
+     235
+    ],
+    "c.pass2": [
+     179,
+     211
+    ],
+    "cc1": [
+     176,
+     208
+    ]
+   }
+  },
+  {
+   "id": 87,
+   "label": "StrNCat",
+   "instr_len": 31,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18505,
+     18535
+    ],
+    "c.pass1": [
+     13133,
+     13163
+    ],
+    "make": [
+     5713,
+     5743
+    ]
+   }
+  },
+  {
+   "id": 88,
+   "label": "PutcStdout",
+   "instr_len": 30,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.opt": [
+     3714,
+     3747
+    ],
+    "c.prep": [
+     3443,
+     3477
+    ],
+    "cc1": [
+     2453,
+     2486
+    ]
+   }
+  },
+  {
+   "id": 89,
+   "label": "LongModifier",
+   "instr_len": 30,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.prep": [
+     3971,
+     4010
+    ],
+    "c_asm": [
+     8282,
+     8319
+    ],
+    "cc1": [
+     2812,
+     2849
+    ]
+   }
+  },
+  {
+   "id": 90,
+   "label": "StrCmpLoop",
+   "instr_len": 30,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18430,
+     18461
+    ],
+    "c.link": [
+     5284,
+     5315
+    ],
+    "c.pass1": [
+     13058,
+     13089
+    ]
+   }
+  },
+  {
+   "id": 91,
+   "label": "StrNCpy",
+   "instr_len": 29,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18434,
+     18464
+    ],
+    "c.pass1": [
+     13062,
+     13092
+    ],
+    "make": [
+     5642,
+     5672
+    ]
+   }
+  },
+  {
+   "id": 92,
+   "label": "StrCpyDone",
+   "instr_len": 28,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18404,
+     18434
+    ],
+    "c.pass1": [
+     13032,
+     13062
+    ],
+    "c_asm": [
+     8359,
+     8389
+    ]
+   }
+  },
+  {
+   "id": 93,
+   "label": "InternalErr",
+   "instr_len": 28,
+   "module_count": 3,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     486,
+     514
+    ],
+    "c.pass1": [
+     353,
+     381
+    ],
+    "c.pass2": [
+     8011,
+     8039
+    ]
+   }
+  },
+  {
+   "id": 94,
+   "label": "SetupIntercept",
+   "instr_len": 27,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     20001,
+     20031
+    ],
+    "c.link": [
+     6065,
+     6095
+    ],
+    "c.pass1": [
+     13783,
+     13813
+    ]
+   }
+  },
+  {
+   "id": 95,
+   "label": "CopyDone",
+   "instr_len": 27,
+   "module_count": 3,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19379,
+     19408
+    ],
+    "c.pass2": [
+     10513,
+     10542
+    ],
+    "make": [
+     6281,
+     6310
+    ]
+   }
+  },
+  {
+   "id": 96,
+   "label": "StrCmp",
+   "instr_len": 26,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     5258,
+     5285
+    ],
+    "c.pass2": [
+     9661,
+     9688
+    ],
+    "cc1": [
+     2889,
+     2916
+    ]
+   }
+  },
+  {
+   "id": 97,
+   "label": "WidthDigitLoop",
+   "instr_len": 25,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     3924,
+     3949
+    ],
+    "cc1": [
+     1946,
+     1971
+    ],
+    "make": [
+     4314,
+     4339
+    ]
+   }
+  },
+  {
+   "id": 98,
+   "label": "OpDispatch2",
+   "instr_len": 25,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     12259,
+     12283
+    ],
+    "c.pass2": [
+     1614,
+     1638
+    ],
+    "make": [
+     443,
+     467
+    ]
+   }
+  },
+  {
+   "id": 99,
+   "label": "WidthDigitTest",
+   "instr_len": 23,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     3937,
+     3960
+    ],
+    "c.pass1": [
+     9122,
+     9145
+    ],
+    "make": [
+     4327,
+     4350
+    ]
+   }
+  },
+  {
+   "id": 100,
+   "label": "PadRightTest",
+   "instr_len": 22,
+   "module_count": 3,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4374,
+     4397
+    ],
+    "c_asm": [
+     7483,
+     7506
+    ],
+    "cc1": [
+     2396,
+     2419
+    ]
+   }
+  },
+  {
+   "id": 101,
+   "label": "PutCharDone",
+   "instr_len": 22,
+   "module_count": 3,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     620,
+     643
+    ],
+    "c.pass1": [
+     487,
+     510
+    ],
+    "c.pass2": [
+     8233,
+     8256
+    ]
+   }
+  },
+  {
+   "id": 102,
+   "label": "DigitCheckDone",
+   "instr_len": 2014,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     11854,
+     14151
+    ],
+    "c.pass2": [
+     1275,
+     3506
+    ]
+   }
+  },
+  {
+   "id": 103,
+   "label": "ArgLoop2",
+   "instr_len": 1348,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     1359,
+     2838
+    ],
+    "c.pass1": [
+     1226,
+     2705
+    ]
+   }
+  },
+  {
+   "id": 104,
+   "label": "GenNode51Match",
+   "instr_len": 1251,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     3293,
+     4701
+    ],
+    "c.pass1": [
+     3160,
+     4568
+    ]
+   }
+  },
+  {
+   "id": 105,
+   "label": "TypesMatchOk",
+   "instr_len": 1101,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     14896,
+     16121
+    ],
+    "c.pass1": [
+     6340,
+     7565
+    ]
+   }
+  },
+  {
+   "id": 106,
+   "label": "BuildByteType",
+   "instr_len": 776,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18606,
+     19429
+    ],
+    "c.pass2": [
+     9740,
+     10562
+    ]
+   }
+  },
+  {
+   "id": 107,
+   "label": "LoadMemberNode",
+   "instr_len": 774,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     8264,
+     9138
+    ],
+    "c.pass2": [
+     6332,
+     7206
+    ]
+   }
+  },
+  {
+   "id": 108,
+   "label": "SubstDone",
+   "instr_len": 675,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     17633,
+     18359
+    ],
+    "c.pass2": [
+     8821,
+     9545
+    ]
+   }
+  },
+  {
+   "id": 109,
+   "label": "MinusOpTok",
+   "instr_len": 621,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     10569,
+     11225
+    ],
+    "c.pass1": [
+     9905,
+     10561
+    ]
+   }
+  },
+  {
+   "id": 110,
+   "label": "FloatTypeRet",
+   "instr_len": 489,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     14135,
+     14675
+    ],
+    "c.pass1": [
+     5569,
+     6119
+    ]
+   }
+  },
+  {
+   "id": 111,
+   "label": "SignExtendTo32",
+   "instr_len": 472,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19444,
+     19962
+    ],
+    "c.pass2": [
+     10577,
+     11095
+    ]
+   }
+  },
+  {
+   "id": 112,
+   "label": "RetPop2",
+   "instr_len": 425,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     16079,
+     16573
+    ],
+    "c.pass2": [
+     3490,
+     3960
+    ]
+   }
+  },
+  {
+   "id": 113,
+   "label": "GenTempSlot",
+   "instr_len": 411,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     7813,
+     8261
+    ],
+    "c.pass2": [
+     5882,
+     6330
+    ]
+   }
+  },
+  {
+   "id": 114,
+   "label": "FlushExit",
+   "instr_len": 404,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18120,
+     18553
+    ],
+    "c.pass1": [
+     12748,
+     13181
+    ]
+   }
+  },
+  {
+   "id": 115,
+   "label": "LongMulAccHigh",
+   "instr_len": 352,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.opt": [
+     4398,
+     4790
+    ],
+    "c.pass2": [
+     10718,
+     11111
+    ]
+   }
+  },
+  {
+   "id": 116,
+   "label": "AllocZeroLoop",
+   "instr_len": 333,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     406,
+     767
+    ],
+    "c.pass1": [
+     273,
+     634
+    ]
+   }
+  },
+  {
+   "id": 117,
+   "label": "PrecisionScan",
+   "instr_len": 327,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     16998,
+     17352
+    ],
+    "c.pass2": [
+     5193,
+     5547
+    ]
+   }
+  },
+  {
+   "id": 118,
+   "label": "EmitOneChar",
+   "instr_len": 311,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4110,
+     4446
+    ],
+    "cc1": [
+     2132,
+     2468
+    ]
+   }
+  },
+  {
+   "id": 119,
+   "label": "CheckRightConst",
+   "instr_len": 301,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     5984,
+     6302
+    ],
+    "c.pass2": [
+     4382,
+     4700
+    ]
+   }
+  },
+  {
+   "id": 120,
+   "label": "EmitExternRef",
+   "instr_len": 288,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     6705,
+     7016
+    ],
+    "c.pass1": [
+     7619,
+     7930
+    ]
+   }
+  },
+  {
+   "id": 121,
+   "label": "RetEmitValue",
+   "instr_len": 273,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     5479,
+     5793
+    ],
+    "c.pass1": [
+     5281,
+     5595
+    ]
+   }
+  },
+  {
+   "id": 122,
+   "label": "FillCaseNode",
+   "instr_len": 272,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     5102,
+     5382
+    ],
+    "c.pass1": [
+     4969,
+     5249
+    ]
+   }
+  },
+  {
+   "id": 123,
+   "label": "IntToLong",
+   "instr_len": 270,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.link": [
+     5549,
+     5847
+    ],
+    "c_asm": [
+     8464,
+     8750
+    ]
+   }
+  },
+  {
+   "id": 124,
+   "label": "EmitConstResult",
+   "instr_len": 256,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     6375,
+     6648
+    ],
+    "c.pass2": [
+     4790,
+     5063
+    ]
+   }
+  },
+  {
+   "id": 125,
+   "label": "TellSubBuf",
+   "instr_len": 250,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4660,
+     4927
+    ],
+    "cc1": [
+     2463,
+     2732
+    ]
+   }
+  },
+  {
+   "id": 126,
+   "label": "PutCharDone2",
+   "instr_len": 229,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17352,
+     17610
+    ],
+    "c.link": [
+     3500,
+     3758
+    ]
+   }
+  },
+  {
+   "id": 127,
+   "label": "PutCharFile",
+   "instr_len": 223,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17349,
+     17601
+    ],
+    "c.pass1": [
+     12137,
+     12403
+    ]
+   }
+  },
+  {
+   "id": 128,
+   "label": "StrScanTest",
+   "instr_len": 212,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c_asm": [
+     7177,
+     7403
+    ],
+    "cc1": [
+     2090,
+     2316
+    ]
+   }
+  },
+  {
+   "id": 129,
+   "label": "EmitRegisterField",
+   "instr_len": 201,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     9342,
+     9575
+    ],
+    "c.pass2": [
+     7409,
+     7642
+    ]
+   }
+  },
+  {
+   "id": 130,
+   "label": "EmitCharDecimal",
+   "instr_len": 193,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     11645,
+     11947
+    ],
+    "c.pass1": [
+     10867,
+     11158
+    ]
+   }
+  },
+  {
+   "id": 131,
+   "label": "NameSearchLoop",
+   "instr_len": 187,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     769,
+     984
+    ],
+    "c.pass1": [
+     636,
+     851
+    ]
+   }
+  },
+  {
+   "id": 132,
+   "label": "GetStatSys",
+   "instr_len": 155,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c_asm": [
+     8677,
+     8850
+    ],
+    "cc1": [
+     2992,
+     3168
+    ]
+   }
+  },
+  {
+   "id": 133,
+   "label": "copybytes",
+   "instr_len": 146,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.link": [
+     81,
+     237
+    ],
+    "cc1": [
+     54,
+     210
+    ]
+   }
+  },
+  {
+   "id": 134,
+   "label": "GetByte",
+   "instr_len": 134,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4945,
+     5089
+    ],
+    "c.opt": [
+     4012,
+     4156
+    ]
+   }
+  },
+  {
+   "id": 135,
+   "label": "GenRelOp",
+   "instr_len": 127,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     3033,
+     3169
+    ],
+    "c.pass1": [
+     2900,
+     3036
+    ]
+   }
+  },
+  {
+   "id": 136,
+   "label": "FillInitElements",
+   "instr_len": 121,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     7016,
+     7147
+    ],
+    "c.pass1": [
+     7931,
+     8062
+    ]
+   }
+  },
+  {
+   "id": 137,
+   "label": "FatalError",
+   "instr_len": 118,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.opt": [
+     2814,
+     2950
+    ],
+    "c.pass1": [
+     12133,
+     12281
+    ]
+   }
+  },
+  {
+   "id": 138,
+   "label": "BuildEmptyAssign",
+   "instr_len": 118,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     14677,
+     14801
+    ],
+    "c.pass1": [
+     6121,
+     6245
+    ]
+   }
+  },
+  {
+   "id": 139,
+   "label": "EmitPaddedString",
+   "instr_len": 110,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4069,
+     4187
+    ],
+    "c.opt": [
+     3350,
+     3468
+    ]
+   }
+  },
+  {
+   "id": 140,
+   "label": "PutcRet",
+   "instr_len": 109,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.opt": [
+     3707,
+     3824
+    ],
+    "cc1": [
+     2446,
+     2563
+    ]
+   }
+  },
+  {
+   "id": 141,
+   "label": "GenNode5ATest",
+   "instr_len": 108,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     3171,
+     3283
+    ],
+    "c.pass1": [
+     3038,
+     3150
+    ]
+   }
+  },
+  {
+   "id": 142,
+   "label": "CmpLess",
+   "instr_len": 106,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.link": [
+     5517,
+     5630
+    ],
+    "make": [
+     6313,
+     6425
+    ]
+   }
+  },
+  {
+   "id": 143,
+   "label": "DoAllocBuf",
+   "instr_len": 104,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.prep": [
+     3945,
+     4065
+    ],
+    "cc1": [
+     2786,
+     2904
+    ]
+   }
+  },
+  {
+   "id": 144,
+   "label": "FindFreeStream",
+   "instr_len": 103,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c_asm": [
+     6648,
+     6764
+    ],
+    "cc1": [
+     1607,
+     1723
+    ]
+   }
+  },
+  {
+   "id": 145,
+   "label": "FlushBuffer",
+   "instr_len": 96,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.pass1": [
+     12649,
+     12751
+    ],
+    "cc1": [
+     2634,
+     2736
+    ]
+   }
+  },
+  {
+   "id": 146,
+   "label": "StmtDispatchLoop",
+   "instr_len": 95,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     10288,
+     10395
+    ],
+    "c.pass1": [
+     9624,
+     9731
+    ]
+   }
+  },
+  {
+   "id": 147,
+   "label": "SetupBuf",
+   "instr_len": 92,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     5093,
+     5193
+    ],
+    "cc1": [
+     2735,
+     2835
+    ]
+   }
+  },
+  {
+   "id": 148,
+   "label": "EmitCmpImm",
+   "instr_len": 92,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     16678,
+     16786
+    ],
+    "c.pass2": [
+     4064,
+     4172
+    ]
+   }
+  },
+  {
+   "id": 149,
+   "label": "OperRegA",
+   "instr_len": 90,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.opt": [
+     2953,
+     3053
+    ],
+    "cc1": [
+     1731,
+     1831
+    ]
+   }
+  },
+  {
+   "id": 150,
+   "label": "FormatScanLoop",
+   "instr_len": 89,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     3885,
+     3979
+    ],
+    "make": [
+     4275,
+     4369
+    ]
+   }
+  },
+  {
+   "id": 151,
+   "label": "EmitStmtRet",
+   "instr_len": 89,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     5767,
+     5887
+    ],
+    "c.pass2": [
+     4176,
+     4274
+    ]
+   }
+  },
+  {
+   "id": 152,
+   "label": "PrintfToBuf",
+   "instr_len": 89,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     16870,
+     16965
+    ],
+    "c.pass2": [
+     5063,
+     5158
+    ]
+   }
+  },
+  {
+   "id": 153,
+   "label": "CreateExisting",
+   "instr_len": 87,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.prep": [
+     4327,
+     4424
+    ],
+    "cc1": [
+     3106,
+     3203
+    ]
+   }
+  },
+  {
+   "id": 154,
+   "label": "LoadConvChar",
+   "instr_len": 86,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c_asm": [
+     7080,
+     7173
+    ],
+    "cc1": [
+     1993,
+     2086
+    ]
+   }
+  },
+  {
+   "id": 155,
+   "label": "PrecDigitTest",
+   "instr_len": 85,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     3964,
+     4056
+    ],
+    "c.opt": [
+     3245,
+     3337
+    ]
+   }
+  },
+  {
+   "id": 156,
+   "label": "FormatToScratch",
+   "instr_len": 82,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c_asm": [
+     6944,
+     7032
+    ],
+    "cc1": [
+     1857,
+     1945
+    ]
+   }
+  },
+  {
+   "id": 157,
+   "label": "HandleLineFile",
+   "instr_len": 82,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     7436,
+     7521
+    ],
+    "c.pass1": [
+     11277,
+     11362
+    ]
+   }
+  },
+  {
+   "id": 158,
+   "label": "GenNode65MakeConst",
+   "instr_len": 80,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     2943,
+     3031
+    ],
+    "c.pass1": [
+     2810,
+     2898
+    ]
+   }
+  },
+  {
+   "id": 159,
+   "label": "BuildSizeofNode",
+   "instr_len": 79,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     1103,
+     1185
+    ],
+    "c.pass1": [
+     970,
+     1052
+    ]
+   }
+  },
+  {
+   "id": 160,
+   "label": "StrToFpDone",
+   "instr_len": 78,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     16790,
+     16870
+    ],
+    "c.pass1": [
+     9502,
+     9584
+    ]
+   }
+  },
+  {
+   "id": 161,
+   "label": "GenAddrRefOp",
+   "instr_len": 77,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     5888,
+     5970
+    ],
+    "c.pass2": [
+     4280,
+     4362
+    ]
+   }
+  },
+  {
+   "id": 162,
+   "label": "AddInt32",
+   "instr_len": 76,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19381,
+     19463
+    ],
+    "c_asm": [
+     8404,
+     8482
+    ]
+   }
+  },
+  {
+   "id": 163,
+   "label": "EmitLocalLabel",
+   "instr_len": 76,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     9580,
+     9930
+    ],
+    "c.pass2": [
+     7643,
+     7993
+    ]
+   }
+  },
+  {
+   "id": 164,
+   "label": "LongNot",
+   "instr_len": 74,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.pass1": [
+     13218,
+     13297
+    ],
+    "c.pass2": [
+     10569,
+     10648
+    ]
+   }
+  },
+  {
+   "id": 165,
+   "label": "GotData",
+   "instr_len": 72,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     5091,
+     5168
+    ],
+    "c.opt": [
+     4158,
+     4235
+    ]
+   }
+  },
+  {
+   "id": 166,
+   "label": "GenConstCompare",
+   "instr_len": 71,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     16588,
+     16662
+    ],
+    "c.pass2": [
+     3974,
+     4048
+    ]
+   }
+  },
+  {
+   "id": 167,
+   "label": "SelectFormat",
+   "instr_len": 70,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     5170,
+     5259
+    ],
+    "c.opt": [
+     4237,
+     4326
+    ]
+   }
+  },
+  {
+   "id": 168,
+   "label": "StrLen",
+   "instr_len": 67,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     5214,
+     5285
+    ],
+    "cc1": [
+     2845,
+     2916
+    ]
+   }
+  },
+  {
+   "id": 169,
+   "label": "EmitRefExpr",
+   "instr_len": 67,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     7176,
+     7252
+    ],
+    "c.pass1": [
+     8087,
+     8163
+    ]
+   }
+  },
+  {
+   "id": 170,
+   "label": "ReadLineExit",
+   "instr_len": 66,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     7644,
+     7733
+    ],
+    "c.pass2": [
+     5738,
+     5808
+    ]
+   }
+  },
+  {
+   "id": 171,
+   "label": "MulInt",
+   "instr_len": 65,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "cc1": [
+     2924,
+     2990
+    ],
+    "make": [
+     6387,
+     6454
+    ]
+   }
+  },
+  {
+   "id": 172,
+   "label": "FWriteByteLoop",
+   "instr_len": 65,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     3811,
+     3880
+    ],
+    "c_asm": [
+     6920,
+     6989
+    ]
+   }
+  },
+  {
+   "id": 173,
+   "label": "AddConstJoin",
+   "instr_len": 64,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     6303,
+     6377
+    ],
+    "c.pass2": [
+     4710,
+     4784
+    ]
+   }
+  },
+  {
+   "id": 174,
+   "label": "Fopen",
+   "instr_len": 62,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.pass1": [
+     12345,
+     12412
+    ],
+    "c_asm": [
+     6835,
+     6902
+    ]
+   }
+  },
+  {
+   "id": 175,
+   "label": "GetcOrFlags",
+   "instr_len": 61,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.opt": [
+     4148,
+     4213
+    ],
+    "c_asm": [
+     8193,
+     8258
+    ]
+   }
+  },
+  {
+   "id": 176,
+   "label": "ArenaAllocFail",
+   "instr_len": 61,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     19961,
+     20031
+    ],
+    "c.pass1": [
+     13743,
+     13813
+    ]
+   }
+  },
+  {
+   "id": 177,
+   "label": "ShlLoop",
+   "instr_len": 59,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.prep": [
+     4210,
+     4277
+    ],
+    "cc1": [
+     2987,
+     3054
+    ]
+   }
+  },
+  {
+   "id": 178,
+   "label": "FloatSetExp",
+   "instr_len": 59,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     11258,
+     11319
+    ],
+    "c.pass1": [
+     10584,
+     10645
+    ]
+   }
+  },
+  {
+   "id": 179,
+   "label": "CopyByteTest3",
+   "instr_len": 58,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.link": [
+     5484,
+     5547
+    ],
+    "c_asm": [
+     8401,
+     8462
+    ]
+   }
+  },
+  {
+   "id": 180,
+   "label": "GenReturnEmit",
+   "instr_len": 58,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     7738,
+     7808
+    ],
+    "c.pass2": [
+     5810,
+     5880
+    ]
+   }
+  },
+  {
+   "id": 181,
+   "label": "EmitOperand2",
+   "instr_len": 55,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     9200,
+     9258
+    ],
+    "c.pass2": [
+     7264,
+     7322
+    ]
+   }
+  },
+  {
+   "id": 182,
+   "label": "TestSkipTok",
+   "instr_len": 55,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     7310,
+     7382
+    ],
+    "c.pass1": [
+     11076,
+     11216
+    ]
+   }
+  },
+  {
+   "id": 183,
+   "label": "FloatConvert",
+   "instr_len": 54,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4037,
+     4096
+    ],
+    "cc1": [
+     2059,
+     2118
+    ]
+   }
+  },
+  {
+   "id": 184,
+   "label": "Pow10Copy",
+   "instr_len": 54,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     11471,
+     11530
+    ],
+    "c.pass1": [
+     10715,
+     10774
+    ]
+   }
+  },
+  {
+   "id": 185,
+   "label": "ApplyDecExp",
+   "instr_len": 53,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     11342,
+     11401
+    ],
+    "c.pass1": [
+     10658,
+     10717
+    ]
+   }
+  },
+  {
+   "id": 186,
+   "label": "IfCheckElse",
+   "instr_len": 52,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     4800,
+     4852
+    ],
+    "c.pass1": [
+     4667,
+     4719
+    ]
+   }
+  },
+  {
+   "id": 187,
+   "label": "TypeWalkDone",
+   "instr_len": 52,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     6643,
+     6703
+    ],
+    "c.pass1": [
+     7522,
+     7616
+    ]
+   }
+  },
+  {
+   "id": 188,
+   "label": "Op46Emit",
+   "instr_len": 51,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     2881,
+     2934
+    ],
+    "c.pass1": [
+     2748,
+     2801
+    ]
+   }
+  },
+  {
+   "id": 189,
+   "label": "FlushLoopAdvance",
+   "instr_len": 50,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.opt": [
+     3956,
+     4010
+    ],
+    "c.pass1": [
+     12712,
+     12766
+    ]
+   }
+  },
+  {
+   "id": 190,
+   "label": "GenLongDefault",
+   "instr_len": 47,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     8572,
+     8619
+    ],
+    "c.pass2": [
+     806,
+     853
+    ]
+   }
+  },
+  {
+   "id": 191,
+   "label": "CompileSwitch",
+   "instr_len": 47,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     4936,
+     4987
+    ],
+    "c.pass1": [
+     4803,
+     4854
+    ]
+   }
+  },
+  {
+   "id": 192,
+   "label": "PushCompareArgs",
+   "instr_len": 47,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     14842,
+     14894
+    ],
+    "c.pass1": [
+     6286,
+     6338
+    ]
+   }
+  },
+  {
+   "id": 193,
+   "label": "BuildMemberNode",
+   "instr_len": 46,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     1265,
+     1314
+    ],
+    "c.pass1": [
+     1132,
+     1181
+    ]
+   }
+  },
+  {
+   "id": 194,
+   "label": "EvalExprStmt",
+   "instr_len": 46,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     4704,
+     4753
+    ],
+    "c.pass1": [
+     4571,
+     4620
+    ]
+   }
+  },
+  {
+   "id": 195,
+   "label": "InitCopyLoop",
+   "instr_len": 45,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.prep": [
+     2610,
+     2662
+    ],
+    "cc1": [
+     1593,
+     1645
+    ]
+   }
+  },
+  {
+   "id": 196,
+   "label": "AdvanceOffset",
+   "instr_len": 45,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.pass1": [
+     9009,
+     9066
+    ],
+    "c.pass2": [
+     5058,
+     5109
+    ]
+   }
+  },
+  {
+   "id": 197,
+   "label": "LongMul",
+   "instr_len": 44,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.opt": [
+     4354,
+     4398
+    ],
+    "c.pass1": [
+     13293,
+     13337
+    ]
+   }
+  },
+  {
+   "id": 198,
+   "label": "PrecDigitLoop",
+   "instr_len": 43,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     3951,
+     3997
+    ],
+    "cc1": [
+     1973,
+     2019
+    ]
+   }
+  },
+  {
+   "id": 199,
+   "label": "FlushError",
+   "instr_len": 43,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4913,
+     4959
+    ],
+    "c_asm": [
+     8025,
+     8071
+    ]
+   }
+  },
+  {
+   "id": 200,
+   "label": "CopyHiBitLoop",
+   "instr_len": 41,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.comp": [
+     18553,
+     18604
+    ],
+    "c.pass2": [
+     9688,
+     9738
+    ]
+   }
+  },
+  {
+   "id": 201,
+   "label": "CompileIf",
+   "instr_len": 41,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     4756,
+     4797
+    ],
+    "c.pass1": [
+     4623,
+     4664
+    ]
+   }
+  },
+  {
+   "id": 202,
+   "label": "FillBufAlloc",
+   "instr_len": 40,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.opt": [
+     4215,
+     4260
+    ],
+    "c_asm": [
+     8260,
+     8305
+    ]
+   }
+  },
+  {
+   "id": 203,
+   "label": "FormatXDone",
+   "instr_len": 40,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.pass1": [
+     12436,
+     12481
+    ],
+    "c_asm": [
+     6901,
+     6944
+    ]
+   }
+  },
+  {
+   "id": 204,
+   "label": "PrecDigit",
+   "instr_len": 39,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.pass2": [
+     5181,
+     5222
+    ],
+    "c_asm": [
+     7061,
+     7102
+    ]
+   }
+  },
+  {
+   "id": 205,
+   "label": "ReadLineEofRet",
+   "instr_len": 39,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     7603,
+     7666
+    ],
+    "c.pass1": [
+     11438,
+     11501
+    ]
+   }
+  },
+  {
+   "id": 206,
+   "label": "ErrCheckFatal",
+   "instr_len": 38,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     7526,
+     7567
+    ],
+    "c.pass1": [
+     11364,
+     11405
+    ]
+   }
+  },
+  {
+   "id": 207,
+   "label": "PipeOpTok",
+   "instr_len": 38,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     10444,
+     10488
+    ],
+    "c.pass1": [
+     9780,
+     9824
+    ]
+   }
+  },
+  {
+   "id": 208,
+   "label": "ArgLoopNext",
+   "instr_len": 38,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     314,
+     353
+    ],
+    "c.pass1": [
+     12090,
+     12129
+    ]
+   }
+  },
+  {
+   "id": 209,
+   "label": "WriteStringLoop",
+   "instr_len": 37,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     3757,
+     3797
+    ],
+    "c.pass2": [
+     8787,
+     8827
+    ]
+   }
+  },
+  {
+   "id": 210,
+   "label": "BuildPostIncDec",
+   "instr_len": 37,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     1317,
+     1356
+    ],
+    "c.pass1": [
+     1184,
+     1223
+    ]
+   }
+  },
+  {
+   "id": 211,
+   "label": "BuildSubscript",
+   "instr_len": 36,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     1222,
+     1259
+    ],
+    "c.pass1": [
+     1089,
+     1126
+    ]
+   }
+  },
+  {
+   "id": 212,
+   "label": "EmitVsectRmb",
+   "instr_len": 35,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     9943,
+     9980
+    ],
+    "c.pass1": [
+     11511,
+     11548
+    ]
+   }
+  },
+  {
+   "id": 213,
+   "label": "OptDispatch",
+   "instr_len": 34,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     277,
+     313
+    ],
+    "c.pass1": [
+     12051,
+     12087
+    ]
+   }
+  },
+  {
+   "id": 214,
+   "label": "PadCheck",
+   "instr_len": 34,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     5321,
+     5357
+    ],
+    "make": [
+     5674,
+     5710
+    ]
+   }
+  },
+  {
+   "id": 215,
+   "label": "WhileEmitTest",
+   "instr_len": 34,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     4877,
+     4911
+    ],
+    "c.pass1": [
+     4744,
+     4778
+    ]
+   }
+  },
+  {
+   "id": 216,
+   "label": "DispatchTypeSize",
+   "instr_len": 34,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     7271,
+     7324
+    ],
+    "c.pass1": [
+     8185,
+     8238
+    ]
+   }
+  },
+  {
+   "id": 217,
+   "label": "OptCharLoad",
+   "instr_len": 34,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     227,
+     265
+    ],
+    "c.pass1": [
+     11999,
+     12037
+    ]
+   }
+  },
+  {
+   "id": 218,
+   "label": "EmitInstrLine",
+   "instr_len": 33,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     9164,
+     9197
+    ],
+    "c.pass2": [
+     7228,
+     7261
+    ]
+   }
+  },
+  {
+   "id": 219,
+   "label": "TypeChkTest",
+   "instr_len": 33,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     2843,
+     2876
+    ],
+    "c.pass1": [
+     2710,
+     2743
+    ]
+   }
+  },
+  {
+   "id": 220,
+   "label": "HandlePostAssign",
+   "instr_len": 32,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     14803,
+     14840
+    ],
+    "c.pass1": [
+     6247,
+     6284
+    ]
+   }
+  },
+  {
+   "id": 221,
+   "label": "RetWidenInt",
+   "instr_len": 31,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     5443,
+     5477
+    ],
+    "c.pass2": [
+     1211,
+     1245
+    ]
+   }
+  },
+  {
+   "id": 222,
+   "label": "EmitSwitchDispatch",
+   "instr_len": 31,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     5005,
+     5036
+    ],
+    "c.pass1": [
+     4872,
+     4903
+    ]
+   }
+  },
+  {
+   "id": 223,
+   "label": "EmitStringBody",
+   "instr_len": 31,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     11542,
+     11575
+    ],
+    "c.pass1": [
+     10795,
+     10828
+    ]
+   }
+  },
+  {
+   "id": 224,
+   "label": "CaseEntryLoopTest",
+   "instr_len": 30,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     5039,
+     5069
+    ],
+    "c.pass1": [
+     4906,
+     4936
+    ]
+   }
+  },
+  {
+   "id": 225,
+   "label": "main",
+   "instr_len": 30,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     193,
+     224
+    ],
+    "c.pass1": [
+     11961,
+     11992
+    ]
+   }
+  },
+  {
+   "id": 226,
+   "label": "ReadInitVar",
+   "instr_len": 29,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.prep": [
+     2579,
+     2608
+    ],
+    "cc1": [
+     1562,
+     1591
+    ]
+   }
+  },
+  {
+   "id": 227,
+   "label": "ParseStatement2",
+   "instr_len": 29,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     10248,
+     10278
+    ],
+    "c.pass1": [
+     9584,
+     9614
+    ]
+   }
+  },
+  {
+   "id": 228,
+   "label": "ParseDecimalBody",
+   "instr_len": 29,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     7569,
+     7598
+    ],
+    "c.pass1": [
+     11407,
+     11436
+    ]
+   }
+  },
+  {
+   "id": 229,
+   "label": "RetEmitLoad",
+   "instr_len": 28,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     5408,
+     5438
+    ],
+    "c.pass2": [
+     1176,
+     1206
+    ]
+   }
+  },
+  {
+   "id": 230,
+   "label": "EmitStringByte",
+   "instr_len": 28,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     11595,
+     11623
+    ],
+    "c.pass2": [
+     8479,
+     8507
+    ]
+   }
+  },
+  {
+   "id": 231,
+   "label": "ParsePrefixOp",
+   "instr_len": 28,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     1039,
+     1068
+    ],
+    "c.pass1": [
+     906,
+     935
+    ]
+   }
+  },
+  {
+   "id": 232,
+   "label": "OptUnknown",
+   "instr_len": 26,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.link": [
+     369,
+     395
+    ],
+    "cc1": [
+     411,
+     437
+    ]
+   }
+  },
+  {
+   "id": 233,
+   "label": "SPadRightTest",
+   "instr_len": 26,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     4423,
+     4453
+    ],
+    "c_asm": [
+     7532,
+     7562
+    ]
+   }
+  },
+  {
+   "id": 234,
+   "label": "EmitFuncPrologue",
+   "instr_len": 26,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     10031,
+     10056
+    ],
+    "c.pass2": [
+     8387,
+     8412
+    ]
+   }
+  },
+  {
+   "id": 235,
+   "label": "AllocBlk",
+   "instr_len": 26,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     376,
+     402
+    ],
+    "c.pass1": [
+     243,
+     269
+    ]
+   }
+  },
+  {
+   "id": 236,
+   "label": "MakeErrNode",
+   "instr_len": 26,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     1010,
+     1036
+    ],
+    "c.pass1": [
+     877,
+     903
+    ]
+   }
+  },
+  {
+   "id": 237,
+   "label": "ParseSubscript",
+   "instr_len": 26,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     1194,
+     1219
+    ],
+    "c.pass1": [
+     1061,
+     1086
+    ]
+   }
+  },
+  {
+   "id": 238,
+   "label": "CompileCase",
+   "instr_len": 26,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     5072,
+     5099
+    ],
+    "c.pass1": [
+     4939,
+     4966
+    ]
+   }
+  },
+  {
+   "id": 239,
+   "label": "WidthScanLoop",
+   "instr_len": 25,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.pass2": [
+     5160,
+     5185
+    ],
+    "cc1": [
+     1953,
+     1978
+    ]
+   }
+  },
+  {
+   "id": 240,
+   "label": "WidthDigit",
+   "instr_len": 25,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.pass2": [
+     5154,
+     5179
+    ],
+    "c_asm": [
+     7034,
+     7059
+    ]
+   }
+  },
+  {
+   "id": 241,
+   "label": "SizeofExpr",
+   "instr_len": 24,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     1072,
+     1097
+    ],
+    "c.pass1": [
+     939,
+     964
+    ]
+   }
+  },
+  {
+   "id": 242,
+   "label": "AccumWidthDigit",
+   "instr_len": 24,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     16960,
+     16984
+    ],
+    "c.pass1": [
+     9110,
+     9134
+    ]
+   }
+  },
+  {
+   "id": 243,
+   "label": "AmpOpTok",
+   "instr_len": 24,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     10414,
+     10442
+    ],
+    "c.pass1": [
+     9750,
+     9778
+    ]
+   }
+  },
+  {
+   "id": 244,
+   "label": "GreaterOpTok",
+   "instr_len": 24,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     10519,
+     10546
+    ],
+    "c.pass1": [
+     9855,
+     9882
+    ]
+   }
+  },
+  {
+   "id": 245,
+   "label": "CopyByteStore",
+   "instr_len": 23,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.pass1": [
+     12411,
+     12435
+    ],
+    "cc1": [
+     1827,
+     1851
+    ]
+   }
+  },
+  {
+   "id": 246,
+   "label": "WidthScan",
+   "instr_len": 23,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     16972,
+     16995
+    ],
+    "cc1": [
+     1959,
+     1982
+    ]
+   }
+  },
+  {
+   "id": 247,
+   "label": "GetcCheckRead",
+   "instr_len": 22,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.opt": [
+     4138,
+     4162
+    ],
+    "c.prep": [
+     3872,
+     3896
+    ]
+   }
+  },
+  {
+   "id": 248,
+   "label": "UnknownFlag",
+   "instr_len": 22,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c.comp": [
+     267,
+     290
+    ],
+    "c.pass2": [
+     266,
+     289
+    ]
+   }
+  },
+  {
+   "id": 249,
+   "label": "EmitPopByte",
+   "instr_len": 22,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     9134,
+     9157
+    ],
+    "c.pass2": [
+     7487,
+     7510
+    ]
+   }
+  },
+  {
+   "id": 250,
+   "label": "GenReturnStmt",
+   "instr_len": 22,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     5384,
+     5406
+    ],
+    "c.pass1": [
+     5251,
+     5273
+    ]
+   }
+  },
+  {
+   "id": 251,
+   "label": "erexit",
+   "instr_len": 21,
+   "module_count": 2,
+   "region": "cstart-head",
+   "members": {
+    "c_asm": [
+     404,
+     452
+    ],
+    "make": [
+     187,
+     209
+    ]
+   }
+  },
+  {
+   "id": 252,
+   "label": "PoolAlloc",
+   "instr_len": 21,
+   "module_count": 2,
+   "region": "clib-tail",
+   "members": {
+    "c.link": [
+     6050,
+     6074
+    ],
+    "c.prep": [
+     4493,
+     4516
+    ]
+   }
+  },
+  {
+   "id": 253,
+   "label": "Getc",
+   "instr_len": 21,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.opt": [
+     4000,
+     4022
+    ],
+    "c.prep": [
+     3734,
+     3756
+    ]
+   }
+  },
+  {
+   "id": 254,
+   "label": "ParseNumber",
+   "instr_len": 21,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.link": [
+     2892,
+     2913
+    ],
+    "c.pass1": [
+     11389,
+     11410
+    ]
+   }
+  },
+  {
+   "id": 255,
+   "label": "FlagP",
+   "instr_len": 21,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.pass1": [
+     12033,
+     12055
+    ],
+    "c.pass2": [
+     260,
+     282
+    ]
+   }
+  },
+  {
+   "id": 256,
+   "label": "EmitLocalOffset",
+   "instr_len": 21,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     9268,
+     9290
+    ],
+    "c.pass2": [
+     7334,
+     7356
+    ]
+   }
+  },
+  {
+   "id": 257,
+   "label": "ScanCharTest",
+   "instr_len": 20,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     17619,
+     17641
+    ],
+    "c.pass1": [
+     12421,
+     12443
+    ]
+   }
+  },
+  {
+   "id": 258,
+   "label": "FlagUnknown",
+   "instr_len": 20,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.pass1": [
+     12039,
+     12059
+    ],
+    "c.pass2": [
+     519,
+     539
+    ]
+   }
+  },
+  {
+   "id": 259,
+   "label": "AccumFracDigit",
+   "instr_len": 20,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     11227,
+     11247
+    ],
+    "c.pass1": [
+     10563,
+     10583
+    ]
+   }
+  },
+  {
+   "id": 260,
+   "label": "DumpStrings",
+   "instr_len": 20,
+   "module_count": 2,
+   "region": "compiler-mid",
+   "members": {
+    "c.comp": [
+     10128,
+     10148
+    ],
+    "c.pass1": [
+     11716,
+     11736
+    ]
+   }
+  }
+ ]
+}

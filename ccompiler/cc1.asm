@@ -51,156 +51,11 @@ name                equ       *
                     fcs       /cc1/
                     fcb       edition
 
-copybytes           lda       ,y+       load next source byte
-                    sta       ,u+       store byte to destination
-                    leax      -$01,x    decrement remaining count
-                    bne       copybytes loop until count exhausted
-                    rts                 return from copy
-
-_start              pshs      y         save data area base pointer
-                    pshs      u         save initial u pointer
-                    clra                prepare zero fill value
-                    clrb                set fill counter to 256
-ZeroDataLoop        sta       ,u+       zero one data byte
-                    decb                decrement fill counter
-                    bne       ZeroDataLoop loop until 256 bytes cleared
-                    ldx       ,s        get saved data base pointer
-                    leau      ,x        point u at data base
-                    leax      $05E1,x   compute end of data area
-                    pshs      x         save data area end pointer
-                    leay      WorkBlockImage,pcr point y at the init copy table
-                    ldx       ,y++      load first init block length
-                    beq       AfterFirstInit skip if first block empty
-                    bsr       copybytes copy first init block
-                    ldu       $02,s     reload u from saved base
-AfterFirstInit      leau      >$002d,u  advance u past header area
-                    ldx       ,y++      load second init block length
-                    beq       PadLoop   skip if second block empty
-                    bsr       copybytes copy second init block
-                    clra                prepare zero pad byte
-PadLoop             cmpu      ,s        reached data area end?
-                    beq       RelocateData stop when padding complete
-PadStore            sta       ,u+       pad remaining data with zero
-                    bra       PadLoop   continue padding loop
-
-RelocateData        ldu       $02,s     reload base for relocation
-                    ldd       ,y++      load first relocation table size
-                    beq       CheckSecondReloc skip if no first relocations
-                    leax      >$0000,pcr point x at module base
-                    lbsr      RelocatePointers relocate first pointer table
-CheckSecondReloc    ldd       ,y++      load second relocation table size
-                    beq       InitComplete skip if no second relocations
-                    leax      ,u        point x at data base
-                    lbsr      RelocatePointers relocate second pointer table
-InitComplete        leas      $04,s     drop saved pointers
-                    puls      x         restore data end pointer
-                    stx       $01FF,u   save data end into globals
-                    sty       $01BF,u   save argument pointer into globals
-                    ldd       #$0001    initialize argument count to one
-                    std       $01FB,u   store initial argument count
-                    leay      $01C1,u   point y at the argv array
-                    leax      ,s        point x at the command line
-                    lda       ,x+       get first command character
-ParseArgLoop        ldb       $01FC,u   check current argument count
-                    cmpb      #$1d      reached maximum arguments?
-                    beq       ArgsParsed stop parsing if full
-SkipSepLoop         cmpa      #$0d      end of command line?
-                    beq       ArgsParsed finish at carriage return
-                    cmpa      #$20      skip space separator?
-                    beq       NextSepChar advance past space
-                    cmpa      #$2C      skip comma separator?
-                    bne       CheckQuote not a separator, start a token
-NextSepChar         lda       ,x+       get next char after separator
-                    bra       SkipSepLoop keep skipping separators
-
-CheckQuote          cmpa      #$22      double quote token?
-                    beq       StartQuoted handle quoted token
-                    cmpa      #$27      single quote token?
-                    bne       StartWord unquoted word if not a quote
-StartQuoted         stx       ,y++      record token start in argv
-                    inc       $01FC,u   bump argument count
-                    pshs      a         save the quote character
-QuoteScanLoop       lda       ,x+       scan a char inside quotes
-                    cmpa      #$0d      line end inside quote?
-                    beq       QuoteEnd  stop at line end
-                    cmpa      ,s        matching close quote?
-                    bne       QuoteScanLoop keep scanning quoted text
-QuoteEnd            puls      b         discard saved quote char
-                    clr       -$01,x    terminate token with null
-                    cmpa      #$0d      was it the end of line?
-                    beq       ArgsParsed finish if line ended
-                    lda       ,x+       get char after the quote
-                    bra       ParseArgLoop process the next token
-
-StartWord           leax      -$01,x    back up to token start
-                    stx       ,y++      record token start in argv
-                    leax      $01,x     advance past first char
-                    inc       $01FC,u   bump argument count
-WordScanLoop        cmpa      #$0d      end of line?
-                    beq       WordEnd   stop token at line end
-                    cmpa      #$20      space ends the word?
-                    beq       WordEnd   stop token at space
-                    cmpa      #$2C      comma ends the word?
-                    beq       WordEnd   stop token at comma
-                    lda       ,x+       scan next word character
-                    bra       WordScanLoop keep scanning the word
-
-WordEnd             clr       -$01,x    terminate word with null
-                    bra       ParseArgLoop process the next token
-
-ArgsParsed          leax      $01BF,u   point x at the argv pointer slot
-                    pshs      x         push argv address
-                    ldd       $01FB,u   load the argument count
-                    pshs      d         push argc
-                    leay      ,u        set y to the data base
-                    bsr       stkinit   initialize stack tracking
-                    lbsr      main      call the driver main
-                    clr       ,-s       push exit status high
-                    clr       ,-s       push exit status low
-                    lbsr      exit      exit the program
-stkinit             leax      $05E1,y   compute the stack low limit
-                    stx       $0209,y   save the stack low limit
-                    sts       $01FD,y   save the initial stack pointer
-                    sts       $020b,y   seed the stack high water
-                    ldd       #$FF82    prepare stack margin
-stkcheck            leax      d,s       compute projected stack top
-                    cmpx      $020b,y   below recorded high water?
-                    bcc       StackOk   return if within bounds
-                    cmpx      $0209,y   below the stack limit?
-                    bcs       StackOverflow overflow if past the limit
-                    stx       $020b,y   update stack high water
-StackOk             rts                 return from stack check
-
-MsgStackOverflow    fcc       /**** STACK OVERFLOW ****/
-                    fcb       $0d       carriage return terminator
-StackOverflow       leax      MsgStackOverflow,pcr point at the overflow message
-                    ldb       #$CF      message length byte
-                    pshs      b         push the length
-                    lda       #$02      select the standard error path
-                    ldy       #$0064    byte count to write
-                    os9       I$WritLn  write the overflow message
-                    clr       ,-s       push exit status
-                    lbsr      _exit     abort on stack overflow
-                    ldd       $01FD,y   load the initial stack pointer
-                    subd      $020b,y   compute used stack size
-                    rts                 return stack usage
-                    ldd       $020b,y   load the stack high water
-                    subd      $0209,y   compute remaining stack
-                    rts                 return stack headroom
-
-RelocatePointers    pshs      x         save the relocation base value
-                    leax      d,y       compute the table end (low)
-                    leax      d,x       compute the table end (high)
-                    pshs      x         save the table end pointer
-RelocLoop           ldd       ,y++      load the next offset entry
-                    leax      d,u       point at the pointer to fix
-                    ldd       ,x        load the stored pointer
-                    addd      $02,s     add the relocation base
-                    std       ,x        store the relocated pointer
-                    cmpy      ,s        reached the table end?
-                    bne       RelocLoop loop over all pointers
-                    leas      $04,s     drop the saved values
-                    rts                 return from relocation
+* --- shared C runtime startup (see cstart.i) ---
+RTBASE              equ       $01BF     runtime-globals block base in the data area
+DATAEND             equ       $05E1     end of static data / heap start / stack limit
+HDRADV              equ       $002D     initialized-data header advance
+                    use       lib/cstart.asm
 
 main                pshs      u         save the frame pointer
                     ldd       #$FFA1    stack space needed for main
@@ -1939,7 +1794,7 @@ SetPadChar          std       $05DD,y   store the pad character global
 WidthDigitLoop      ldd       $06,s     current accumulated width
                     pshs      d         save width on stack
                     ldd       #$000A    multiplier of ten
-                    lbsr      MulInt    multiply width by ten
+                    lbsr      MulEntry  multiply width by ten
                     pshs      d         save product
                     ldb       $0a,s     load the digit char
                     sex                 sign-extend the digit
@@ -1966,7 +1821,7 @@ WidthTestDigit      ldb       $08,s     load the current char
 PrecDigitLoop       ldd       $02,s     current accumulated precision
                     pshs      d         save precision on stack
                     ldd       #$000A    multiplier of ten
-                    lbsr      MulInt    multiply precision by ten
+                    lbsr      MulEntry  multiply precision by ten
                     pshs      d         save product
                     ldb       $0a,s     load the digit char
                     sex                 sign-extend the digit
@@ -2915,79 +2770,8 @@ StrCmpLoop          ldb       ,u        load the first char
                     subd      ,s++      compute the difference
                     puls      pc,u      return the difference
 
-MulInt              tsta                is the first high byte zero
-                    bne       MulFull   no, take the full path
-                    tst       $02,s     is the second high byte zero
-                    bne       MulFull   no, take the full path
-                    lda       $03,s     load the low byte
-                    mul                 eight-by-eight multiply
-                    ldx       ,s        clear the high result
-                    stx       $02,s     store zero high word
-                    ldx       #$0000    zero for high result
-                    std       ,s        store the low product
-                    puls      pc,d      return the product
-
-MulFull             pshs      d         save the operands
-                    ldd       #$0000    zero accumulator
-                    pshs      d         push zero high word
-                    pshs      d         push zero low word
-                    lda       $05,s     first low byte
-                    ldb       $09,s     second low byte
-                    mul                 partial product
-                    std       $02,s     store it
-                    lda       $05,s     first low byte
-                    ldb       $08,s     second high byte
-                    mul                 partial product
-                    addd      $01,s     add running total
-                    std       $01,s     store it
-                    bcc       MulAcc1   skip carry
-                    inc       ,s        propagate the carry
-MulAcc1             lda       $04,s     first high byte
-                    ldb       $09,s     second low byte
-                    mul                 partial product
-                    addd      $01,s     add running total
-                    std       $01,s     store it
-                    bcc       MulAcc2   skip carry
-                    inc       ,s        propagate the carry
-MulAcc2             lda       $04,s     first high byte
-                    ldb       $08,s     second high byte
-                    mul                 partial product
-                    addd      ,s        add running total
-                    std       ,s        store it
-                    ldx       $06,s     gather low result
-                    stx       $08,s     place low result
-                    ldx       ,s        load high result
-                    ldd       $02,s     load low result
-                    leas      $08,s     drop the temporaries
-                    rts                 return the product
-                    tstb                is the shift count zero
-                    beq       ShiftDone nothing to shift
-AsrLoop             asr       $02,s     arithmetic shift right high byte
-                    ror       $03,s     rotate low byte
-                    decb                decrement the count
-                    bne       AsrLoop   loop for the count
-                    bra       ShiftDone go return the result
-
-LsrEntry            tstb                is the shift count zero
-                    beq       ShiftDone nothing to shift
-LsrLoop             lsr       $02,s     logical shift right high byte
-                    ror       $03,s     rotate low byte
-                    decb                decrement the count
-                    bne       LsrLoop   loop for the count
-ShiftDone           ldd       $02,s     load the shifted result
-                    pshs      d         save it
-                    ldd       $02,s     load result again
-                    std       $04,s     place it
-                    ldd       ,s        load return value
-                    leas      $04,s     drop the temporary
-                    rts                 return
-                    tstb                is the shift count zero
-                    beq       ShiftDone nothing to shift
-AslLoop             asl       $03,s     shift left low byte
-                    rol       $02,s     rotate high byte
-                    decb                decrement the count
-                    bne       AslLoop   loop for the count
-                    bra       ShiftDone go return the result
+                    use       lib/imul.asm
+                    use       lib/shift.asm
 
 GetStat             lda       $05,s     load the path number
                     ldb       $03,s     load the getstat function code
@@ -3363,7 +3147,7 @@ DoSetUser           ldy       $04,s     load the new user id argument
                     cmpb      #$D0      check for unknown-service error
                     bne       IdErr     fail on any other error
                     tfr       y,d       move the requested id into d
-                    ldy       >PadStore point y at the global work block
+                    ldy       >$004B    point y at the global work block (data-area address, overlaps cstart)
                     std       $09,y     record the user id in the work block
 SetUserOk           clra                clear a
                     clrb                clear b

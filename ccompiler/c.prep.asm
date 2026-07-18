@@ -15,7 +15,7 @@ tylg                set       Prgrm+Objct
 atrv                set       ReEnt+rev
 rev                 set       $01
 edition             set       4
-                    mod       eom,name,tylg,atrv,start,size
+                    mod       eom,name,tylg,atrv,_start,size
 BuiltinArgBuf       rmb       1
 PoolPtr             rmb       1
 FileBufBase         rmb       1
@@ -59,171 +59,23 @@ name                equ       *
                     fcs       /c.prep/
                     fcb       edition
 
-CopyStr             lda       ,y+       get next source byte
-                    sta       ,u+       copy it to the destination
-                    leax      -1,x      decrement the byte count (sets Z)
-                    bne       CopyStr   loop until the count reaches zero
-                    rts
-
-start               equ       *         program entry point
-                    pshs      y         save caller Y and U
-                    pshs      u
-                    clra
-                    clrb                D=0, B=0 -> clear 256 bytes
-ClrStgLoop          sta       ,u+       zero out the static storage
-                    decb
-                    bne       ClrStgLoop
-                    ldx       ,s        X = base of static storage
-                    leau      ,x
-                    leax      >$058A,x  X = work area past the variables
-                    pshs      x         save work-area pointer
-                    leay      >DfltStrTbl,pcr Y -> default include-path strings
-                    ldx       ,y++      X = first default string
-                    beq       Arg1Start skip if none
-                    bsr       CopyStr   copy it into static storage
-                    ldu       $02,s
-Arg1Start           leau      >OptEqPtr,u advance to next storage slot
-                    ldx       ,y++      X = second default string
-                    beq       PadArg
-                    bsr       CopyStr   copy it in
-                    clra
-PadArg              cmpu      ,s        pad slot with zeros up to work area
-                    beq       Arg1Set
-                    sta       ,u+
-                    bra       PadArg
-
-Arg1Set             ldu       $02,s
-                    ldd       ,y++      next default string
-                    beq       Arg2Set
-                    leax      >BuiltinArgBuf,pcr
-                    lbsr      RelocDefPtrs register default definition
-Arg2Set             ldd       ,y++
-                    beq       ArgsReady
-                    leax      ,u
-                    lbsr      RelocDefPtrs register default definition
-ArgsReady           leas      $04,s     drop saved pointers
-                    puls      x         X = command-line pointer
-                    stx       >WorkArea,u save command-line pointer
-                    sty       >SavedArgv,u save argv table pointer
-                    ldd       #$0001
-                    std       >NestDepth,u init nesting depth = 1
-                    leay      >ArgPtrTable,u Y -> argument work block
-                    leax      ,s        X -> command line on stack
-                    lda       ,x+       get first char
-ScanArgLoop         ldb       >ArgCount,u B = current arg count
-                    cmpb      #$1D      reached max args (29)?
-                    beq       RunPreproc
-ScanChar            cmpa      #$0D      carriage return -> end of line?
-                    beq       RunPreproc
-                    cmpa      #$20      space?
-                    beq       SkipSep
-                    cmpa      #$2C      comma?
-                    bne       ChkQuote
-SkipSep             lda       ,x+       skip separator, get next char
-                    bra       ScanChar
-
-ChkQuote            cmpa      #$22      double quote?
-                    beq       QuotedArg
-                    cmpa      #$27      single quote?
-                    bne       PlainArg
-QuotedArg           stx       ,y++      record start of quoted arg
-                    inc       >ArgCount,u bump arg count
-                    pshs      a         save quote char as terminator
-QuoteScan           lda       ,x+       scan chars of quoted arg
-                    cmpa      #$0D      end of line?
-                    beq       QuoteDone
-                    cmpa      ,s        matching quote?
-                    bne       QuoteScan
-QuoteDone           puls      b         discard saved quote char
-                    clr       -$01,x    NUL-terminate the arg
-                    cmpa      #$0D      was terminator the CR?
-                    beq       RunPreproc
-                    lda       ,x+       get next char
-                    bra       ScanArgLoop
-
-PlainArg            leax      -$01,x    back up to arg start
-                    stx       ,y++      record start of plain arg
-                    leax      $01,x
-                    inc       >ArgCount,u bump arg count
-PlainScan           cmpa      #$0D      end of line?
-                    beq       PlainDone
-                    cmpa      #$20      space -> end of arg?
-                    beq       PlainDone
-                    cmpa      #$2C      comma -> end of arg?
-                    beq       PlainDone
-                    lda       ,x+       next char of arg
-                    bra       PlainScan
-
-PlainDone           clr       -$01,x    NUL-terminate the arg
-                    bra       ScanArgLoop
-
-RunPreproc          leax      >SavedArgv,u X -> saved argv table
-                    pshs      x
-                    ldd       >NestDepth,u D = nesting depth
-                    pshs      b,a
-                    leay      ,u        Y = static-storage base
-                    bsr       InitWorkBlk set up work block + stack guard
-                    lbsr      PreprocessInput run the preprocessor over the input
-                    clr       ,-s
-                    clr       ,-s
-                    lbsr      CleanupExit finish and flush output
-InitWorkBlk         leax      >$058A,y  X = top of work area
-                    stx       >$01C8,y  save work-area limit
-                    sts       >$01BC,y  save entry stack pointer
-                    sts       >$01CA,y  init low-water stack mark
-                    ldd       #$FF82    D = -126 (stack margin to check)
-ChkStk              leax      d,s       X = SP - margin
-                    cmpx      >$01CA,y  below recorded low-water?
-                    bcc       StkOk
-                    cmpx      >$01C8,y  past work-area limit -> overflow?
-                    bcs       StackOvf
-                    stx       >$01CA,y  record new low-water mark
-StkOk               rts
-
-StkOvfMsg           fcc       /**** STACK OVERFLOW ****/
-                    fcb       $0D
-StackOvf            leax      <StkOvfMsg,pcr X -> overflow banner
-                    ldb       #$CF      B = fatal exit code
-                    pshs      b         save it for the exit
-                    lda       #$02      A = stderr path
-                    ldy       #$0064    Y = message length
-WriteOvfMsg         os9       I$WritLn
-                    clr       ,-s       push zero
-                    lbsr      DoExit    abort the preprocessor
-
-GetStackUsed        ldd       >$01BC,y  D = entry stack pointer
-                    subd      >$01CA,y  minus low-water = stack used
-                    rts                 return
-
-                    ldd       >$01CA,y  D = low-water mark
-                    subd      >$01C8,y  minus limit = stack remaining
-GetStackFree        rts                 return
-
-RelocDefPtrs        pshs      x         save X
-                    leax      d,y       X = base + offset
-                    leax      d,x       X = base + 2*offset
-                    pshs      x         save relocation base
-RelocLoop           ldd       ,y++      D = next pointer from the table
-                    leax      d,u       X = storage + offset
-                    ldd       ,x        D = stored pointer value
-                    addd      $02,s     add the relocation base
-                    std       ,x        store the fixed-up pointer
-                    cmpy      ,s        reached end of table?
-                    bne       RelocLoop no -> keep relocating
-                    leas      $04,s     drop locals
-RelocDone           rts                 return
+* --- shared C runtime startup (see lib/cstart.asm) ---
+RTBASE              equ       $017E     runtime-globals block base in the data area
+DATAEND             equ       $058A     end of static data / heap start / stack limit
+HDRADV              equ       $001C     advance to where the non-DP data starts
+                    use       lib/cstart.asm
 
 ErrorCleanup        pshs      u         save U
                     ldd       #$FFBA    D = -70 stack margin
-                    lbsr      ChkStk    check stack
+                    lbsr      stkcheck  check stack
                     ldd       #$0002    D = output stream code 2
                     pshs      b,a       pass it
-                    lbsr      CleanupExit flush that output stream
+                    lbsr      exit      flush that output stream
                     puls      pc,u,x    return
 
-PreprocessInput     pshs      u         save U
+main                pshs      u         save U
                     ldd       #$FFB0    D = -80 stack margin
-                    lbsr      ChkStk    check stack
+                    lbsr      stkcheck  check stack
                     leas      -$04,s    make room for locals
                     ldd       #$0800    D = $0800 work-buffer size
                     pshs      b,a       pass the size
@@ -271,11 +123,11 @@ ParseDefine         leau      PoolPtr,u skip the 'D' letter
                     ldb       ,x        B = class bits
                     clra                clear A
                     andb      #$06      is it a letter?
-                    bne       DefNameStart yes -> valid name start
+                    bne       DefNameStart yes -> valid name _start
                     ldb       ,u        B = char again
                     cmpb      #$5F      underscore?
                     lbne      BadDefineErr no -> bad define name
-DefNameStart        stu       $02,s     save name start pointer
+DefNameStart        stu       $02,s     save name _start pointer
                     bra       DefNameTest begin scanning the name
 
 DefNameLoop         ldd       $02,s     advance the scan pointer
@@ -416,7 +268,7 @@ EmitErrTail         pshs      x         X -> secondary message format
                     leas      $02,s     drop format arg
                     ldd       #$0001    write flag = 1
                     pshs      b,a       push flush flag
-                    lbsr      CleanupExit flush output stream
+                    lbsr      exit      flush output stream
 NextArgDrop         leas      $02,s     drop saved word
 NextArgLoop         ldd       $08,s     D = remaining arg count
                     addd      #$FFFF    decrement the count
@@ -454,9 +306,9 @@ MsgCantOpen         fcc       "can't open file"
 
 ResetLineBuf        pshs      u         save U
                     ldd       #$FFC0    stack margin to check
-                    lbsr      ChkStk    stack overflow guard
+                    lbsr      stkcheck  stack overflow guard
                     leax      >$02CE,y  X -> line buffer
-                    stx       <InPtr    input pointer = buffer start
+                    stx       <InPtr    input pointer = buffer _start
                     clra                clear A
                     clrb                D = 0
                     stb       >$02CE,y  empty the line buffer
@@ -466,7 +318,7 @@ ResetLineBuf        pshs      u         save U
 
 GetNextLine         pshs      u         save U
                     ldd       #$FEAD    stack margin
-                    lbsr      ChkStk    stack overflow guard
+                    lbsr      stkcheck  stack overflow guard
                     leas      >-$010B,s reserve line work buffer
                     leax      >$02CE,y  X -> current line buffer
                     pshs      x         push source ptr
@@ -483,7 +335,7 @@ ReadRawLine         lbsr      ReadLine  read next raw source line
                     lbra      ProcessLine process the line
 
 HandleDirective     ldd       <InPtr    D = input pointer
-                    std       <TokenStart remember line start
+                    std       <TokenStart remember line _start
 SkipDirWsLoop       clra                clear A
                     clrb                D = 0 no-skip flag
                     pshs      b,a       push flag
@@ -496,7 +348,7 @@ SkipDirWsLoop       clra                clear A
                     cmpb      #$09      tab?
 SkipDirTab          lbeq      SkipDirWsLoop skip leading tabs
                     ldd       <InPtr    D = input pointer
-                    std       <TokenStart mark keyword start
+                    std       <TokenStart mark keyword _start
                     ldb       <CurChar  B = current char
                     sex                 sign-extend to D
                     leax      >$00FE,y  X -> character-class table
@@ -697,7 +549,7 @@ GetLineDone         leas      >$010B,s  release the work buffer
 
 ExpandMacros        pshs      u         save U
                     ldd       #$FE72    stack margin
-                    lbsr      ChkStk    stack overflow guard
+                    lbsr      stkcheck  stack overflow guard
                     leas      <-$38,s   reserve locals
                     ldd       <InPtr    D = input pointer
                     std       <$21,s    save caller input pointer
@@ -788,7 +640,7 @@ CollectArg          leas      -$04,s    reserve scratch for this arg
                     pshs      x         hold the slot pointer
                     ldd       <InPtr    input read pointer
                     addd      #$FFFF    back up one char
-                    std       [,s++]    record this arg's start
+                    std       [,s++]    record this arg's _start
                     clra                clear length
                     clrb                clear length
                     std       $0A,s     argument length = 0
@@ -923,9 +775,9 @@ SubstBodyLoop       ldd       $02,s     current body char
                     rola                index times two
                     leax      >$012F,s  argument pointer table
                     leax      d,x       point at that arg
-                    ldd       ,x        its start pointer
+                    ldd       ,x        its _start pointer
                     std       >$010A,s  arg text source pointer
-                    bra       CopyArgLoop start copying the arg text
+                    bra       CopyArgLoop _start copying the arg text
 
 CopyArgText         ldx       >$010A,s  arg source pointer
                     leax      $01,x     advance source
@@ -1082,7 +934,7 @@ NextToken           ldb       <CurChar  current char
 
 LookupMacro         pshs      u         save caller U
                     ldd       #$FFB6    stack margin to check
-                    lbsr      ChkStk    guard against stack overflow
+                    lbsr      stkcheck  guard against stack overflow
                     leas      -$02,s    reserve a local word
                     ldd       $06,s     name string to look up
                     pshs      b,a       pass the name
@@ -1118,7 +970,7 @@ MacroBucketLoop     stu       ,s        hold the entry pointer
 
 HandleDefUndef      pshs      u         save caller u
                     ldd       #$FFAF    frame size for stack check
-                    lbsr      ChkStk    guard against stack overflow
+                    lbsr      stkcheck  guard against stack overflow
                     leas      -$09,s    make room for locals
                     ldd       >$001E,y  in a false #if block?
                     lbeq      DefExit   yes, ignore this directive
@@ -1168,8 +1020,8 @@ DefExit             leas      $09,s     release locals
 
 UndefMacro          pshs      u         save caller u
                     ldd       #$FFBA    frame size for stack check
-                    lbsr      ChkStk    guard against stack overflow
-                    bra       UndefLoop start the lookup
+                    lbsr      stkcheck  guard against stack overflow
+                    bra       UndefLoop _start the lookup
 
 ClearMacroEntry     clra                clear defined flag
                     clrb                d = 0
@@ -1185,7 +1037,7 @@ UndefLoop           ldd       $04,s     d = name pointer
 
 AddMacro            pshs      u         save caller u
                     ldd       #$FE91    large frame for parse buffers
-                    lbsr      ChkStk    guard against stack overflow
+                    lbsr      stkcheck  guard against stack overflow
                     leas      >-$0127,s allocate parse buffers
                     ldd       #$0006    size of a macro entry
                     pshs      b,a       push size
@@ -1303,7 +1155,7 @@ ParamsDone          ldd       #$0001    request a char read
                     lbsr      NextChar  consume the ')'
                     leas      $02,s     drop arg
 BodyStart           lbsr      SkipSpaces skip spaces before body
-                    lbra      BodyNext  start body scan
+                    lbra      BodyNext  _start body scan
 
 BodyLoop            ldb       <CurChar  b = current char
                     cmpb      #$27      single quote?
@@ -1332,7 +1184,7 @@ ReadBodyWord        leax      <$16,s    x -> word buffer
                     pshs      x         push buffer
                     lbsr      ReadIdent read identifier word
                     leas      $02,s     drop buffer
-                    clra                start at param 0
+                    clra                _start at param 0
                     clrb                index low = 0
                     bra       ParamMatchTest begin param match
 
@@ -1441,7 +1293,7 @@ AddMacroDone        leas      >$0127,s  release buffers
 
 StripHighBits       pshs      u         save caller u
                     ldd       #$FFC0    frame size for stack check
-                    lbsr      ChkStk    guard against stack overflow
+                    lbsr      stkcheck  guard against stack overflow
                     ldu       $04,s     u -> string argument
                     bra       StripTest test first char
 
@@ -1455,13 +1307,13 @@ StripTest           ldb       ,u        b = current char
 
 DoInclude           pshs      u         save caller u
                     ldd       #$FF90    frame size for stack check
-                    lbsr      ChkStk    guard against stack overflow
+                    lbsr      stkcheck  guard against stack overflow
                     leas      <-$26,s   allocate include-name buffer
                     ldd       >$001E,y  active-output flag set?
                     lbeq      IncDone   inactive region, skip include
                     lbsr      SkipWsComment advance to next input line
                     ldd       <InPtr    current input pointer
-                    std       <TokenStart remember line start
+                    std       <TokenStart remember line _start
                     leau      $04,s     U points at filename buffer
                     ldd       #$0001    request skip leading whitespace
                     pshs      b,a       pass the flag
@@ -1607,7 +1459,7 @@ IncDone             leas      <$26,s    drop locals
 
 DoLineDir           pshs      u         save caller U
                     ldd       #$FFAB    stack margin to check
-                    lbsr      ChkStk    verify stack headroom
+                    lbsr      stkcheck  verify stack headroom
                     leas      -$0B,s    reserve locals
                     ldd       >$001E,y  active-output flag set?
                     lbeq      LineDone  inactive region, skip
@@ -1666,7 +1518,7 @@ LineDone            leas      $0B,s     drop locals
 
 DeriveBaseName      pshs      u         save caller U
                     ldd       #$FFBA    stack margin to check
-                    lbsr      ChkStk    verify stack headroom
+                    lbsr      stkcheck  verify stack headroom
                     ldu       $04,s     U = source path
                     leas      -$04,s    reserve locals
                     bra       MarkAfterSlash enter the scan loop
@@ -1674,7 +1526,7 @@ DeriveBaseName      pshs      u         save caller U
 ChkSlash            ldd       ,s        current char
                     cmpd      #$002F    path separator '/'?
                     bne       SlashScanLoop no, keep scanning
-MarkAfterSlash      stu       $02,s     record start just past slash
+MarkAfterSlash      stu       $02,s     record _start just past slash
 SlashScanLoop       ldb       ,u+       next path char
                     sex                 sign-extend
                     std       ,s        save char
@@ -1725,7 +1577,7 @@ IdentDone           clra                D = 0
 
 DoIfdef             pshs      u         save caller U
                     ldd       #$FFB1    stack margin to check
-                    lbsr      ChkStk    verify stack headroom
+                    lbsr      stkcheck  verify stack headroom
                     leas      -$09,s    reserve locals
                     ldd       >$0534,y  current if-nesting depth
                     cmpd      #$000A    nesting limit (10) reached?
@@ -1739,7 +1591,7 @@ IfChkIdent          lbsr      SkipWsComment advance to next line
                     lbsr      NextChar  read next char
                     leas      $02,s     drop arg
                     ldd       <InPtr    input pointer
-                    std       <TokenStart remember line start
+                    std       <TokenStart remember line _start
                     ldb       <CurChar  current char
                     sex                 sign-extend
                     leax      >$00FE,y  char-class table
@@ -1800,7 +1652,7 @@ IfDefDone           leas      $09,s     drop local scratch bytes
 
 DoElse              pshs      u         save U for #else handler
                     ldd       #$FFBA    stack margin to reserve
-                    lbsr      ChkStk    check for stack overflow
+                    lbsr      stkcheck  check for stack overflow
                     ldd       >$054A,y  any open #if group?
                     bne       ElseHasIf yes, evaluate the else
                     leax      >NoIfForElseMsg,pcr point at 'no #if for #else'
@@ -1830,7 +1682,7 @@ ElseStoreActive     std       >$001E,y  set current output-active flag
 
 DoEndif             pshs      u         save U for #endif handler
                     ldd       #$FFBA    stack margin to reserve
-                    lbsr      ChkStk    check for stack overflow
+                    lbsr      stkcheck  check for stack overflow
                     ldd       >$0534,y  any open #if to close?
                     bne       EndifPop  yes -> pop it
                     leax      >TooManyEndifMsg,pcr point at 'too many #endifs'
@@ -1858,7 +1710,7 @@ StoreIfBranchState  std       >$054A,y  store branch-seen state
 
 CopyStringLit2      pshs      u         save U for literal copy
                     ldd       #$FFB9    stack margin to reserve
-                    lbsr      ChkStk    check for stack overflow
+                    lbsr      stkcheck  check for stack overflow
                     leas      -$01,s    reserve local for quote char
                     ldu       [<$05,s]  U = destination buffer
                     ldb       <CurChar  current char is the opening quote
@@ -1895,10 +1747,10 @@ CopyStrDone         stu       [<$05,s]  save updated buffer pointer
 
 ReadIdent           pshs      u         save U for identifier read
                     ldd       #$FFB8    stack margin to reserve
-                    lbsr      ChkStk    check for stack overflow
+                    lbsr      stkcheck  check for stack overflow
                     ldu       $04,s     U = identifier buffer
                     leas      -$02,s    reserve length counter
-                    ldd       #$0001    start length at 1
+                    ldd       #$0001    _start length at 1
                     bra       IdentCheck enter the length check
 
 IdentLoop           ldb       <CurChar  store the identifier char
@@ -1948,7 +1800,7 @@ IdentSkipCheck      ldb       <CurChar  classify current char
 
 ReadLine            pshs      u         save U for line read
                     ldd       #$FFB6    stack margin to reserve
-                    lbsr      ChkStk    check for stack overflow
+                    lbsr      stkcheck  check for stack overflow
 ReadLineLoop        lbsr      ReadSourceLine read one source line
                     std       -$02,s    got a line?
                     beq       PopInclude no -> input exhausted
@@ -2015,7 +1867,7 @@ ReadLineEOF         clra                no more input
 
 SkipSpaces          pshs      u         save U for space skip
                     ldd       #$FFBA    stack margin to reserve
-                    lbsr      ChkStk    check for stack overflow
+                    lbsr      stkcheck  check for stack overflow
                     bra       SkipSpTest enter the space test
 
 SkipSpLoop          ldd       #$0001    request next char
@@ -2029,7 +1881,7 @@ SkipSpTest          ldb       <CurChar  current char
 
 NextChar            pshs      u         save U for char fetch
                     ldd       #$FFBC    stack margin to reserve
-                    lbsr      ChkStk    check for stack overflow
+                    lbsr      stkcheck  check for stack overflow
                     ldb       [>$0008,y] read char at input pointer
                     stb       <CurChar  store as current char
                     bne       NextCharNonNul non-NUL -> process
@@ -2051,7 +1903,7 @@ NextCharDone        puls      pc,u      return
 
 SkipWsComment       pshs      u         save U for ws/comment skip
                     ldd       #$FFB9    stack margin to reserve
-                    lbsr      ChkStk    check for stack overflow
+                    lbsr      stkcheck  check for stack overflow
                     leas      -$03,s    reserve flag and char locals
                     clra                clear A
                     clrb                clear B
@@ -2072,7 +1924,7 @@ SkipWsSpace         ldd       <InPtr    advance input pointer
 
 MaybeComment        ldx       <InPtr    peek char after '/'
                     ldb       $01,x     next char
-                    cmpb      #$2A      start of a comment?
+                    cmpb      #$2A      _start of a comment?
                     bne       SkipWsDone no -> stop skipping
                     ldd       #$0001    remember whitespace seen
                     std       ,s        save flag
@@ -2123,7 +1975,7 @@ SkipWsExit          leas      $03,s     drop locals
 
 ReadSourceLine      pshs      u         save U for source-line read
                     ldd       #$FFB6    stack margin to reserve
-                    lbsr      ChkStk    check for stack overflow
+                    lbsr      stkcheck  check for stack overflow
                     leas      -$04,s    reserve char and count locals
                     ldd       #$0100    max line length 256
                     std       $02,s     save the count
@@ -2247,13 +2099,13 @@ ReportError         pshs      u         save the caller U
                     leax      >$02CE,y  base of the line buffer
                     pshs      x         push it
                     ldd       <TokenStart position of the error
-                    subd      ,s++      column = position minus buffer start
+                    subd      ,s++      column = position minus buffer _start
                     pshs      b,a       push the column
                     bsr       FormatDiag format the diagnostic
                     leas      $08,s     drop the arguments
                     ldd       #$0001    exit status 1
                     pshs      b,a       push it
-                    lbsr      CleanupExit flush output and exit
+                    lbsr      exit      flush output and exit
                     puls      pc,u,x    (never reached) restore and return
 
 ReportWarnAtMark    pshs      u         save the caller U
@@ -2278,7 +2130,7 @@ ReportWarn          pshs      u         save the caller U
                     leax      >$02CE,y  base of the line buffer
                     pshs      x         push it
                     ldd       <InPtr    current scan position
-DiagColumn          subd      ,s++      column = position minus buffer start
+DiagColumn          subd      ,s++      column = position minus buffer _start
                     pshs      b,a       push the column
                     bsr       FormatDiag format the diagnostic
 WarnReturn          leas      $08,s     drop the arguments
@@ -2418,7 +2270,7 @@ AllocBytes          pshs      u         save the caller U
                     ldu       $04,s     requested size
                     leas      -$02,s    make room for a local
                     ldd       <PoolPtr  current heap pointer
-                    std       ,s        save the start pointer
+                    std       ,s        save the _start pointer
                     ldd       <PoolPtr  heap pointer again
                     cmpd      <PoolEnd  past the heap top?
                     bls       CheckHeapRoom no, check for room
@@ -2478,7 +2330,7 @@ StoreString         pshs      u         save the caller U
                     ldu       $04,s     the source string
                     leas      -$02,s    make room for a local
                     ldd       <PoolPtr  heap pointer
-                    std       ,s        save the copy start
+                    std       ,s        save the copy _start
 StoreStringLoop     ldb       ,u+       next source byte
                     ldx       <PoolPtr  heap pointer
                     leax      $01,x     advance it
@@ -2486,7 +2338,7 @@ StoreStringLoop     ldb       ,u+       next source byte
                     stb       -$01,x    store the byte in the heap
                     bne       StoreStringLoop loop until the NUL
                     lbsr      EnsureHeap grow output buffer if near limit
-                    ldd       ,s        D = start of appended string
+                    ldd       ,s        D = _start of appended string
                     puls      pc,u,x    return the string pointer
 
 AppendOutByte       pshs      u         save caller U
@@ -2622,7 +2474,7 @@ StrInitVar          fcc       "Init"
                     fcb       $00
 
 FindFreeStream      pshs      u         save caller U
-                    leau      >$002D,y  U = start of FILE table
+                    leau      >$002D,y  U = _start of FILE table
 StreamSlotLoop      ldd       ExpandPtr,u D = stream flags
                     clra                clear A
                     andb      #$03      slot in use?
@@ -2885,7 +2737,7 @@ RunFormat           pshs      b,a       push the format string
 Doprnt              pshs      u         save caller U
                     ldu       $06,s     U -> format string
                     leas      -$0B,s    reserve local workspace
-                    bra       FormatLoop start scanning the format
+                    bra       FormatLoop _start scanning the format
 
 EmitLiteral         ldb       $08,s     B = current literal char
                     lbeq      DoprntDone NUL -> whole format done
@@ -2929,7 +2781,7 @@ SetFill             std       >$0584,y  store the chosen pad character
 WidthDigit          ldd       $06,s     D = accumulated width
                     pshs      b,a       save it
                     ldd       #$000A    base-10 multiplier
-                    lbsr      LongMul   width times ten
+                    lbsr      MulEntry  width times ten
                     pshs      b,a       save the product
                     ldb       $0A,s     B = current digit char
                     sex                 extend to D
@@ -2956,7 +2808,7 @@ WidthLoop           ldb       $08,s     B = current char
 PrecDigit           ldd       $02,s     D = accumulated precision
                     pshs      b,a       save it
                     ldd       #$000A    base-10 multiplier
-                    lbsr      LongMul   precision times ten
+                    lbsr      MulEntry  precision times ten
                     pshs      b,a       save the product
                     ldb       $0A,s     B = current digit char
                     sex                 extend to D
@@ -3064,7 +2916,7 @@ ConvString          ldx       <$13,s    X -> string vararg pointer
                     std       $09,s     save the string pointer
                     ldd       $04,s     precision specified?
                     beq       EmitStrFull no, print the whole string
-                    ldd       $09,s     D = string start
+                    ldd       $09,s     D = string _start
                     std       $04,s     set the scan pointer
                     bra       StrLenNext count up to the precision
 
@@ -3081,9 +2933,9 @@ StrLenNext          ldd       $02,s     D = remaining precision
 EmitStr             ldd       $06,s     D = field width
                     pshs      b,a       pass the width
                     ldd       $0B,s     D = end pointer
-                    subd      $06,s     length = end minus start
+                    subd      $06,s     length = end minus _start
                     pshs      b,a       pass the length
-                    ldd       $08,s     D = string start
+                    ldd       $08,s     D = string _start
                     pshs      b,a       pass the string pointer
                     ldd       <$15,s    D = left-justify flag
                     pshs      b,a       pass the flag
@@ -3276,8 +3128,8 @@ OctCopyLoop         ldb       ,u        grab reversed digit
                     stb       -$01,x    copy digit out
 OctCopyTest         leau      -PoolPtr,u step back through scratch
                     pshs      u         save scratch pointer
-                    leax      >$0578,y  scratch buffer start
-                    cmpx      ,s++      reached start?
+                    leax      >$0578,y  scratch buffer _start
+                    cmpx      ,s++      reached _start?
                     bls       OctCopyLoop copy next reversed digit
                     clra                clear high byte
                     clrb                clear low byte
@@ -3331,8 +3183,8 @@ HexCopyLoop         ldb       ,u        grab reversed digit
                     stb       -$01,x    copy digit out
 HexCopyTest         leau      -PoolPtr,u step back through scratch
                     pshs      u         save scratch pointer
-                    leax      >$0578,y  scratch buffer start
-                    cmpx      ,s++      reached start?
+                    leax      >$0578,y  scratch buffer _start
+                    cmpx      ,s++      reached _start?
                     bls       HexCopyLoop copy next reversed digit
                     clra                clear high byte
                     clrb                clear low byte
@@ -3538,7 +3390,7 @@ PutcReturn          ldd       $04,s     return char written
                     pshs      b,a       push word
                     pshs      u         push file
                     ldd       #$0008    shift count eight
-                    lbsr      LongShr   extract high byte
+                    lbsr      LsrEntry  extract high byte
                     pshs      b,a       push high byte
                     lbsr      FilePutc  write high byte
                     leas      $04,s     drop the two pushed arguments
@@ -3761,7 +3613,7 @@ GetCharDone         puls      pc,u      return character
                     cmpd      #$FFFF    was it EOF?
                     beq       GetCharEof yes, cannot push
                     ldd       ,u        current buffer pointer
-                    cmpd      FileBufBase,u already at buffer start?
+                    cmpd      FileBufBase,u already at buffer _start?
                     bhi       UnGetStore room to back up
 GetCharEof          ldd       #$FFFF    return -1
                     puls      pc,u
@@ -3796,7 +3648,7 @@ GetWordEof          ldd       #$FFFF    return -1
 GetWordCombine      ldd       $02,s     high byte
                     pshs      b,a       push it
                     ldd       #$0008    shift amount 8
-                    lbsr      LongShl   shift high byte up
+                    lbsr      AslEntry  shift high byte up
                     addd      ,s        combine with low byte
 GetWordDone         leas      $04,s     drop locals
                     puls      pc,u      return the word
@@ -4003,11 +3855,11 @@ FloatFmtStub        pshs      u         save caller U
 EmptyFloatStr       fcb       $00
 
 StrLen              pshs      u         save caller U
-                    ldu       $04,s     U = start of the string
+                    ldu       $04,s     U = _start of the string
 StrLenLoop2         ldb       ,u+       scan forward one byte
                     bne       StrLenLoop2 until the terminator
                     tfr       u,d       D = pointer past terminator
-                    subd      $04,s     minus the start gives length+1
+                    subd      $04,s     minus the _start gives length+1
                     addd      #$FFFF    drop the NUL from the count
                     puls      pc,u      return the length
 
@@ -4103,13 +3955,13 @@ StoreSign           std       $03,s     save the sign flag
                     beq       NextParseChar consume it
                     ldb       ,s        reload the char
                     cmpb      #$2B      leading plus?
-                    bne       DigitTest no, start scanning digits
+                    bne       DigitTest no, _start scanning digits
                     bra       NextParseChar consume the plus
 
 AccumDigit          ldd       $01,s     D = current value
                     pshs      b,a
                     ldd       #$000A    multiply by ten
-                    lbsr      LongMul   call the multiply helper
+                    lbsr      MulEntry  call the multiply helper
                     pshs      b,a
                     ldb       $02,s     B = the digit character
                     sex                 widen
@@ -4138,79 +3990,8 @@ PositiveResult      ldd       $01,s     positive result
 ApplySign           leas      $05,s     drop the local frame
                     puls      pc,u      return the value
 
-LongMul             tsta                high byte of multiplier zero?
-                    bne       LongMulFull no, full 16x16 multiply
-                    tst       $02,s     high byte of multiplicand zero?
-                    bne       LongMulFull no, full 16x16 multiply
-                    lda       $03,s     A = multiplicand low byte
-                    mul                 single 8x8 product
-                    ldx       ,s        discard the saved word
-                    stx       $02,s     high result word
-                    ldx       #$0000    high word is zero
-                    std       ,s        low word of product
-                    puls      pc,b,a    return 16-bit product
-
-LongMulFull         pshs      b,a       push the multiplier word
-                    ldd       #$0000    clear high accumulator
-                    pshs      b,a
-                    pshs      b,a
-                    lda       $05,s     low times low
-                    ldb       $09,s
-                    mul                 partial product
-                    std       $02,s     store low word
-                    lda       $05,s     low times high
-                    ldb       $08,s
-                    mul                 partial product
-                    addd      $01,s     add into accumulator
-                    std       $01,s
-                    bcc       LongMulMid no carry
-                    inc       ,s        propagate the carry
-LongMulMid          lda       $04,s     high times low
-                    ldb       $09,s
-                    mul                 partial product
-                    addd      $01,s     add into accumulator
-                    std       $01,s
-                    bcc       LongMulHigh no carry
-                    inc       ,s        propagate the carry
-LongMulHigh         lda       $04,s     high times high
-                    ldb       $08,s
-                    mul                 partial product
-                    addd      ,s        add into top word
-                    std       ,s
-                    ldx       $06,s     save return address slot
-                    stx       $08,s
-                    ldx       ,s        X = high word of product
-                    ldd       $02,s     D = low word of product
-                    leas      $08,s     clean up the frame
-                    rts                 return 32-bit product
-                    tstb                arithmetic-shift entry, count in B
-                    beq       ShiftDone zero count, nothing to do
-AsrLoop             asr       $02,s     arithmetic shift right high
-                    ror       $03,s     rotate into low bytes
-                    decb                decrement the count
-                    bne       AsrLoop   repeat for each bit
-                    bra       ShiftDone done shifting
-
-LongShr             tstb                zero shift count?
-                    beq       ShiftDone yes, nothing to do
-ShrLoop             lsr       $02,s     logical shift right high
-                    ror       $03,s     rotate into low bytes
-                    decb                decrement the count
-                    bne       ShrLoop   repeat for each bit
-ShiftDone           ldd       $02,s     D = high word result
-                    pshs      b,a
-                    ldd       $02,s     reload high word
-                    std       $04,s     store to result slot
-                    ldd       ,s        D = low word result
-                    leas      $04,s     drop the frame
-                    rts                 return the shifted value
-LongShl             tstb                zero shift count?
-                    beq       ShiftDone yes, nothing to do
-ShlLoop             lsl       $03,s     logical shift left low
-                    rol       $02,s     rotate into high bytes
-                    decb                decrement the count
-                    bne       ShlLoop   repeat for each bit
-                    bra       ShiftDone done shifting
+                    use       lib/imul.asm
+                    use       lib/shift.asm
 
 GetDevStat          lda       $05,s     A = path number
                     ldb       $03,s     B = status function code
@@ -4478,7 +4259,7 @@ CarveBlock          leas      $02,s     drop saved top
                     subd      ,s++      block = top minus free pool
                     pshs      b,a       save block pointer
                     clra                fill byte = 0
-                    ldx       ,s        X = block start
+                    ldx       ,s        X = block _start
 ZeroBlockLoop       sta       ,x+       zero the block
                     cmpx      >$01BE,y  reached heap top?
                     bcs       ZeroBlockLoop loop until filled
@@ -4497,7 +4278,7 @@ ZeroWorkLoop        cmpx      ,s        reached new limit?
                     sta       ,x+       zero the block
                     bra       ZeroWorkLoop loop
 
-WorkAllocOk         ldd       >$01C8,y  D = old limit (block start)
+WorkAllocOk         ldd       >$01C8,y  D = old limit (block _start)
                     puls      x         X = new limit
                     stx       >$01C8,y  advance work-area limit
                     rts                 return block pointer
@@ -4529,14 +4310,14 @@ CheckErrRet         bcs       ReturnErr carry set -> errno
                     clrb                clear low byte
                     rts                 return success
 
-CleanupExit         lbsr      ReturnStub no-op stub call
+exit                lbsr      ReturnStub no-op stub call
                     lbsr      CloseAllFiles flush all open files
 
-DoExit              ldd       $02,s     D = exit status
+_exit               ldd       $02,s     D = exit status
                     os9       F$Exit
 ReturnStub          rts                 return (stub)
 
-DfltStrTbl          fcb       $00
+WorkBlockImage      fcb       $00
                     fcb       $01
                     fcb       $00
                     fcb       $01

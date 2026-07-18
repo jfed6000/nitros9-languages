@@ -28,7 +28,12 @@ ccompiler/cc1
 ccompiler/c.prep
 ccompiler/c.pass1
 ccompiler/c.pass2
+ccompiler/c.comp
 ccompiler/c.opt
 ccompiler/c_asm
 ccompiler/c.link
 ccompiler/make
+ccompiler/lib/cstart_check
+ccompiler/lib/cstart_rev_check
+ccompiler/lib/imul_check
+ccompiler/lib/shift_check

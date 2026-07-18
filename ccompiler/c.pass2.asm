@@ -54,156 +54,11 @@ name                equ       *
                     fcs       /c.pass2/
                     fcb       edition
 
-copybytes           lda       ,y+       load a source byte
-                    sta       ,u+       store into destination
-                    leax      -$01,x    decrement byte counter
-                    bne       copybytes loop until count exhausted
-                    rts                 return to caller
-
-_start              pshs      y         save data base pointer
-                    pshs      u         save top of memory
-                    clra                zero high byte
-                    clrb                zero low byte and counter
-ZeroPageLoop        sta       ,u+       clear a byte of storage
-                    decb                count down 256 bytes
-                    bne       ZeroPageLoop loop until page cleared
-                    ldx       ,s        reload saved memory base
-                    leau      ,x        point u at data base
-                    leax      $02E7,x   skip past static data area
-                    pshs      x         save data end pointer
-                    leay      WorkBlockImage,pcr point at relocation tables
-                    ldx       ,y++      load first table byte count
-                    beq       TextCopied skip copy if table empty
-                    bsr       copybytes copy the initialized text block
-                    ldu       $02,s     reload data base pointer
-TextCopied          leau      >$0027,u  advance past module header
-                    ldx       ,y++      load next block byte count
-                    beq       ZeroBssLoop skip if nothing to copy
-                    bsr       copybytes copy the initialized data block
-                    clra                zero fill value
-ZeroBssLoop         cmpu      ,s        reached data end yet
-                    beq       BssZeroed done zeroing bss
-                    sta       ,u+       clear a bss byte
-                    bra       ZeroBssLoop continue zeroing bss
-
-BssZeroed           ldu       $02,s     reload data base pointer
-                    ldd       ,y++      load first relocation count
-                    beq       DataRelocDone skip if no relocations
-                    leax      >$0000,pcr code base for pcr relocation
-                    lbsr      ApplyReloc apply text relocation fixups
-DataRelocDone       ldd       ,y++      load second relocation count
-                    beq       RelocDone skip if none
-                    leax      ,u        data base for relocation
-                    lbsr      ApplyReloc apply data relocation fixups
-RelocDone           leas      $04,s     drop saved pointers
-                    puls      x         recover data end pointer
-                    stx       $0252,u   set heap top in globals
-                    sty       $0212,u   store argv table base
-                    ldd       #$0001    initial argument count one
-                    std       $024e,u   set the argument count
-                    leay      $0214,u   point at argv storage
-                    leax      ,s        point at the command line
-                    lda       ,x+       fetch a command byte
-ScanArgLoop         ldb       $024f,u   reload current arg index
-                    cmpb      #$1d      end of parameters marker
-                    beq       ArgsParsed finished parsing arguments
-SkipSepLoop         cmpa      #$0d      end of line reached
-                    beq       ArgsParsed finished parsing arguments
-                    cmpa      #$20      space separator
-                    beq       SkipSeparator skip the separator
-                    cmpa      #$2C      comma separator
-                    bne       StartToken start of a token
-SkipSeparator       lda       ,x+       fetch next byte
-                    bra       SkipSepLoop keep skipping separators
-
-StartToken          cmpa      #$22      double quote
-                    beq       ParseQuoted parse a quoted string
-                    cmpa      #$27      single quote
-                    bne       ParseWord parse an unquoted word
-ParseQuoted         stx       ,y++      store the argv pointer
-                    inc       $024f,u   bump the argument count
-                    pshs      a         save the quote character
-QuotedLoop          lda       ,x+       fetch a string byte
-                    cmpa      #$0d      end of line reached
-                    beq       QuotedEnd terminate on line end
-                    cmpa      ,s        matching close quote
-                    bne       QuotedLoop keep scanning the string
-QuotedEnd           puls      b         discard saved quote
-                    clr       -$01,x    null terminate the token
-                    cmpa      #$0d      was line end reached
-                    beq       ArgsParsed finished parsing arguments
-                    lda       ,x+       fetch next byte
-                    bra       ScanArgLoop process the next token
-
-ParseWord           leax      -$01,x    back up to token start
-                    stx       ,y++      store the argv pointer
-                    leax      $01,x     restore scan pointer
-                    inc       $024f,u   bump the argument count
-WordLoop            cmpa      #$0d      end of line reached
-                    beq       WordEnd   terminate the token
-                    cmpa      #$20      space separator
-                    beq       WordEnd   terminate the token
-                    cmpa      #$2C      comma separator
-                    beq       WordEnd   terminate the token
-                    lda       ,x+       fetch next byte
-                    bra       WordLoop  keep scanning the word
-
-WordEnd             clr       -$01,x    null terminate the token
-                    bra       ScanArgLoop process the next token
-
-ArgsParsed          leax      $0212,u   point at the argv array
-                    pshs      x         push argv pointer
-                    ldd       $024e,u   load the argument count
-                    pshs      d         push argc
-                    leay      ,u        copy globals base into y
-                    bsr       stkinit   initialize stack limits
-                    lbsr      main      run the compiler
-                    clr       ,-s       push exit status high byte
-                    clr       ,-s       push exit status low byte
-                    lbsr      exit      terminate the program
-stkinit             leax      $02E7,y   compute top of stack region
-                    stx       $025C,y   save the stack lower limit
-                    sts       $0250,y   save the initial stack pointer
-                    sts       $025e,y   save current stack low water
-                    ldd       #$FF82    negative headroom offset
-stkcheck            leax      d,s       project stack after allocation
-                    cmpx      $025e,y   below recorded low water
-                    bcc       StackOk   still within limit
-                    cmpx      $025C,y   below the hard stack limit
-                    bcs       StackOverflow stack overflow detected
-                    stx       $025e,y   record new low water mark
-StackOk             rts                 return, stack ok
-
-MsgStackOvfl        fcc       /**** STACK OVERFLOW ****/
-                    fcb       $0D
-StackOverflow       leax      MsgStackOvfl,pcr point at overflow message
-                    ldb       #$CF      message length byte
-                    pshs      b         push the length
-                    lda       #$02      standard error path
-                    ldy       #$0064    maximum write length
-                    os9       I$WritLn  write the message
-                    clr       ,-s       push exit status
-                    lbsr      DoExit2   abort the program
-                    ldd       $0250,y   load the initial stack
-                    subd      $025e,y   compute stack consumed
-                    rts                 return stack used
-                    ldd       $025e,y   load current low water
-                    subd      $025C,y   compute remaining stack
-                    rts                 return remaining space
-
-ApplyReloc          pshs      x         save the relocation base
-                    leax      d,y       start toward the table end
-                    leax      d,x       table end is base plus twice count
-                    pshs      x         save the table end pointer
-RelocLoop           ldd       ,y++      load the next fixup offset
-                    leax      d,u       point at the word needing fixup
-                    ldd       ,x        load the unrelocated value
-                    addd      $02,s     add the load address bias
-                    std       ,x        store the relocated pointer
-                    cmpy      ,s        reached the end of table
-                    bne       RelocLoop process next fixup
-                    leas      $04,s     drop saved pointers
-                    rts                 return
+* --- shared C runtime startup (see lib/cstart.asm) ---
+RTBASE              equ       $0212     runtime-globals block base in the data area
+DATAEND             equ       $02E7     end of static data / heap start / stack limit
+HDRADV              equ       $0027     advance to where the non-DP data starts
+                    use       lib/cstart.asm
 
 main                pshs      u         save caller frame
                     ldd       #$FF86    stack need for main
@@ -5146,7 +5001,7 @@ SetPadChar          std       GlbVar001F set the pad character
 WidthDigit          ldd       $06,s     current width
                     pshs      d         save it
                     ldd       #$000A    times ten
-                    lbsr      MulLong   multiply width by ten
+                    lbsr      MulEntry  multiply width by ten
                     pshs      d         save product
                     ldb       $0a,s     get the digit char
                     sex                 sign-extend
@@ -5173,7 +5028,7 @@ WidthScanLoop       ldb       $08,s     get current char
 PrecDigit           ldd       $02,s     current precision
                     pshs      d         save it
                     ldd       #$000A    times ten
-                    lbsr      MulLong   multiply precision by ten
+                    lbsr      MulEntry  multiply precision by ten
                     pshs      d         save product
                     ldb       $0a,s     get digit char
                     sex                 sign-extend
@@ -5640,14 +5495,14 @@ GrowArena           pshs      u,d       save registers
                     addd      #$007F    round up toward a page
                     pshs      d         pass value
                     ldd       #$0007    shift count of seven
-                    lbsr      LsrWord   divide down to page count
+                    lbsr      LsrEntry  divide down to page count
                     pshs      d         pass page count
                     ldd       #$0007    shift count of seven
-                    lbsr      AslWord   multiply back to byte size
+                    lbsr      AslEntry  multiply back to byte size
                     std       ,s        save byte size
                     pshs      d         pass value
                     ldd       #$0004    constant four
-                    lbsr      MulLong   compute size operand
+                    lbsr      MulEntry  compute size operand
                     std       ,s        save result
                     pshs      d         pass value
                     lbsr      GrowHeap  request memory from the system
@@ -7102,7 +6957,7 @@ GenLoadLowByte      pshs      d         push the flag argument
 GenMaskByte         ldd       $0e,s     load the operand
                     pshs      d         push it
                     ldd       #$0008    byte mask/size eight
-                    lbsr      AsrWord   compute the masked value
+                    lbsr      AsrEntry  compute the masked value
                     clra                clear high byte
                     std       ,s        store the result
                     tfr       d,x       move it into x
@@ -8060,7 +7915,7 @@ RingAdvance         pshs      u         save the frame pointer
 RingStore           ldd       $02DA,y   load the head index
                     pshs      d         push the index
                     ldd       #$0006    entry size six
-                    lbsr      MulLong   multiply to a byte offset
+                    lbsr      MulEntry  multiply to a byte offset
                     leax      $029e,y   point at ring table base
                     leax      d,x       index to the slot
                     leau      ,x        keep the slot pointer
@@ -8079,7 +7934,7 @@ RingLookup          pshs      u,d       save frame and search key
 RingLookupLoop      ldd       ,s        load the current index
                     pshs      d         push the index
                     ldd       #$0006    entry size six
-                    lbsr      MulLong   multiply to a byte offset
+                    lbsr      MulEntry  multiply to a byte offset
                     leax      $029e,y   point at ring table base
                     leax      d,x       index to the slot
                     leau      ,x        keep the slot pointer
@@ -9121,7 +8976,7 @@ GenOpReturn         ldd       $04,s     return the byte
                     pshs      d         push it
                     pshs      u         push descriptor
                     ldd       #$0008    field size eight
-                    lbsr      LsrWord   fetch field byte
+                    lbsr      LsrEntry  fetch field byte
                     pshs      d         push it
                     lbsr      GenOperand3 emit first operand byte
                     leas      $04,s     drop arguments
@@ -9375,7 +9230,7 @@ FetchWordFail       ldd       #$FFFF    load failure value
 FetchWordCombine    ldd       $02,s     load the high byte
                     pshs      d         push it
                     ldd       #$0008    shift count of eight
-                    lbsr      AslWord   shift high byte left
+                    lbsr      AslEntry  shift high byte left
                     addd      ,s        add the low byte
 FetchWordExit       leas      $04,s     drop the locals
                     puls      pc,u      restore and return
@@ -10641,51 +10496,7 @@ CopyOperandToTemp   ldd       ,x        load high word
                     std       $02,x     store low word into temp
                     rts                 return with x on temp
 
-MulLong             tsta                is first operand high byte zero
-                    bne       MulLongFull no, take full multiply path
-                    tst       $02,s     is second operand high word zero
-                    bne       MulLongFull no, take full multiply path
-                    lda       $03,s     second operand low byte
-                    mul                 quick eight-bit multiply
-                    ldx       ,s        grab caller word
-                    stx       $02,s     reposition on stack
-                    ldx       #$0000    clear high result
-                    std       ,s        store the product
-                    puls      pc,d      return with the product
-
-MulLongFull         pshs      d         save the multiplier
-                    ldd       #$0000    zero accumulator
-                    pshs      d         push accumulator high
-                    pshs      d         push accumulator low
-                    lda       $05,s     first low byte
-                    ldb       $09,s     second low byte
-                    mul                 partial product
-                    std       $02,s     seed the accumulator
-                    lda       $05,s     first low byte
-                    ldb       $08,s     second high byte
-                    mul                 partial product
-                    addd      $01,s     accumulate
-                    std       $01,s     store running sum
-                    bcc       MulPartial2 branch if no carry
-                    inc       ,s        carry into high byte
-MulPartial2         lda       $04,s     first high byte
-                    ldb       $09,s     second low byte
-                    mul                 partial product
-                    addd      $01,s     accumulate
-                    std       $01,s     store running sum
-                    bcc       MulPartial3 branch if no carry
-                    inc       ,s        carry into high byte
-MulPartial3         lda       $04,s     first high byte
-                    ldb       $08,s     second high byte
-                    mul                 partial product
-                    addd      ,s        accumulate high word
-                    std       ,s        store high word
-                    ldx       $06,s     fetch caller pointer
-                    stx       $08,s     reposition on stack
-                    ldx       ,s        high half of product
-                    ldd       $02,s     low half of product
-                    leas      $08,s     drop the work frame
-                    rts                 return the long product
+                    use       lib/imul.asm
                     clr       $02E2,y   clear the result sign flag
                     leax      >DivUnsigned,pcr point at unsigned divide helper
                     stx       $02E3,y   store helper vector
@@ -10789,35 +10600,7 @@ DivSwapResults      ldx       $04,s     grab caller pointer
                     leas      $06,s     drop the work frame
                     rts                 return quotient and remainder
 
-AsrWord             tstb                any bits to shift
-                    beq       ShiftWordTail skip when zero
-AsrWordLoop         asr       $02,s     arithmetic shift word right
-                    ror       $03,s     rotate low byte
-                    decb                decrement count
-                    bne       AsrWordLoop loop until done
-                    bra       ShiftWordTail join the common tail
-
-LsrWord             tstb                any bits to shift
-                    beq       ShiftWordTail skip when zero
-LsrWordLoop         lsr       $02,s     logical shift word right
-                    ror       $03,s     rotate low byte
-                    decb                decrement count
-                    bne       LsrWordLoop loop until done
-ShiftWordTail       ldd       $02,s     load shifted word
-                    pshs      d         stage it
-                    ldd       $02,s     load shifted word
-                    std       $04,s     place for return
-                    ldd       ,s        reload staged word
-                    leas      $04,s     drop the temp
-                    rts                 return shifted result
-
-AslWord             tstb                any bits to shift
-                    beq       ShiftWordTail skip when zero
-AslWordLoop         asl       $03,s     shift word left
-                    rol       $02,s     rotate high byte
-                    decb                decrement count
-                    bne       AslWordLoop loop until done
-                    bra       ShiftWordTail join the common tail
+                    use       lib/shift.asm
 
 SendSignal          std       $0260,y   save the signal code
                     pshs      y,b       preserve y and code
@@ -11106,7 +10889,7 @@ CheckIoResult       bcs       FailClearErrno error on carry set
 
 exit                lbsr      CleanupStub run cleanup hook
                     lbsr      ClearBufTable flush and close output
-DoExit2             ldd       $02,s     load exit status
+_exit               ldd       $02,s     load exit status
                     os9       F$Exit    terminate process
 CleanupStub         rts                 empty cleanup stub
 

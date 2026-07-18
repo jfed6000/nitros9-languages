@@ -27,7 +27,7 @@ tylg                set       Prgrm+Objct
 atrv                set       ReEnt+rev
 rev                 set       $01
 
-                    mod       eom,name,tylg,atrv,_cstart,size
+                    mod       eom,name,tylg,atrv,_start,size
 
 U0000               rmb       1
 U0001               rmb       1
@@ -232,222 +232,11 @@ name                fcs       /c.asm/
 *
 * move bytes (Y=From addr, U=To addr, X=Count)
 *
-movbytes            lda       ,Y+       get a byte
-                    sta       ,U+       put a byte
-                    leax      -1,X      dec the count
-                    bne       movbytes  and round again
-                    rts                 return from the block move
-
-_cstart             pshs      Y         save the to of mem
-                    pshs      U         save the data beginning address
-
-                    clra                setup to clear
-                    clrb                256 bytes
-csta05              sta       ,U+       clear dp bytes
-                    decb                count down the byte
-                    bne       csta05    loop until the page is cleared
-
-csta10              ldx       ,S        get the beginning of data address
-                    leau      ,X        (tfr x,u)
-                    leax      >2502,X   get the end of bss address
-                    pshs      X         save it
-                    leay      >etext,PC point to dp-data count word
-
-                    ldx       ,Y++      get count of dp-data to be moved
-                    beq       csta15    bra if none
-                    bsr       movbytes  move dp data into position
-
-                    ldu       2,S       get beginning address again
-csta15              leau      >232,U    point to where non-dp should start
-                    ldx       ,Y++      get count of non-dp data to be moved
-                    beq       clrbss    skip the copy when empty
-                    bsr       movbytes  move non-dp data into position
-
-* clear the bss area - starts where
-* the transferred data finished
-                    clra                prepare a zero fill byte
-clrbss              cmpu      ,S        reached the end?
-                    beq       RelocText bra if so
-                    sta       ,U+       clear it
-                    bra       clrbss    continue clearing the bss
-
-* now replace the data-text references
-RelocText           ldu       2,S       store to data bottom
-                    ldd       ,Y++      get data-text ref. count
-                    beq       reldd     skip when no text references
-                    leax      >U0000,PC point to text
-                    lbsr      patch     patch them
-
-* and the data-data refs.
-reldd               ldd       ,Y++      get the count of data refs.
-                    beq       restack   bra if none
-                    leax      ,U        u was already pointing there
-                    lbsr      patch     patch the text references
-
-restack             leas      4,S       reset stack
-                    puls      X         restore 'memend'
-                    stx       >1433,U   save the parameter pointer
-
-* process the params
-* the stack pointer is back where it started so is
-* pointing at the params
-*
-* the objective is to insert null chars at the end of each argument
-* and fill in the argv vector with pointers to them
-
-* first store the program name address
-* (an extra name is inserted here for just this purpose
-* - undocumented as yet)
-                    sty       >1369,U   save the argument vector base
-
-                    ldd       #1        at least one arg
-                    std       >1429,U   clear the argument count
-                    leay      >1371,U   point y at second slot
-                    leax      ,S        point x at params
-                    lda       ,X+       initialize
-
-aloop               ldb       >1430,U   load the current argument count
-                    cmpb      #29       about to overflow?
-                    beq       final     stop when the vector is full
-aloop10             cmpa      #13       is it EOL?
-                    beq       final     yes - reached the end of the list
-
-                    cmpa      #32       is it a space?
-                    beq       aloop20   yes - try another
-                    cmpa      #44       is it a comma?
-                    bne       aloop30   no - a word has started
-aloop20             lda       ,X+       yes - bump
-                    bra       aloop10   and round again
-
-aloop30             cmpa      #34       quoted string?
-                    beq       aloop40   yes
-                    cmpa      #39       the other one?
-                    bne       aloop60   no - ordinary
-
-aloop40             stx       ,Y++      save address in vector
-                    inc       >1430,U   bump the arg count
-                    pshs      A         save delimiter
-
-qloop               lda       ,X+       get another
-                    cmpa      #13       eol?
-                    beq       aloop50   end the quoted token at eol
-                    cmpa      ,S        delimiter?
-                    bne       qloop     scan until the closing delimiter
-
-aloop50             puls      B         clean stack
-                    clr       -1,X      terminate the quoted token
-                    cmpa      #13       was it end of line
-                    beq       final     yes - finish the scan
-                    lda       ,X+       no - get the next character
-                    bra       aloop     process the next word
-
-aloop60             leax      -1,X      point at first char
-                    stx       ,Y++      put address in vector
-                    leax      1,X       bump it back
-                    inc       >1430,U   bump the arg count
-
-* at least one non-space char has been seen
-aloop70             cmpa      #13       have
-                    beq       loopend   we
-                    cmpa      #32       reached
-                    beq       loopend   the end?
-                    cmpa      #44       comma?
-                    beq       loopend   end the word at a comma
-                    lda       ,X+       no - look further
-                    bra       aloop70   keep scanning the word
-
-loopend             clr       -1,X      yes - put in the null byte
-                    bra       aloop     and look for the next word
-
-* now put the pointers on the stack
-final               leax      >1369,U   get the address of the arg vector
-                    pshs      X         goes on the stack first
-                    ldd       >1429,U   get the arg count
-                    pshs      D         stack it
-                    leay      ,U        C progs. assume data & bss offset from y
-
-                    bsr       _fixtop   set various variables
-
-                    lbsr      main      call the program
-
-                    clr       ,-S       put a zero
-                    clr       ,-S       on the stack
-                    lbsr      exit      and a dummy 'return address'
-
-* no return here
-_fixtop             leax      >end,Y    get the initial memory end address
-                    stx       >_mtop,Y  it's the current memory top
-                    sts       >_sttop,Y this is really two bytes short!
-                    sts       >_stbot,Y record the stack bottom
-                    ldd       #-126     give ourselves some breathing space
-
-* on entry here, d holds the negative of a stack reservation request
-_stkcheck           leax      D,S       calculate the requested size
-                    cmpx      >_stbot,Y is it lower than already reserved?
-                    bcc       stk10     no - return
-                    cmpx      >_mtop,Y  yes - is it lower than possible?
-                    bcs       fsterr    yes - can't cope
-                    stx       >_stbot,Y no - reserve it
-stk10               rts                 and return
-
-fixserr             fcc       "**** STACK OVERFLOW ****"
-                    fcb       $0D
-
-fsterr              leax      <fixserr,PC address of error string
-                    ldb       #E$MemFul MEMORY FULL error number
-
-erexit              pshs      B         stack the error number
-                    lda       #2        standard error output
-                    ldy       #100      more than necessary
-                    os9       I$WritLn  write it
-                    clr       ,-S       clear MSB of status
-                    lbsr      _exit     and out
-* no return here
-
-* stacksize()
-* the extent of stack requested
-* can be used by programmer for guidance
-* in sizing memory at compile time
-stacksiz            ldd       >_sttop,Y top of stack on entry
-                    subd      >_stbot,Y subtract current reserved limit
-                    rts                 return the stack size in use
-
-* freemem()
-* returns the current size of the free memory area
-freemem             ldd       >_stbot,Y load the reserved stack bottom
-                    subd      >_mtop,Y  minus the memory top
-                    rts                 return the free memory size
-
-* patch - adjust initialized data which refer to memory locations.
-* entry:
-*       y -> list of offsets in the data area to be patched
-*       u -> base of data
-*       x -> base of either text or data area as appropriate
-*       d =  count of offsets in the list
-*
-* exit:
-*       u - unchanged
-*       y - past the last entry in the list
-*       x and d mangled
-
-patch               pshs      X         save the base
-                    leax      D,Y       half way up the list
-                    leax      D,X       top of list
-                    pshs      X         save it as place to stop
-
-* we do not come to this routine with
-* a zero count (check!) so a test at the loop top
-* is unnecessary
-patch10             ldd       ,Y++      get the offset
-                    leax      D,U       point to location
-                    ldd       ,X        get the relative reference
-                    addd      2,S       add in the base
-                    std       ,X        store the absolute reference
-                    cmpy      ,S        reached the top?
-                    bne       patch10   no - round again
-
-                    leas      4,S       reset the stack
-                    rts                 and return
+* --- shared C runtime startup (see cstart.i) ---
+RTBASE              equ       $0559     runtime-globals block base in the data area
+DATAEND             equ       $09C6     end of static data / heap start / stack limit
+HDRADV              equ       $00E8     advance to where the non-DP data starts
+                    use       lib/cstart.asm
 
 main                pshs      U,D       save frame pointer and arguments
                     ldd       8,S       load an argument word
@@ -2162,7 +1951,7 @@ MatchRegToken       pshs      U         save frame pointer
 MatchRegLoop        ldd       1,S       load current index
                     pshs      D         push as argument
                     ldd       #3        element size three
-                    lbsr      Multiply16 multiply index by size
+                    lbsr      MulEntry  multiply index by size
                     leax      >RegisterTbl,Y point to register table
                     leax      D,X       index into table
                     ldb       ,X        load table entry character
@@ -2176,7 +1965,7 @@ MatchRegLoop        ldd       1,S       load current index
                     ldd       1,S       reload index
                     pshs      D         push as argument
                     ldd       #3        element size three
-                    lbsr      Multiply16 multiply index by size
+                    lbsr      MulEntry  multiply index by size
                     leax      >RegisterTbl,Y point to register table
                     leax      D,X       index into table
                     ldb       1,X       load second entry byte
@@ -2214,7 +2003,7 @@ HighRegGroup        ldd       1,S       reload index
 UseTableField       ldd       1,S       reload matched index
                     pshs      D         push as argument
                     ldd       #3        element size three
-                    lbsr      Multiply16 multiply index by size
+                    lbsr      MulEntry  multiply index by size
                     leax      >RegisterTbl,Y point to register table
                     leax      D,X       index into table
                     ldb       2,X       load table result byte
@@ -4449,7 +4238,7 @@ MsgSymTabOvf        fcc       "symbol table overflow"
                     fcb       $00
 ParseValue          pshs      U         save frame pointer
                     ldd       #-68      request stack space for locals
-                    lbsr      _stkcheck check stack space
+                    lbsr      stkcheck  check stack space
                     lbsr      EvalLineExpr parse the expression
                     std       -2,S      save result
                     beq       RetZero   nothing parsed, return zero
@@ -4462,7 +4251,7 @@ ParseValue          pshs      U         save frame pointer
 
 ParseReloc          pshs      U         save frame pointer
                     ldd       #-70      request stack space for locals
-                    lbsr      _stkcheck check stack space
+                    lbsr      stkcheck  check stack space
                     bsr       EvalLineExpr parse the expression
                     std       -2,S      save result
                     bne       EmitReloc parsed, continue
@@ -4501,7 +4290,7 @@ StoreStatusFlags    stb       <ModeFlags store status flags
 
 EvalLineExpr        pshs      U         save frame pointer
                     ldd       #-68      request stack space for locals
-                    lbsr      _stkcheck check stack space
+                    lbsr      stkcheck  check stack space
                     lbsr      SkipSpaces skip leading spaces
                     leax      >ListStart,Y address table base
                     stx       >ListEnd,Y reset symbol stack
@@ -4510,7 +4299,7 @@ EvalLineExpr        pshs      U         save frame pointer
 
 EvalConstTerm       pshs      U         save frame pointer
                     ldd       #-68      request stack space for locals
-                    lbsr      _stkcheck check stack space
+                    lbsr      stkcheck  check stack space
                     lbsr      ExtRefErr evaluate the term
                     std       <OperandVal save computed value
                     std       <RelocFlags save relocation flags
@@ -4518,7 +4307,7 @@ EvalConstTerm       pshs      U         save frame pointer
 
 EvalAddSub          pshs      U         save frame pointer
                     ldd       #-77      request stack space for locals
-                    lbsr      _stkcheck check stack space
+                    lbsr      stkcheck  check stack space
                     leas      -7,S      reserve locals
                     clra                clear high byte
                     clrb                clear low byte
@@ -4611,7 +4400,7 @@ TermScanDone        leas      7,S       discard local frame
 
 ParseMulDiv         pshs      U         save frame pointer
                     ldd       #-73      stack check size
-                    lbsr      _stkcheck verify stack space
+                    lbsr      stkcheck  verify stack space
                     leas      -3,S      allocate locals
                     lbsr      ParseAndOr parse higher precedence operand
                     std       -2,S      save result flag
@@ -4639,7 +4428,7 @@ DoMulDiv            ldb       ,S        get operator
                     ldd       1,S       get left operand
                     pshs      D         push multiplicand
                     ldd       <OperandVal get right operand
-                    lbsr      Multiply16 multiply operands
+                    lbsr      MulEntry  multiply operands
                     bra       StoreMulDiv store the product
 
 CheckDivZero        ldd       <OperandVal get the divisor
@@ -4665,7 +4454,7 @@ MulDivNext          ldb       [>SrcPtr,Y] get current char
 
 ParseAndOr          pshs      U         save frame pointer
                     ldd       #-71      stack check size
-                    lbsr      _stkcheck verify stack space
+                    lbsr      stkcheck  verify stack space
                     leas      -3,S      allocate locals
                     lbsr      ParseAddSub parse higher precedence operand
                     std       -2,S      save result flag
@@ -4709,7 +4498,7 @@ AndOrNext           ldb       [>SrcPtr,Y] get current char
 
 ParseAddSub         pshs      U         save frame pointer
                     ldd       #-71      stack check size
-                    lbsr      _stkcheck verify stack space
+                    lbsr      stkcheck  verify stack space
                     leas      -3,S      allocate locals
                     ldb       [>SrcPtr,Y] get current char
                     stb       ,S        save it
@@ -4776,7 +4565,7 @@ AddSubDone          leas      3,S       discard locals
 
 ParsePrimary        pshs      U         save frame pointer
                     ldd       #-72      stack check size
-                    lbsr      _stkcheck verify stack space
+                    lbsr      stkcheck  verify stack space
                     leas      -2,S      allocate locals
                     ldb       [>SrcPtr,Y] get current char
                     sex                 sign extend
@@ -4885,7 +4674,7 @@ PrimaryDone         ldd       #1        return success flag
 
 ParseNumber         pshs      U         save frame pointer
                     ldd       #-72      stack check size
-                    lbsr      _stkcheck verify stack space
+                    lbsr      stkcheck  verify stack space
                     leas      -6,S      allocate locals
                     clra                clear high byte
                     clrb                clear low byte
@@ -4954,7 +4743,7 @@ InitAccumulator     clra                clear high byte
 AccumDigitLoop      ldd       <OperandVal get the accumulator
                     pshs      D         push it
                     ldd       6,S       get the radix
-                    lbsr      Multiply16 multiply accumulator by radix
+                    lbsr      MulEntry  multiply accumulator by radix
                     pshs      D         push the product
                     ldb       2,S       get current digit char
                     cmpb      #65       is it a letter
@@ -6163,7 +5952,7 @@ PushContext         pshs      U         save the frame pointer
                     subd      #1        recover the previous depth
                     pshs      D         pass the index argument
                     ldd       #10       context record size ten
-                    lbsr      Multiply16 multiply for the offset
+                    lbsr      MulEntry  multiply for the offset
                     leax      >ContextArray,Y point to the context array
                     leax      D,X       index the entry
                     leau      ,X        keep the entry pointer
@@ -6222,7 +6011,7 @@ PopContext          pshs      U         save the frame pointer
                     std       <CtxDepth save the new depth
                     pshs      D         pass the index argument
                     ldd       #10       context record size ten
-                    lbsr      Multiply16 multiply for the offset
+                    lbsr      MulEntry  multiply for the offset
                     leax      >ContextArray,Y point to the context array
                     leax      D,X       index the entry
                     leau      ,X        keep the entry pointer
@@ -7026,7 +6815,7 @@ SetPadChar          std       >PadChar,Y store the chosen pad character
 WidthDigitLoop      ldd       6,S       load the current field width
                     pshs      D         save it
                     ldd       #10       load ten
-                    lbsr      Multiply16 multiply the width by ten
+                    lbsr      MulEntry  multiply the width by ten
                     pshs      D         save the product
                     ldb       10,S      load the current digit character
                     sex                 sign-extend it
@@ -7053,7 +6842,7 @@ WidthDigitTest      ldb       8,S       load the current character
 PrecDigitLoop       ldd       2,S       load the current precision
                     pshs      D         save it
                     ldd       #10       load ten
-                    lbsr      Multiply16 multiply the precision by ten
+                    lbsr      MulEntry  multiply the precision by ten
                     pshs      D         save the product
                     ldb       10,S      load the current digit character
                     sex                 sign-extend it
@@ -8493,51 +8282,7 @@ CopyToTemp32        ldd       ,X        load the high word
                     leax      >TempResult,Y point at the temp
                     std       2,X       store the low word
                     rts                 return to caller
-Multiply16          tsta                test the multiplier high byte
-                    bne       Multiply16Full use full multiply if nonzero
-                    tst       2,S       test the multiplicand high byte
-                    bne       Multiply16Full use full multiply if nonzero
-                    lda       3,S       load the low byte
-                    mul                 eight by eight multiply
-                    ldx       ,S        load the low half
-                    stx       2,S       store into the result
-                    ldx       #0        clear the high word
-                    std       ,S        store the product
-                    puls      PC,D      return with the product
-
-Multiply16Full      pshs      D         save the multiplier
-                    ldd       #0        load zero
-                    pshs      D         reserve accumulator word
-                    pshs      D         reserve accumulator word
-                    lda       5,S       load a byte
-                    ldb       9,S       load a byte
-                    mul                 partial product
-                    std       2,S       store the partial
-                    lda       5,S       load a byte
-                    ldb       8,S       load a byte
-                    mul                 partial product
-                    addd      1,S       add into the accumulator
-                    std       1,S       store the accumulator
-                    bcc       AddNoCarry1 skip carry propagation
-                    inc       ,S        propagate the carry
-AddNoCarry1         lda       4,S       load a byte
-                    ldb       9,S       load a byte
-                    mul                 partial product
-                    addd      1,S       add into the accumulator
-                    std       1,S       store the accumulator
-                    bcc       AddNoCarry2 skip carry propagation
-                    inc       ,S        propagate the carry
-AddNoCarry2         lda       4,S       load a byte
-                    ldb       8,S       load a byte
-                    mul                 partial product
-                    addd      ,S        add into the accumulator
-                    std       ,S        store the accumulator
-                    ldx       6,S       reload the low half
-                    stx       8,S       stash the low half
-                    ldx       ,S        load the high half
-                    ldd       2,S       load the low half
-                    leas      8,S       clean up the stack
-                    rts                 return with the product
+                    use       lib/imul.asm
 Divide32            clr       >SignFlag,Y clear the sign flag
                     leax      >UDivWorker,PC point at the unsigned divide routine
                     stx       >RoutinePtr,Y store the routine pointer
@@ -8639,34 +8384,7 @@ DivFinish           ldx       4,S       load the low words
                     ldd       4,S       load the result
                     leas      6,S       clean up the stack
                     rts                 return to caller
-                    tstb                test the shift count
-                    beq       ShiftDone nothing to shift
-AsrLoop             asr       2,S       arithmetic shift right
-                    ror       3,S       rotate the low byte
-                    decb                decrement the count
-                    bne       AsrLoop   loop until done
-                    bra       ShiftDone go to the shift exit
-
-LsrEntry            tstb                test the shift count
-                    beq       ShiftDone nothing to shift
-LsrLoop             lsr       2,S       logical shift right
-                    ror       3,S       rotate the low byte
-                    decb                decrement the count
-                    bne       LsrLoop   loop until done
-ShiftDone           ldd       2,S       load the result low
-                    pshs      D         push it
-                    ldd       2,S       load the result
-                    std       4,S       store into place
-                    ldd       ,S        load the return value
-                    leas      4,S       clean up the stack
-                    rts                 return to caller
-AslEntry            tstb                test the shift count
-                    beq       ShiftDone nothing to shift
-AslLoop             asl       3,S       shift the value left
-                    rol       2,S       rotate the high byte
-                    decb                decrement the count
-                    bne       AslLoop   loop until done
-                    bra       ShiftDone go to the shift exit
+                    use       lib/shift.asm
 
 SendSignal          std       >errno,Y  save the signal number as errno
                     pshs      Y,B       save registers
@@ -8957,7 +8675,7 @@ _exit               ldd       2,S       load the exit status code
 
 _dumprof            rts                 profiling stub does nothing
 
-etext               fcb       $00
+WorkBlockImage      fcb       $00
                     fcb       $15
                     fcb       $00
                     fcb       $01
