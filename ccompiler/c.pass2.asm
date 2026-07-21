@@ -20,35 +20,73 @@ edition             set       $05
 
                     mod       eom,name,tylg,atrv,_start,size
 
-DataSpace           rmb       3431
+                    * ------------------------------------------------------------------
+                    * Data area (named rmb fields).  rmb reserves RAM without emitting
+                    * bytes; OS-9 allocates <size> at load, cstart inits from WorkBlockImage.
+                    * Names for ,y-referenced fields are derived from the code comments.
+                    * ------------------------------------------------------------------
+                    rmb       $1
+GlbVar0001          rmb       $1
+LowWordDestination  rmb       $1
+GlbVar0003          rmb       $2
+GlbVar0005          rmb       $2
+GlbVar0007          rmb       $2
+GlbVar0009          rmb       $2
+GlbVar000B          rmb       $2
+GlbVar000D          rmb       $2
+GlbVar000F          rmb       $2
+GlbVar0011          rmb       $2
+GlbVar0013          rmb       $2
+GlbVar0015          rmb       $2
+GlbMaxCaseVal       rmb       $2
+GlbVar0019          rmb       $2
+GlbVar001B          rmb       $2
+GlbVar001D          rmb       $2
+GlbVar001F          rmb       $2
+GlbVar0021          rmb       $2
+GlbType5Val         rmb       $2
+GlbVar0025          rmb       $2
+LookupTable         rmb       $1C
+Pow10               rmb       $8
+FreeRoot            rmb       $2
+GlobalField         rmb       $2
+SSuffixString       rmb       $2
+PushMnemonicPointer rmb       $2
+StackPointerRegister rmb       $2
+RegisterName        rmb       $2
+NodeFieldY          rmb       $2
+RegisterNameTable   rmb       $68
+Stdin               rmb       $D
+Stdout              rmb       $D
+Stderr              rmb       $B6
+PastTableEnd        rmb       $1
+CtypeTab            rmb       $C0
+HeapTop             rmb       $2
+TempBuffer          rmb       $2
+OutputArea          rmb       $2
+OutputArea2         rmb       $4
+BumpPointer         rmb       $2
+Limit               rmb       $2
+ErrorCode           rmb       $2
+FilenameBuffer      rmb       $1D
+BufferEndPointer    rmb       $1
+OutputNameAlready   rmb       $2
+Label               rmb       $2
+InputFilename       rmb       $2
+ConversionBuffer    rmb       $A
+TempHexBuffer       rmb       $A
+ArenaBase           rmb       $2
+NodeSize            rmb       $2
+RingTableBase       rmb       $3C
+HeadIndex           rmb       $2
+TailIndex           rmb       $2
+LabelId             rmb       $2
+ColumnCounter       rmb       $2
+ResultSignFlag      rmb       $1
+HelperVector        rmb       $2
+FreeSpace           rmb       $2
+                    rmb       $A80     remaining data, bss and heap
 size                equ       .
-
-* --------------------------------------------------------------------
-* Direct-page global variables.
-* The C runtime keeps its globals in the direct page (DP = data base).
-* The disassembler assumed DP=$00, so these direct-page references had
-* resolved onto the startup code at the same low addresses; they are
-* defined here as equates and the references repointed, byte-identically.
-* --------------------------------------------------------------------
-GlbVar0001          equ       $0001
-GlbVar0003          equ       $0003
-GlbVar0005          equ       $0005
-GlbVar0007          equ       $0007
-GlbVar0009          equ       $0009
-GlbVar000B          equ       $000B
-GlbVar000D          equ       $000D
-GlbVar000F          equ       $000F
-GlbVar0011          equ       $0011
-GlbVar0013          equ       $0013
-GlbVar0015          equ       $0015
-GlbMaxCaseVal       equ       $0017
-GlbVar0019          equ       $0019
-GlbVar001B          equ       $001B
-GlbVar001D          equ       $001D
-GlbVar001F          equ       $001F
-GlbVar0021          equ       $0021
-GlbType5Val         equ       $0023
-GlbVar0025          equ       $0025
 
 name                equ       *
                     fcs       /c.pass2/
@@ -63,7 +101,7 @@ HDRADV              equ       $0027     advance to where the non-DP data starts
 main                pshs      u         save caller frame
                     ldd       #$FF86    stack need for main
                     lbsr      stkcheck  verify stack space
-                    leas      -$24,s    allocate the local frame
+                    leas      -36,s      allocate the local frame
                     lbra      ArgLoopTop jump to the argument loop
 
 ArgProcess          ldx       $2a,s     load the argv pointer
@@ -89,7 +127,7 @@ OptSetN             ldd       #$0001    flag value one
                     leax      MsgDevNull,pcr point at the option name
                     pshs      x         push the argument
                     lbsr      OpenOutputFile process the option
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     lbra      NextOptChar next option character
 
 OptSetO             leau      $01,u     advance past the o
@@ -99,7 +137,7 @@ OptSetO             leau      $01,u     advance past the o
                     leau      $01,u     skip the equals
                     pshs      u         push the value string
                     lbsr      OpenOutputFile process the -o value
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     leax      $24,s     point past the local frame
                     lbra      RestoreFrame resume the argument loop
 
@@ -107,10 +145,10 @@ OptBadO             leau      -$01,u    back up the pointer
                     pshs      u         push the option text
                     leax      MsgBadArg,pcr point at the format string
                     pshs      x         push the format
-                    leax      $00DB,y   stderr stream pointer
+                    leax      Stderr,y  stderr stream pointer
                     pshs      x         push the stream
                     lbsr      fprintf   print the error message
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     lbsr      FatalExit count the error
 OptSetP             ldd       #$0001    flag value one
                     std       GlbVar0013 set the -p option flag
@@ -121,10 +159,10 @@ OptUnknown          ldb       ,u        load the option character
                     pshs      d         push the character
                     leax      MsgBadOption,pcr unknown option format
                     pshs      x         push the format
-                    leax      $00DB,y   stderr stream pointer
+                    leax      Stderr,y  stderr stream pointer
                     pshs      x         push the stream
                     lbsr      fprintf   print the warning message
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     lbsr      FatalExit count the error
                     bra       NextOptChar next option character
 
@@ -145,34 +183,34 @@ NextOptChar         leau      $01,u     advance to next character
 
 HandleFileArg       ldd       GlbVar0003 input file already open
                     beq       OpenInput no, open the input
-                    ldd       $0280,y   output name already set
+                    ldd       OutputNameAlready,y   output name already set
                     beq       SaveOutName no, set the output name
                     leax      MsgTooManyFiles,pcr too many files format
                     pshs      x         push the format
-                    leax      $00DB,y   stderr stream pointer
+                    leax      Stderr,y  stderr stream pointer
                     pshs      x         push the stream
                     lbsr      fprintf   print the error message
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     lbsr      FatalExit count the error
-SaveOutName         stu       $0280,y   save the output filename
+SaveOutName         stu       OutputNameAlready,y   save the output filename
                     bra       ArgLoopTop next argument
 
 OpenInput           leax      ModeRead,pcr default extension string
                     pshs      x         push the extension
                     pshs      u         push the filename
                     lbsr      CompareOperands open the input source file
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     std       GlbVar0003 save the input file handle
                     bne       SaveInName opened successfully
                     pshs      u         push the filename
                     leax      MsgCantOpenR,pcr cannot open format string
                     pshs      x         push the format
-                    leax      $00DB,y   stderr stream pointer
+                    leax      Stderr,y  stderr stream pointer
                     pshs      x         push the stream
                     lbsr      fprintf   print the error message
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     lbsr      FatalExit count the error
-SaveInName          stu       $0284,y   save the input filename
+SaveInName          stu       InputFilename,y   save the input filename
                     bra       ArgLoopTop next argument
 
 RestoreFrame        leas      -$24,x    reset stack to frame base
@@ -182,16 +220,16 @@ ArgLoopTop          ldd       $28,s     load remaining arg count
                     lbne      ArgProcess process the next argument
                     ldd       GlbVar0005 output stream already set
                     bne       CheckInDefault yes, keep it
-                    leax      $00CE,y   default output to stdout
+                    leax      Stdout,y  default output to stdout
                     stx       GlbVar0005 store the output stream
 CheckInDefault      ldd       GlbVar0003 input stream already set
                     bne       CheckOutName yes, keep it
-                    leax      $00C1,y   default input to stdin
+                    leax      Stdin,y   default input to stdin
                     stx       GlbVar0003 store the input stream
-CheckOutName        ldd       $0280,y   output name already set
+CheckOutName        ldd       OutputNameAlready,y   output name already set
                     bne       EnterCodegen yes, keep it
                     leax      EmptyStr,pcr default output name
-                    stx       $0280,y   store the output name
+                    stx       OutputNameAlready,y   store the output name
 EnterCodegen        lbra      NextRecord enter the code generator loop
 
 CaseLoadNode        ldx       $1a,s     load saved node pointer
@@ -200,7 +238,7 @@ CaseLoadNode        ldx       $1a,s     load saved node pointer
 EmitTokenLoop       ldd       GlbVar0003 input stream
                     pshs      d         push the stream
                     lbsr      FetchByte read intermediate token
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $1a,s     save the token
                     cmpd      #$FFFF    end marker
                     beq       EmitTokensDone done with the list
@@ -209,7 +247,7 @@ EmitTokenLoop       ldd       GlbVar0003 input stream
                     ldd       $1C,s     the token
                     pshs      d         push the token
                     lbsr      GenOperand3 emit the token
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldd       $1a,s     reload the token
                     cmpd      #$000D    carriage return terminator
                     bne       EmitTokenLoop continue reading tokens
@@ -218,14 +256,14 @@ EmitTokensDone      lbra      NextRecord back to main loop
 EmitBinaryOp        ldd       GlbVar0003 input stream
                     pshs      d         push the stream
                     lbsr      FetchWord read intermediate word
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       GlbVar0007 save the value
                     leax      $14,s     point at operand buffer
                     pshs      x         push the buffer pointer
                     ldd       GlbVar0003 input stream
                     pshs      d         push the stream
                     lbsr      FetchByte read intermediate token
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     clra                clear high byte
                     lbsr      SignExtendLong build a register operand
                     pshs      x         save the register descriptor
@@ -241,7 +279,7 @@ EmitBinaryOp        ldd       GlbVar0003 input stream
                     ldd       GlbVar0003 input stream
                     pshs      d         push the stream
                     lbsr      FetchWord read intermediate word
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     lbsr      SignExtendLong build a register operand
                     lbsr      IntAdd32  build a memory operand
                     lbsr      StoreLong flush the operand
@@ -253,23 +291,23 @@ EmitBinaryOp        ldd       GlbVar0003 input stream
                     ldd       GlbVar0007 reload the saved value
                     pshs      d         push it
                     lbsr      RingAdvance emit the instruction
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     lbra      NextRecord back to main loop
 
 EmitSwitchNode      ldd       GlbVar0003 input stream
                     pshs      d         push the stream
                     lbsr      FetchWord read the node type
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $22,s     save the node type
                     ldd       GlbVar0003 input stream
                     pshs      d         push the stream
                     lbsr      FetchWord read intermediate word
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       GlbVar000B save the first operand
                     ldd       GlbVar0003 input stream
                     pshs      d         push the stream
                     lbsr      FetchWord read intermediate word
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       GlbVar000D save the second operand
                     ldd       GlbMaxCaseVal load the running maximum
                     cmpd      GlbVar000D compare with the new value
@@ -282,31 +320,31 @@ MaxKept             ldx       $22,s     load the node type
 NodeType2           ldd       GlbVar0003 input stream
                     pshs      d         push the stream
                     lbsr      FetchWord read intermediate word
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $1e,s     save the first field
                     ldd       GlbVar0003 input stream
                     pshs      d         push the stream
                     lbsr      FetchWord read intermediate word
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $20,s     save the second field
                     ldd       GlbVar0003 input stream
                     pshs      d         push the stream
                     lbsr      FetchByte read intermediate token
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $1C,s     save the third field
                     bra       EmitNode  emit the node
 
 NodeType5           ldd       GlbVar0003 input stream
                     pshs      d         push the stream
                     lbsr      FetchWord read intermediate word
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       GlbType5Val save the type five operand
                     bra       EmitNode  emit the node
 
 NodeType18          ldd       GlbVar0003 input stream
                     pshs      d         push the stream
                     lbsr      FetchWord read intermediate word
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $18,s     save the operand field
                     bra       EmitNode  emit the node
 
@@ -317,7 +355,7 @@ NodeTypeDispatch    cmpx      #$0002    node type two
                     cmpx      #$0012    node type eighteen
                     beq       NodeType18 handle type eighteen
 EmitNode            lbsr      BuildExprNode allocate a label
-                    std       $0282,y   save the current label
+                    std       Label,y   save the current label
                     ldx       $22,s     reload the node type
                     lbra      DispatchNode dispatch the node emit
 
@@ -327,43 +365,43 @@ EmitNodeA           ldd       $1C,s     third field
                     pshs      d         push it
                     ldd       $22,s     node type again
                     pshs      d         push it
-                    ldd       $0282,y   current label
+                    ldd       Label,y   current label
                     pshs      d         push it
                     lbsr      GenExpr2  emit the construct
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     lbra      FinishOperand continue the main loop
 
 EmitNodeB           ldd       $18,s     operand field
                     pshs      d         push it
-                    ldd       $0282,y   current label
+                    ldd       Label,y   current label
                     pshs      d         push it
                     lbsr      LoadOperandReg emit the construct
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     lbra      FinishOperand continue the main loop
 
-EmitNodeC           ldd       $0282,y   current label
+EmitNodeC           ldd       Label,y   current label
                     pshs      d         push it
                     lbsr      GenExpr   emit the construct
-                    leas      $02,s     drop the argument
-                    std       $0282,y   update the current label
+                    leas      2,s        drop the argument
+                    std       Label,y   update the current label
                     lbra      FinishOperand continue the main loop
 
-EmitNodeD           ldd       $0282,y   current label
+EmitNodeD           ldd       Label,y   current label
                     pshs      d         push it
                     lbsr      ForceReg71 emit the construct
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     lbra      FinishOperand continue the main loop
 
 EmitNodeE           lbsr      EmitFdb   emit the prologue
                     clra                clear high byte
                     clrb                clear low byte
                     pshs      d         push zero
-                    ldd       $0282,y   current label
+                    ldd       Label,y   current label
                     pshs      d         push value as emit argument
                     ldd       #$0077    load constant $77
                     pshs      d         push it as argument
                     lbsr      EmitAddrMode call emit helper
-                    leas      $06,s     drop the three arguments
+                    leas      6,s        drop the three arguments
                     lbsr      EmitNewline call emit helper
                     clra                zero accumulator a
                     clrb                zero accumulator b
@@ -374,10 +412,10 @@ EmitTypeDefault     ldd       $22,s     load the local operand
                     pshs      d         push as fprintf argument
                     leax      MsgBadAction,pcr address of format string
                     pshs      x         push format pointer
-                    leax      $00DB,y   output file pointer
+                    leax      Stderr,y  output file pointer
                     pshs      x         push FILE argument
                     lbsr      fprintf   print the formatted operand
-                    leas      $06,s     drop the three arguments
+                    leas      6,s        drop the three arguments
                     lbsr      FatalExit emit trailer
                     bra       FinishOperand join operand tail
 
@@ -393,7 +431,7 @@ DispatchNode        cmpx      #$0002    dispatch on node type 2
                     beq       EmitNodeE branch to that handler
                     bra       EmitTypeDefault default: formatted emit
 
-FinishOperand       ldd       $0282,y   load current node pointer
+FinishOperand       ldd       Label,y   load current node pointer
                     pshs      d         push as argument
                     lbsr      WalkTreeChildren free or emit the node
                     lbra      DoneOperand operand done
@@ -429,16 +467,16 @@ StringCharLoop      ldd       $1a,s     load current character
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchByte read the escaped character
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $1a,s     store escaped character
 EmitStringChar      ldd       $1a,s     load character to emit
                     pshs      d         push as argument
                     lbsr      EmitStrChar emit one string character
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 GenStringRecord     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchByte read next character
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $1a,s     store the character
                     bne       StringCharLoop loop while nonzero
 StringDone          clra                zero accumulator a
@@ -452,7 +490,7 @@ GenMRecord          ldd       GlbVar0003 input file pointer
                     lbsr      FetchWord read a number from input
                     std       ,s        overwrite argument
                     lbsr      EmitLeas  emit the value
-DoneOperand         leas      $02,s     drop the operand
+DoneOperand         leas      2,s        drop the operand
                     lbra      NextRecord read next record
 
 GenRRecord          clra                zero accumulator a
@@ -467,7 +505,7 @@ GenRRecord          clra                zero accumulator a
 GenJRecord          ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchWord read first operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $18,s     save first operand
                     pshs      d         push it as argument
                     ldd       GlbVar0003 input file pointer
@@ -500,7 +538,7 @@ GenLowJRecord       clra                zero accumulator a
 GenDRecord          ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchWord read first operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $18,s     save first operand
                     pshs      d         push it as argument
                     ldd       GlbVar0003 input file pointer
@@ -510,7 +548,7 @@ GenDRecord          ldd       GlbVar0003 input file pointer
                     ldd       #$0009    load opcode $09
 EmitOpTwoArgs       pshs      d         push the opcode
                     lbsr      GenOperand emit the instruction
-                    leas      $06,s     drop the three arguments
+                    leas      6,s        drop the three arguments
                     lbra      NextRecord read next record
 
 GenYRecord          ldd       GlbVar0003 input file pointer
@@ -527,20 +565,20 @@ GenURecord          ldd       GlbVar0003 input file pointer
                     ldd       #$006F    load opcode $6F
 EmitOpOneArg        pshs      d         push the opcode
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the two arguments
+                    leas      4,s        drop the two arguments
                     lbra      NextRecord read next record
 
 GenSRecord          ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchByte read a token
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $18,s     save the token
                     ldd       GlbVar0011 check global flag
                     bne       StringBufInit skip if flag set
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchWord read a number
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       GlbVar000B store into global
 StringBufInit       leau      ,s        buffer pointer is stack
                     bra       ReadBufChar enter read loop
@@ -550,7 +588,7 @@ StoreBufChar        ldd       $1a,s     load current character
 ReadBufChar         ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchByte read next character
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $1a,s     store the character
                     bne       StoreBufChar loop while nonzero
                     clra                zero accumulator a
@@ -561,7 +599,7 @@ ReadBufChar         ldd       GlbVar0003 input file pointer
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchWord read a number
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $1a,s     save it
 EmitSymbol          ldd       $1a,s     load argument
                     pshs      d         push it
@@ -572,17 +610,17 @@ EmitSymbol          ldd       $1a,s     load argument
                     leax      $06,s     buffer pointer
                     pshs      x         push it
                     lbsr      EmitFuncProlog emit the symbol
-                    leas      $08,s     drop the four arguments
+                    leas      8,s        drop the four arguments
                     lbra      NextRecord read next record
 
 GenEndRecord        lbsr      EmitFrameEqu emit the 'E' record
                     lbra      NextRecord read next record
 
-GenFuncRecord       leas      -$0a,s    reserve locals
+GenFuncRecord       leas      -10,s      reserve locals
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchWord read a number
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       ,s        save local
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
@@ -593,11 +631,11 @@ GenFuncRecord       leas      -$0a,s    reserve locals
                     leax      $08,s     pointer argument
                     pshs      x         push it
                     lbsr      FillBuffer lookup or build
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     leax      $02,s     pointer argument
                     pshs      x         push it
                     lbsr      EvalFloatNode process it
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       ,s        load the result
                     cmpd      #$0006    is it type 6
                     bne       FuncRecordAlt no, alternate path
@@ -608,7 +646,7 @@ GenFuncRecord       leas      -$0a,s    reserve locals
                     lbsr      EmitCaseTable emit it
                     bra       FuncRecordDone merge
 
-FuncRecordAlt       leas      -$04,s    more locals
+FuncRecordAlt       leas      -4,s       more locals
                     leax      ,s        pointer to locals
                     pshs      x         push it
                     leax      $08,s     pointer argument
@@ -619,22 +657,22 @@ FuncRecordAlt       leas      -$04,s    more locals
                     leax      $02,s     pointer argument
                     pshs      x         push it
                     lbsr      EmitCaseTable emit it
-                    leas      $04,s     drop the arguments
-FuncRecordDone      leas      $04,s     release inner locals
-                    leas      $0a,s     release locals
+                    leas      4,s        drop the arguments
+FuncRecordDone      leas      4,s        release inner locals
+                    leas      10,s       release locals
                     lbra      NextRecord read next record
 
-                    leas      $0a,s     unreachable frame cleanup
+                    leas      10,s       unreachable frame cleanup
 GenPRecord          lbsr      EmitLiterals emit the 'p' record
                     lbra      NextRecord read next record
 
-GenFileRecord       leau      $0262,y   point at filename buffer
+GenFileRecord       leau      FilenameBuffer,y   point at filename buffer
                     bra       ReadFileChar enter the loop
 
 FileCharLoop        ldd       $1a,s     load current character
                     cmpd      #$FFFF    end of input marker
                     beq       FileNameDone filename done
-                    leax      $027f,y   buffer end pointer
+                    leax      BufferEndPointer,y   buffer end pointer
                     pshs      x         push it
                     cmpu      ,s++      is the buffer full
                     beq       ReadFileChar yes, skip the store
@@ -643,7 +681,7 @@ FileCharLoop        ldd       $1a,s     load current character
 ReadFileChar        ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchByte read next character
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $1a,s     store the character
                     cmpd      #$000D    carriage return
                     bne       FileCharLoop loop until carriage return
@@ -656,10 +694,10 @@ EmitUnknownRecord   ldd       $1a,s     load unknown record character
                     pshs      d         push as argument
                     leax      MsgBadCode,pcr format string address
                     pshs      x         push it
-                    leax      $00DB,y   output file pointer
+                    leax      Stderr,y  output file pointer
                     pshs      x         push it
                     lbsr      fprintf   print the diagnostic
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     lbsr      FatalExit emit trailer
                     lbra      NextRecord read next record
 
@@ -712,26 +750,26 @@ DispatchRecord      cmpx      #$002A    record type '*'
 NextRecord          ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchByte read next record character
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $1a,s     store record character
                     cmpd      #$FFFF    end of input marker
                     lbne      CaseLoadNode no, go process it
-                    leas      $24,s     release the frame
+                    leas      36,s       release the frame
                     puls      pc,u      return to caller
 
 BuildExprNode       pshs      u         save frame pointer
                     ldd       #$FFAA    stack-check size
                     lbsr      stkcheck  verify stack room
-                    leas      -$0a,s    reserve locals
+                    leas      -10,s      reserve locals
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchByte read a token
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $06,s     save the token
                     ldd       #$0016    node size 22 bytes
                     pshs      d         push it
                     lbsr      $310F     allocate the node
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     tfr       d,u       node pointer in u
                     stu       -$02,s    save the pointer
                     bne       FillNodeFields allocation succeeded
@@ -739,38 +777,38 @@ BuildExprNode       pshs      u         save frame pointer
 FillNodeFields      ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchWord read a field
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       ,u        store into node offset 0
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchWord read a field
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $02,u     store into node offset 2
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchWord read a field
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $06,u     store into node offset 6
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchWord read a field
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $0e,u     store into node offset 14
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchByte read a byte field
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     clra                clear the high byte
                     std       $10,u     store into node offset 16
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchByte read a field
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $12,u     store into node offset 18
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchWord read a field
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $14,u     store into node offset 20
                     ldx       $06,u     load child pointer
                     lbra      NodeDataDispatch continue building the node
@@ -778,7 +816,7 @@ FillNodeFields      ldd       GlbVar0003 input file pointer
 BuildChildNode      ldd       #$000D    child node size 13 bytes
                     pshs      d         push it
                     lbsr      $310F     allocate the child node
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $08,s     save the pointer
                     std       $08,u     link into parent node
                     ldd       $08,s     reload the pointer
@@ -787,13 +825,13 @@ BuildChildNode      ldd       #$000D    child node size 13 bytes
 AllocOk             ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchByte read a field
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldx       $08,s     child node pointer
                     std       $02,x     store into child offset 2
                     ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchByte read a field
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       [$08,s]   store through node pointer
                     ldx       [$08,s]   load node pointer
                     bra       NameTypeCheck continue building
@@ -804,7 +842,7 @@ InitStringBuffer    ldd       $08,s     child node pointer
 StringByteLoop      ldd       GlbVar0003 input file pointer
                     pshs      d         push as argument
                     lbsr      FetchByte read a character
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldx       $04,s     load buffer pointer
                     leax      $01,x     advance the pointer
                     stx       $04,s     save the pointer
@@ -818,7 +856,7 @@ StringByteLoop      ldd       GlbVar0003 input file pointer
 ReadFieldWord       ldd       GlbVar0003 load input file pointer
                     pshs      d         pass input file as argument
                     lbsr      FetchWord read a word value from input
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldx       $08,s     load the node buffer pointer
                     std       $04,x     store value into node field
                     lbra      ReadOperandKind continue to operand kind read
@@ -836,7 +874,7 @@ NameTypeCheck       cmpx      #$000E    check for subtype 0e
 ReadConst4          ldd       #$0004    allocation size four bytes
                     pshs      d         pass allocation size
                     lbsr      $310F     allocate memory
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $02,s     save allocated pointer
                     bne       ReadConst4Fill allocation succeeded
                     lbsr      EmitNodeRef report out of memory
@@ -849,14 +887,14 @@ ReadConst4Fill      ldd       GlbVar0003 load input file pointer
                     ldd       $08,s     load allocated buffer pointer
                     pshs      d         pass destination buffer
                     lbsr      FillBuffer read the block from input
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     ldd       $02,s     reload the buffer pointer
                     bra       StoreNodeVal store pointer into node
 
 ReadConst8          ldd       #$0008    allocation size eight bytes
                     pshs      d         pass allocation size
                     lbsr      $310F     allocate memory
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       ,s        save allocated pointer
                     bne       ReadConst8Fill allocation succeeded
                     lbsr      EmitNodeRef report out of memory
@@ -869,18 +907,18 @@ ReadConst8Fill      ldd       GlbVar0003 load input file pointer
                     ldd       $06,s     load buffer pointer
                     pshs      d         pass destination buffer
                     lbsr      FillBuffer read the block from input
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     ldd       ,s        reload the buffer pointer
                     pshs      d         pass the double constant
                     lbsr      EvalFloatNode process the double constant
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       ,s        reload the pointer
                     bra       StoreNodeVal store pointer into node
 
 ReadFieldDefault    ldd       GlbVar0003 load input file pointer
                     pshs      d         pass input file
                     lbsr      FetchWord read a word value from input
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 StoreNodeVal        std       $08,u     store value into node field
                     bra       ReadOperandKind continue to operand kind read
 
@@ -914,10 +952,10 @@ BadNodeTypeErr      ldd       $06,s     load node operand kind
                     pshs      d         pass the kind value
                     leax      MsgBadNodeType,pcr bad node type format string
                     pshs      x         pass the format string
-                    leax      $00DB,y   point at stderr stream
+                    leax      Stderr,y  point at stderr stream
                     pshs      x         pass the output stream
                     lbsr      fprintf   print the error message
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     lbsr      FatalExit exit fatally
                     bra       ReadNodeDone node build complete
 
@@ -932,14 +970,14 @@ OperandKindDispatch cmpx      #$0042    operand kind B both children
                     bra       BadNodeTypeErr unknown kind is an error
 
 ReadNodeDone        tfr       u,d       return the node pointer
-                    leas      $0a,s     release the locals
+                    leas      10,s       release the locals
                     puls      pc,u      restore and return
 
 EvalFloatNode       pshs      u         save frame pointer
                     ldd       #$FFAE    stack frame size
                     lbsr      stkcheck  verify stack space
                     ldu       $04,s     load node pointer argument
-                    leas      -$08,s    reserve local storage
+                    leas      -8,s       reserve local storage
                     stu       $06,s     save the node pointer
                     ldx       $06,s     reload the node pointer
                     ldb       $07,x     load the exponent byte
@@ -961,7 +999,7 @@ FloatSignDone       leax      ,u        point at the node
                     pshs      x         pass the node pointer
                     pshs      u         pass the node pointer
                     lbsr      FpNumCvt  emit conversion helper
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     lbsr      CopyFloat8 emit follow-on helper
                     ldd       $02,s     load the exponent value
                     bge       FloatSetNeg non-negative exponent
@@ -985,7 +1023,7 @@ FloatStoreSign      std       $04,s     store the sign flag
                     leax      ,u        point at the node
                     lbsr      PushArg8  emit conversion helper
                     lbsr      EmitDecimal2 emit conversion helper
-                    leas      $0C,s     drop the arguments
+                    leas      12,s       drop the arguments
                     lbsr      CopyFloat8 emit follow-on helper
                     ldd       ,s        load the sign flag
                     beq       EvalFloatDone positive skip the negate
@@ -994,7 +1032,7 @@ FloatStoreSign      std       $04,s     store the sign flag
                     leax      ,u        point at the node
                     lbsr      FpNegate  emit the negate
                     lbsr      CopyFloat8 emit follow-on helper
-EvalFloatDone       leas      $08,s     release the locals
+EvalFloatDone       leas      8,s        release the locals
                     puls      pc,u      restore and return
 
 OpenOutputFile      pshs      u         save frame pointer
@@ -1009,17 +1047,17 @@ DoOpenOutput        leax      ModeWrite,pcr write mode string
                     ldd       $06,s     load the output filename
                     pshs      d         pass the filename
                     lbsr      CompareOperands open the output file
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     std       GlbVar0005 save the output file pointer
                     bne       OpenOutputDone open succeeded
                     ldd       $04,s     load the filename
                     pshs      d         pass the filename
                     leax      MsgCantOpenW,pcr cannot open format string
                     pshs      x         pass the format
-                    leax      $00DB,y   point at stderr stream
+                    leax      Stderr,y  point at stderr stream
                     pshs      x         pass the output stream
                     lbsr      fprintf   report the open error
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     lbsr      FatalExit exit fatally
 OpenOutputDone      puls      pc,u      return from open output
 
@@ -1032,13 +1070,13 @@ LoadOperandReg      pshs      u         save frame pointer
 
 LoadOperand8        pshs      u         pass the node pointer
                     lbsr      EvalOperand evaluate the operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     leax      ,s        point at the result
                     bra       LoadOperandCont continue emitting
 
 LoadOperand56       pshs      u         pass the node pointer
                     lbsr      GenLongExpr evaluate the operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     bra       EmitRegMove continue emitting
 
 LoadOperandCont     leas      ,x        restore the stack pointer
@@ -1052,13 +1090,13 @@ EmitRegMove         ldd       $06,u     load current operand type
                     ldd       #$007F    source operand code
                     pshs      d         pass source code
                     lbsr      GenOperand emit the move instruction
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     ldd       #$006F    opcode selector
                     pshs      d         pass opcode selector
                     ldd       #$007A    operand code
                     pshs      d         pass operand code
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldx       $06,s     load operand size
                     bra       RegMoveDispatch dispatch the register move
 
@@ -1069,7 +1107,7 @@ EmitRegMove56       ldd       $06,s     load operand size
                     ldd       #$0087    opcode selector
                     pshs      d         pass opcode selector
                     lbsr      GenOperand emit the instruction
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     bra       LoadOperandDone move complete
 
 EmitRegMoveDefault  ldd       #$0089    operand code
@@ -1077,7 +1115,7 @@ EmitRegMoveDefault  ldd       #$0089    operand code
                     ldd       #$0088    opcode selector
                     pshs      d         pass opcode selector
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     bra       LoadOperandDone move complete
 
 RegMoveDispatch     cmpx      #$0005    operand size five?
@@ -1088,7 +1126,7 @@ RegMoveDispatch     cmpx      #$0005    operand size five?
 
 LoadOperandForce    pshs      u         pass the node pointer
                     lbsr      ForceReg70 force operand to register
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     bra       LoadOperandDone load complete
 
 LoadOperandDispatch cmpx      #$0008    operand size eight?
@@ -1111,56 +1149,56 @@ EmitLeas            pshs      u         save frame pointer
                     ldd       GlbVar0005 load the output file
                     pshs      d         pass the output file
                     lbsr      fprintf   emit the leas instruction
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     puls      pc,u      return from emit leas
 
 FatalExit           pshs      u         save frame pointer
                     ldd       #$FFBA    stack frame size
                     lbsr      stkcheck  verify stack space
-                    ldd       $0284,y   temp file handle set?
+                    ldd       InputFilename,y   temp file handle set?
                     beq       DoExit    none so skip removal
-                    ldd       $0284,y   load temp file handle
+                    ldd       InputFilename,y   load temp file handle
                     pshs      d         pass the handle
                     lbsr      DeletePath remove the temp file
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 DoExit              ldd       #$0001    exit status one
                     pshs      d         pass exit status
                     lbsr      exit      terminate the program
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     puls      pc,u      unreached return
 
 MsgDevNull          fcc       |/dev/null|
-                    fcb       $00
+                    fcb       C$NULL
 MsgBadArg           fcc       /bad argument: %s/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 MsgBadOption        fcc       /bad option flag: +%c/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 MsgTooManyFiles     fcc       /too many files/
-                    fcb       $00
+                    fcb       C$NULL
 ModeRead            fcb       $72
-                    fcb       $00
+                    fcb       C$NULL
 MsgCantOpenR        fcc       /can't open %s/
-                    fcb       $0D,$00
-EmptyStr            fcb       $00
+                    fcb       C$CR,C$NULL
+EmptyStr            fcb       C$NULL
 MsgBadAction        fcc       /bad action code: %d/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 MsgBadCode          fcc       /bad code in intermediate file: %02x/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 MsgBadNodeType      fcc       /bad node type: %02x/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 ModeWrite           fcb       $77
-                    fcb       $00
+                    fcb       C$NULL
 MsgCantOpenW        fcc       /can't open %s/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 MsgLeas             fcc       / leas %d,s/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 ForceReg70          pshs      u         save frame pointer
                     ldd       #$FFB4    stack frame size
                     lbsr      stkcheck  verify stack space
                     ldu       $04,s     load node pointer argument
                     pshs      u         pass the node pointer
                     lbsr      EvalOperandTree evaluate the operand tree
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $06,u     load current operand type
                     cmpd      #$0070    already register type 70?
                     beq       ForceRegDone yes so done
@@ -1172,7 +1210,7 @@ ForceReg70          pshs      u         save frame pointer
                     ldd       #$0075    opcode selector
                     pshs      d         pass opcode selector
                     lbsr      GenOperand emit load into register
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     ldd       #$0070    new operand type 70
                     bra       SetNodeType update the node type
 
@@ -1182,7 +1220,7 @@ ForceReg71          pshs      u         save frame pointer
                     ldu       $04,s     load node pointer argument
                     pshs      u         pass the node pointer
                     lbsr      GenLeafAddr evaluate the operand tree
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $06,u     load current operand type
                     cmpd      #$0071    already register type 71?
                     beq       ForceRegDone yes so done
@@ -1194,7 +1232,7 @@ ForceReg71          pshs      u         save frame pointer
                     ldd       #$0075    opcode selector
                     pshs      d         pass opcode selector
                     lbsr      GenOperand emit load into register
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     ldd       #$0071    new operand type 71
 SetNodeType         std       $06,u     update the node operand type
 ForceRegDone        puls      pc,u      return from register coercion
@@ -1216,10 +1254,10 @@ EvalTree56          pshs      u         pass the node pointer
 
 EvalTreeDefault     pshs      u         pass the node pointer
                     lbsr      GenExpr   evaluate the subtree
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     pshs      u         pass the node pointer
                     bsr       FoldRegOperand fold the register operand
-EvalTreeCleanup     leas      $02,s     drop the argument
+EvalTreeCleanup     leas      2,s        drop the argument
                     bra       EvalTreeDone return from operand tree eval
 
 EvalTreeDispatch    cmpx      #$0008    subtree size eight?
@@ -1247,7 +1285,7 @@ FoldRegLoad         pshs      u         pass the node pointer
                     ldd       #$0075    opcode selector
                     pshs      d         pass opcode selector
                     lbsr      GenOperand emit load into register
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     ldd       #$0071    new operand type 71
                     std       $06,u     set the operand type
                     clra                clear high byte
@@ -1264,7 +1302,7 @@ FoldRegIndexed      ldd       $0a,u     load the operand offset value
                     ldd       #$007F    index operand code
                     pshs      d         pass index code
                     lbsr      GenOperand emit the indexed load
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     clra                clear high byte
                     clrb                clear low byte
                     std       $08,u     clear the operand value
@@ -1279,7 +1317,7 @@ CoerceDefault       pshs      u         save node pointer for default coercion
                     ldd       #$0075    third operand code
                     pshs      d         push emit argument
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop the pushed arguments
+                    leas      8,s        drop the pushed arguments
                     bra       DefaultLoc70 go set default result location
 
                     leas      ,x        dead thunk fragment
@@ -1307,12 +1345,12 @@ GenExpr             pshs      u         save caller register
                     ldd       #$FFB4    reserve frame size for check
                     lbsr      stkcheck  check stack space available
                     ldu       $04,s     load node pointer argument
-                    leas      -$02,s    allocate one local word
+                    leas      -2,s       allocate one local word
                     ldd       $06,u     read node location field
                     std       ,s        save location copy locally
                     cmpd      #$0030    is this a comma/sequence node
                     bne       GenSimple no, handle simple node
-                    leas      -$02,s    allocate another local
+                    leas      -2,s       allocate another local
                     ldd       $0C,u     fetch right child pointer
                     std       ,s        stash right child
                     ldd       $0a,u     fetch left child pointer
@@ -1320,20 +1358,20 @@ GenExpr             pshs      u         save caller register
                     bsr       GenExpr   recurse to generate left child
                     std       ,s        save returned node
                     lbsr      WalkTreeChildren free register bookkeeping
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     pshs      u         push current node
                     ldd       $02,s     fetch saved right child
                     pshs      d         push as argument
                     lbsr      CopyNode  allocate register for operand
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     ldd       ,s        reload local
                     pshs      d         push argument
                     lbsr      FreeNode  release register
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     pshs      u         push node for recursion
                     lbsr      GenExpr   recurse to generate right child
-                    leas      $02,s     drop argument
-                    leas      $02,s     drop local
+                    leas      2,s        drop argument
+                    leas      2,s        drop local
                     lbra      GenExprDone return generated node
 
 GenSimple           ldd       ,u        read node operator word
@@ -1341,7 +1379,7 @@ GenSimple           ldd       ,u        read node operator word
                     bne       GenType56Check no, keep checking
                     pshs      u         push node argument
                     lbsr      GenExpr3  generate leaf code
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     lbra      GenExprDone return generated node
 
 GenType56Check      ldd       ,u        read operator word
@@ -1352,7 +1390,7 @@ GenType56Check      ldd       ,u        read operator word
                     bne       GenLookup neither, keep going
 GenType56           pshs      u         push node argument
                     lbsr      GenLongNode generate type 5/6 code
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     lbra      GenExprDone return generated node
 
 GenLookup           ldd       ,s        load location field
@@ -1364,7 +1402,7 @@ GenLookup           ldd       ,s        load location field
                     ldd       $02,s     fetch stashed value
                     pshs      d         push argument
                     lbsr      EmitBinOp generate via binary-op emitter
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     lbra      GenExprDone return generated node
 
 GenByType           ldx       ,s        load node location type
@@ -1382,7 +1420,7 @@ GenType85           ldd       $0a,u     fetch left child
 GenType84           ldd       $0a,u     fetch child pointer
                     pshs      d         push argument
                     lbsr      GenExpr3  generate leaf code
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $0a,u     fetch child again
                     pshs      d         push argument
                     ldd       #$0077    operand code for emit
@@ -1390,13 +1428,13 @@ GenType84           ldd       $0a,u     fetch child pointer
                     ldd       #$0084    operator code $0084
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $06,s     drop arguments
+                    leas      6,s        drop arguments
                     bra       SetLoc70  set result location
 
 GenType8F           ldd       $0a,u     fetch child pointer
                     pshs      d         push argument
                     lbsr      GenLongExpr generate child code
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       #$008F    operand code $008F
                     pshs      d         push argument
                     ldd       #$0087    operator code $0087
@@ -1415,18 +1453,18 @@ GenType40           pshs      u         push node argument
 GenType44           ldd       $0a,u     fetch child pointer
                     pshs      d         push argument
                     lbsr      ForceReg70 generate child code
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       ,s        reload operand code
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     bra       SetLoc70  set result location
 
 GenType64           leax      ForceReg70,pcr pass child generator address
                     pshs      x         push argument
                     pshs      u         push node
                     lbsr      GenBoolBranchInd generate type $0064 code
-GenDropSet          leas      $04,s     drop the pushed arguments
+GenDropSet          leas      4,s        drop the pushed arguments
 SetLoc70            ldd       #$0070    default result location code
                     std       $06,u     store location into node
                     lbra      GenExprDone return generated node
@@ -1439,7 +1477,7 @@ GenCompare          ldd       #$0070    default result location code
 
 GenType65           pshs      u         push node argument
                     lbsr      GenExprList generate type $0065 code
-GenTail             leas      $02,s     drop argument
+GenTail             leas      2,s        drop argument
                     lbra      GenExprDone return generated node
 
 GenDefault          ldd       ,s        load location type
@@ -1455,13 +1493,13 @@ GenLowType          leax      MsgTranslation,pcr point to format string
                     pshs      x         push argument
                     pshs      u         push node
                     lbsr      BuildLabelText report/handle low type
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     ldd       ,s        reload location code
                     pshs      d         push argument
                     leax      MsgPctXCR,pcr point to format string
                     pshs      x         push argument
                     lbsr      Printf    emit formatted output
-GenTail4            leas      $04,s     drop the arguments
+GenTail4            leas      4,s        drop the arguments
                     lbra      GenExprDone return generated node
 
 TypeDispatch        cmpx      #$0037    match node type $0037
@@ -1511,13 +1549,13 @@ TypeDispatch        cmpx      #$0037    match node type $0037
                     lbra      GenDefault otherwise take default path
 
 GenExprDone         tfr       u,d       return node pointer in d
-                    leas      $02,s     drop local
+                    leas      2,s        drop local
                     puls      pc,u      return to caller
 
 EmitBinOp           pshs      u         save caller register
                     ldd       #$FFAE    reserve frame size for check
                     lbsr      stkcheck  check stack space available
-                    leas      -$06,s    allocate three local words
+                    leas      -6,s       allocate three local words
                     ldx       $0C,s     load node argument
                     ldu       $0a,x     fetch left child pointer
                     ldx       $0C,s     reload node argument
@@ -1560,7 +1598,7 @@ OptDeref            ldd       $06,u     read left child location
                     ldd       $0C,s     load node argument
                     pshs      d         push argument
                     lbsr      GenLeafAddr optimize/generate deref
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     clra                clear high byte
                     clrb                clear low byte
                     std       GlbVar0019 clear global flag at $0019
@@ -1583,14 +1621,14 @@ GenStore            ldd       $04,s     load node argument
                     ldd       $04,s     reload node
                     pshs      d         push argument
                     lbsr      EvalOperandTree generate operand code
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldx       $04,s     load node pointer
                     ldd       $06,x     read node location field
                     pshs      d         push argument
                     ldd       #$007A    operand code for emit
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     ldd       #$006E    result location code
                     ldx       $04,s     load node pointer
                     std       $06,x     store location into node
@@ -1600,11 +1638,11 @@ GenStore            ldd       $04,s     load node argument
 
 GenStoreAlt         pshs      u         push node
                     lbsr      ForceReg70 generate operand code
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $04,s     reload node
                     pshs      d         push argument
                     lbsr      GenExpr   recurse to generate node
-GenStoreEmit        leas      $02,s     drop argument
+GenStoreEmit        leas      2,s        drop argument
                     ldd       $04,s     reload node
                     pshs      d         push argument
                     ldd       #$0077    operand code for emit
@@ -1626,12 +1664,12 @@ GenCommutative      pshs      u         push node
 CheckLoc36          ldd       $06,u     read operand location
                     cmpd      #$0036    is it register type $0036
                     bne       GenOperandLoad no, load operand
-SwapOperands        leas      -$02,s    allocate swap slot
+SwapOperands        leas      -2,s       allocate swap slot
                     stu       ,s        store first operand
                     ldu       $06,s     load saved second operand
                     ldd       ,s        reload first operand
                     std       $06,s     store swapped operand
-                    leas      $02,s     drop swap slot
+                    leas      2,s        drop swap slot
 GenOperandLoad      ldd       $06,u     read operand location
                     pshs      d         push argument
                     lbsr      IsFloatType look up operand emitter
@@ -1642,11 +1680,11 @@ EmitLoad7A          pshs      d         push argument
                     ldd       #$007A    operand code for emit
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     ldd       $04,s     reload node
                     pshs      d         push argument
                     lbsr      ForceReg70 generate operand code
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       #$006E    result location code
                     ldx       $04,s     load node pointer
                     std       $06,x     store location into node
@@ -1654,7 +1692,7 @@ EmitLoad7A          pshs      d         push argument
 
 GenLeftFirst        pshs      u         push node
                     lbsr      ForceReg70 generate left operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $04,s     reload node
                     pshs      d         push argument
                     lbsr      NodeIsConst classify right operand
@@ -1666,14 +1704,14 @@ GenLeftFirst        pshs      u         push node
 GenRightRecurse     ldd       $04,s     reload node
                     pshs      d         push argument
                     lbsr      GenExpr   recurse to generate right
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $0a,s     reload mapped operator
                     cmpd      #$0050    was it address op $0050
                     beq       EmitBinTail yes, skip extra emit
                     ldd       $04,s     reload node
                     pshs      d         push argument
                     lbsr      ResolveNegFlag generate extra code
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
 EmitBinTail         ldd       $04,s     reload node
                     pshs      d         push argument
                     ldd       #$0077    operand code for emit
@@ -1683,7 +1721,7 @@ EmitBinTail         ldd       $04,s     reload node
                     ldd       $10,s     fetch mapped operator code
 EmitAndDone         pshs      d         push operator argument
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     lbra      ClearFlagExit return generated node
 
 GenSimpleCall       ldd       $0C,s     load node argument
@@ -1706,7 +1744,7 @@ CheckSmallSize      ldd       ,s        load operand size
                     bhi       RestoreArgsJoin yes, non-indexed path
                     pshs      u         push node
                     lbsr      ForceReg70 generate operand code
-GenIndexTail        leas      $02,s     drop argument
+GenIndexTail        leas      2,s        drop argument
                     bra       DecCountLoop continue index generation
 
 IndexOpSwitch       ldx       $0a,s     load operator code
@@ -1745,12 +1783,12 @@ RestoreArgsJoin     leax      $06,s     restore stack past arguments
 CommuteAssign       ldd       $06,u     load right operand opcode
                     cmpd      #$0036    is it a constant node
                     bne       FoldConstOperand no skip operand swap
-                    leas      -$02,s    make scratch slot
+                    leas      -2,s       make scratch slot
                     stu       ,s        save node pointer
                     ldu       $06,s     load other operand
                     ldd       ,s        reload node pointer
                     std       $06,s     swap operands
-                    leas      $02,s     drop scratch slot
+                    leas      2,s        drop scratch slot
 FoldConstOperand    ldx       $04,s     load node pointer
                     ldd       $06,x     load right operand opcode
                     cmpd      #$0036    is it constant
@@ -1759,7 +1797,7 @@ FoldConstOperand    ldx       $04,s     load node pointer
                     ldd       $08,x     load constant value
                     pshs      d         pass constant value
                     lbsr      LookupConstSlot look up constant slot index
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     std       ,s        save lookup result
                     beq       GenBinaryOp not found use generic
                     ldd       ,s        reload folded value
@@ -1779,21 +1817,21 @@ StoreNewOp          std       $0a,s     store new operator
 RestoreFrameJoin    leas      -$06,x    restore stack frame
 GenBinaryOp         pshs      u         pass node pointer
                     lbsr      EvalOperandTree generate left subtree
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $06,u     load operator opcode
                     pshs      d         pass operator
                     ldd       #$007A    push mnemonic $7A
                     pshs      d         pass mnemonic
                     lbsr      GenOperand emit instruction
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     ldd       $04,s     load node pointer
                     pshs      d         pass node pointer
                     lbsr      ForceReg70 generate right subtree
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $0a,s     load operator
                     pshs      d         pass operator
                     lbsr      GenOperand emit instruction
-EmitBinaryDone      leas      $02,s     drop argument
+EmitBinaryDone      leas      2,s        drop argument
                     lbra      ClearFlagExit clear flag and finish
 
 ErrBinaryOp         leax      MsgBinaryOp,pcr point at binary-op error string
@@ -1801,7 +1839,7 @@ ErrBinaryOp         leax      MsgBinaryOp,pcr point at binary-op error string
                     ldd       $0e,s     load node context
                     pshs      d         pass context
                     lbsr      BuildLabelText report internal error
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     lbra      ClearFlagExit clear flag and finish
 
 DispatchBinOp       cmpx      #$0051    dispatch on node opcode $51
@@ -1874,7 +1912,7 @@ LookupLoop          tfr       u,d       index to d
                     leau      $01,u     advance index
                     aslb                multiply index low by two
                     rola                multiply index high by two
-                    leax      >$0027,y  point at lookup table
+                    leax      >LookupTable,y  point at lookup table
                     leax      d,x       index into table
                     ldd       ,x        load table entry
                     cmpd      $04,s     compare with target value
@@ -1890,7 +1928,7 @@ GenBoolBranch       pshs      u         save frame pointer
                     ldd       #$FFB0    stack frame size
                     lbsr      stkcheck  check stack overflow
                     ldu       $04,s     load node argument
-                    leas      -$04,s    allocate locals
+                    leas      -4,s       allocate locals
                     ldd       #$0001    constant one field
                     pshs      d         push node field
                     ldd       GlbVar000B load label counter
@@ -1905,11 +1943,11 @@ GenBoolBranch       pshs      u         save frame pointer
                     pshs      d         push label
                     pshs      u         push node pointer
                     lbsr      GenExpr2  build tree node
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     ldd       $02,s     load first label
                     pshs      d         pass label
                     lbsr      EmitLocalLabelLine emit label definition
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       #$0001    operand field one
                     pshs      d         push operand field
                     ldd       #$0036    constant node opcode
@@ -1919,7 +1957,7 @@ GenBoolBranch       pshs      u         save frame pointer
                     ldd       #$0075    branch node opcode
                     pshs      d         push node opcode
                     lbsr      GenOperand emit branch instruction
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     ldd       #$0001    operand field one
                     pshs      d         push operand field
                     ldd       GlbVar000B load label counter
@@ -1930,11 +1968,11 @@ GenBoolBranch       pshs      u         save frame pointer
                     ldd       #$007C    jump node opcode
                     pshs      d         push node opcode
                     lbsr      GenOperand emit jump instruction
-                    leas      $06,s     drop arguments
+                    leas      6,s        drop arguments
                     ldd       ,s        load pushed field
                     pshs      d         push field
                     lbsr      EmitLocalLabelLine emit label definition
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     clra                value zero high
                     clrb                value zero low
                     pshs      d         push zero
@@ -1945,11 +1983,11 @@ GenBoolBranch       pshs      u         save frame pointer
                     ldd       #$0075    branch node opcode
                     pshs      d         push node opcode
                     lbsr      GenOperand emit branch instruction
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     ldd       $02,s     load first label
                     pshs      d         pass label
                     lbsr      EmitLocalLabelLine emit label definition
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       #$0070    result register-node opcode
                     std       $06,u     store result opcode
                     lbra      LeafEpilogue return from generator
@@ -1958,7 +1996,7 @@ GenBoolBranchInd    pshs      u         save frame pointer
                     ldd       #$FFAE    stack frame size
                     lbsr      stkcheck  check stack overflow
                     ldu       $04,s     load node argument
-                    leas      -$06,s    allocate locals
+                    leas      -6,s       allocate locals
                     ldd       #$0001    constant one field
                     pshs      d         push field
                     ldd       GlbVar000B load label counter
@@ -1974,16 +2012,16 @@ GenBoolBranchInd    pshs      u         save frame pointer
                     ldd       $0a,u     load node subfield
                     pshs      d         push subfield
                     lbsr      GenExpr2  build tree node
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     ldu       $0C,u     follow node link
                     ldd       $04,s     load label
                     pshs      d         pass label
                     lbsr      EmitLocalLabelLine emit label definition
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $0a,u     load call target field
                     pshs      d         pass field
                     jsr       [$0e,s]   call through function pointer
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     clra                value zero high
                     clrb                value zero low
                     pshs      d         push zero
@@ -1995,26 +2033,26 @@ GenBoolBranchInd    pshs      u         save frame pointer
                     ldd       #$007C    jump node opcode
                     pshs      d         push node opcode
                     lbsr      GenOperand emit jump instruction
-                    leas      $06,s     drop arguments
+                    leas      6,s        drop arguments
                     ldd       ,s        load pushed field
                     pshs      d         push field
                     lbsr      EmitLocalLabelLine emit label definition
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $0C,u     load node link field
                     pshs      d         pass field
                     jsr       [$0e,s]   call through function pointer
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $02,s     load first label
                     pshs      d         pass label
                     lbsr      EmitLocalLabelLine emit label definition
-                    leas      $02,s     drop argument
-GenReturn           leas      $06,s     drop locals
+                    leas      2,s        drop argument
+GenReturn           leas      6,s        drop locals
                     puls      pc,u      restore frame and return
 
 GenExprList         pshs      u         save frame pointer
                     ldd       #$FFB2    stack frame size
                     lbsr      stkcheck  check stack overflow
-                    leas      -$04,s    allocate locals
+                    leas      -4,s       allocate locals
                     ldd       GlbVar000D load list head
                     std       ,s        save current node
                     ldd       $08,s     load argument
@@ -2031,12 +2069,12 @@ ExprListLoop        ldx       $02,s     load current node
                     bne       GenIndirectCall no handle general store
                     pshs      u         pass expression node
                     lbsr      LoadLongConst generate special store
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     lbra      ExprListNext continue chain
 
 GenIndirectCall     pshs      u         pass expression node
                     lbsr      EvalOperand generate address
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       #$006E    operand opcode
                     pshs      d         push operand opcode
                     ldd       #$0088    indirect-call node opcode
@@ -2050,7 +2088,7 @@ CheckAddSub         ldd       ,u        load expression opcode
                     bne       GenValueArg no handle generic
 GenLeaArg           pshs      u         pass expression node
                     lbsr      GenLongExpr generate address expression
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       #$006E    operand opcode
                     pshs      d         push operand opcode
                     ldd       #$0087    lea node opcode
@@ -2058,13 +2096,13 @@ GenLeaArg           pshs      u         pass expression node
 
 GenValueArg         pshs      u         pass expression node
                     lbsr      GenExpr   generate value into register
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldx       $06,u     load result register opcode
                     bra       CheckRegClass check register class
 
 ForceIntoReg        pshs      u         pass expression node
                     lbsr      FoldRegOperand force value into register
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     bra       EmitPushArg emit push
 
 CheckRegClass       cmpx      #$0070    is result in d
@@ -2082,7 +2120,7 @@ EmitPushArg         ldd       $06,u     load register opcode
                     ldd       #$007A    push mnemonic $7A
 DoEmit              pshs      d         pass mnemonic
                     lbsr      GenOperand emit instruction
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
 ExprListNext        ldx       $02,s     load current node
                     ldd       $0C,x     load next link
                     std       $02,s     advance current node
@@ -2091,7 +2129,7 @@ ExprListNext        ldx       $02,s     load current node
                     ldd       $0a,x     load expression
                     pshs      d         pass expression
                     lbsr      GenExpr   generate value into register
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldx       $08,s     reload argument node
                     ldd       $0a,x     load expression
                     pshs      d         pass expression
@@ -2100,11 +2138,11 @@ ExprListNext        ldx       $02,s     load current node
                     ldd       #$0065    call node opcode
                     pshs      d         push node opcode
                     lbsr      GenOperand emit call instruction
-                    leas      $06,s     drop arguments
+                    leas      6,s        drop arguments
                     ldd       ,s        load pushed field
                     pshs      d         push field
                     lbsr      EmitStackAdjust2 patch stack adjustment
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     std       GlbVar000D update list head
                     ldd       #$0070    result register-node opcode
                     ldx       $08,s     load result node
@@ -2115,7 +2153,7 @@ IsSimpleAddr        pshs      u         save frame pointer
                     ldd       #$FFB8    stack frame size
                     lbsr      stkcheck  check stack overflow
                     ldu       $04,s     load node argument
-                    leas      -$02,s    allocate local
+                    leas      -2,s       allocate local
                     ldx       $06,u     load node opcode
                     bra       ClassifyNode classify node opcode
 
@@ -2131,7 +2169,7 @@ ReturnTrue          ldd       #$0001    return true
 CheckChildAddr      ldd       ,s        load child pointer
                     pshs      d         pass child
                     bsr       IsIndexedAddr check child node
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     bra       AddrReturn return result
 
 ClassifyChild       cmpx      #$0036    is child constant
@@ -2152,7 +2190,7 @@ ClassifyNode        cmpx      #$0034    is node a name
                     beq       InspectIndChild yes inspect child
                     clra                return false high
                     clrb                return false low
-AddrReturn          leas      $02,s     drop local
+AddrReturn          leas      2,s        drop local
                     puls      pc,u      restore frame and return
 
 IsIndexedAddr       pshs      u         save frame pointer
@@ -2240,7 +2278,7 @@ ResolveNegFlag      pshs      u         save frame pointer
                     ldd       #$0075    operand value
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     ldd       #$0093    new type $93
                     std       $06,u     set node type
                     clra                zero
@@ -2251,7 +2289,7 @@ NegDone             puls      pc,u      return
 GenLoadTree         pshs      u         save frame pointer
                     ldd       #$FFB0    frame size minus 80
                     lbsr      stkcheck  check stack space
-                    leas      -$04,s    reserve locals
+                    leas      -4,s       reserve locals
                     ldx       $08,s     load node argument
                     ldd       $0C,x     read field $0C
                     std       ,s        save local
@@ -2275,7 +2313,7 @@ GenLoadTree         pshs      u         save frame pointer
 GenLoadPlain        ldd       ,s        reload type
                     pshs      d         push it
                     lbsr      GenExpr   process operand
-GenLoadChild        leas      $02,s     drop argument
+GenLoadChild        leas      2,s        drop argument
                     ldx       ,s        load child pointer
                     ldx       $06,x     read child type
                     bra       GenLoadDispatch dispatch on type
@@ -2299,7 +2337,7 @@ GenLoadDeref        ldd       ,s        load pointer
                     ldd       #$0075    operand value
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
 GenLoadEmit         ldd       ,s        load pointer
                     pshs      d         push argument
                     ldd       #$0077    opcode selector
@@ -2309,7 +2347,7 @@ GenLoadEmit         ldd       ,s        load pointer
                     ldd       #$0075    operand value
 GenLoadEmitTail     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     lbra      GenSetType go set result type
 
 GenLoadDispatch     cmpx      #$0041    type $41?
@@ -2337,7 +2375,7 @@ GenLoadAlt          pshs      u         push node
                     beq       GenLoadReg branch if false
 GenLoadStore        pshs      u         push node
                     lbsr      GenExpr   process operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       ,s        reload
                     pshs      d         push it
                     lbsr      GenDerefNode process operand
@@ -2351,7 +2389,7 @@ GenLoadReg          ldx       ,s        load pointer
                     beq       GenLoadSize branch if not classified
                     pshs      u         push node
                     lbsr      GenExpr   process operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       ,u        read node field
                     cmpd      #$0002    compare to two
                     lbne      GenLoadTail branch if not two
@@ -2367,14 +2405,14 @@ GenLoadSize         pshs      u         push node
                     ldd       ,s        reload
                     pshs      d         push it
                     lbsr      ForceReg70 process operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     pshs      u         push node
                     lbsr      GenExpr   process operand
                     bra       GenLoadCleanup go cleanup
 
 GenLoadSpill        pshs      u         push node
                     lbsr      GenExpr   process operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       ,s        reload
                     pshs      d         push it
                     lbsr      IsSimpleAddr classify node
@@ -2387,7 +2425,7 @@ GenLoadSpill        pshs      u         push node
 
 GenLoadFree         pshs      u         push node
                     lbsr      GenAddrOffset spill or free operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     bra       GenLoadFinal continue
 
 GenLoadFreeChk      cmpx      #$0095    type $95?
@@ -2399,7 +2437,7 @@ GenLoadFreeChk      cmpx      #$0095    type $95?
 GenLoadFinal        ldd       ,s        reload
                     pshs      d         push it
                     lbsr      EvalOperandTree process operand
-GenLoadCleanup      leas      $02,s     drop argument
+GenLoadCleanup      leas      2,s        drop argument
 GenLoadTail         pshs      u         push node
                     ldd       #$0077    opcode selector
                     pshs      d         push argument
@@ -2409,7 +2447,7 @@ GenLoadTail         pshs      u         push node
                     ldd       #$0079    operand value
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     ldx       ,s        load pointer
                     ldd       $06,x     read type
                     lbra      GenStoreType go set result type
@@ -2417,7 +2455,7 @@ GenLoadTail         pshs      u         push node
 GenStoreTree        pshs      u         save frame pointer
                     ldd       #$FFB0    frame size minus 80
                     lbsr      stkcheck  check stack space
-                    leas      -$04,s    reserve locals
+                    leas      -4,s       reserve locals
                     ldx       $08,s     load node argument
                     ldd       $0C,x     read field $0C
                     std       $02,s     save local
@@ -2425,7 +2463,7 @@ GenStoreTree        pshs      u         save frame pointer
                     ldu       $0a,x     load child pointer
                     pshs      u         push child
                     lbsr      GenExpr   process operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $0a,s     load $0C local
                     addd      #$FFB0    offset by minus 80
                     std       $0a,s     store back
@@ -2485,20 +2523,20 @@ StoreConstEmit      pshs      d         push constant
                     ldd       #$0074    opcode selector
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     bra       GenSetType go set result type
 
 StoreGeneric        ldd       $02,s     load pointer
                     pshs      d         push it
                     lbsr      ForceReg70 process operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $0a,s     load store opcode
                     cmpd      #$0051    opcode $51?
                     bne       StoreGenericEmit skip extra emit
                     ldd       #$0043    operand $43
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
 StoreGenericEmit    ldd       #$0070    operand value
                     pshs      d         push argument
                     ldd       $02,s     load pointer
@@ -2506,7 +2544,7 @@ StoreGenericEmit    ldd       #$0070    operand value
                     ldd       #$0074    opcode selector
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $06,s     drop arguments
+                    leas      6,s        drop arguments
 GenSetType          ldd       $06,u     read child type
 GenStoreType        ldx       $08,s     load node
                     std       $06,x     store result type
@@ -2524,15 +2562,15 @@ StorePtrEmit        ldd       $06,u     read node type
                     ldd       #$007A    opcode selector
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     ldd       $02,s     load pointer
                     pshs      d         push it
                     lbsr      ForceReg70 process operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $0a,s     load store opcode
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     lbra      EmitAddrTemplate continue
 
 StoreDispatch2      cmpx      #$0050    opcode $50?
@@ -2556,14 +2594,14 @@ StoreLoadEmit       pshs      u         push child
                     ldd       #$0075    operand value
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     ldd       ,u        read child type
                     cmpd      #$0002    compare to two
                     bne       StoreLoadDone skip if not two
                     ldd       #$0085    operand $85
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
 StoreLoadDone       ldx       $0a,s     load store opcode local
                     lbra      MatchStoreOp continue
 
@@ -2575,14 +2613,14 @@ StoreLoadReg        ldd       $02,s     load pointer
                     ldd       $02,s     load pointer
                     pshs      d         push it
                     lbsr      GenExpr   process operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldx       $0a,s     load store opcode local
                     bra       StoreLoadDispatch dispatch
 
 StoreLoadNeg        ldd       $02,s     load pointer
                     pshs      d         push it
                     lbsr      ResolveNegFlag resolve negate flag
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     bra       StoreLoadEmit2 continue
 
 StoreLoadDispatch   cmpx      #$0057    opcode $57?
@@ -2600,7 +2638,7 @@ StoreLoadEmit2      ldd       $02,s     load pointer
                     ldd       $10,s     load store opcode
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     lbra      EmitAddrTemplate continue
 
 StoreLoadAlt        ldd       ,s        load pointer
@@ -2611,17 +2649,17 @@ StoreLoadAlt        ldd       ,s        load pointer
                     beq       StoreLoadPtr skip spill
                     pshs      u         push child
                     lbsr      GenAddrOffset spill or free operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
 StoreLoadPtr        ldd       #$0070    operand value
                     pshs      d         push argument
                     ldd       #$007A    opcode selector
                     pshs      d         push argument
                     lbsr      GenOperand emit instruction
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     ldd       $02,s     load pointer
                     pshs      d         push it
                     lbsr      ForceReg70 process operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $0a,s     load store opcode
                     cmpd      #$0051    opcode $51?
                     bne       StoreLoadFixup skip if not $51
@@ -2634,7 +2672,7 @@ StoreLoadFixup      ldd       #$006E    operand $6E
                     ldd       $0e,s     load store opcode
                     pshs      d         push third template operand
                     lbsr      GenOperand emit code template
-                    leas      $06,s     drop pushed operands
+                    leas      6,s        drop pushed operands
                     bra       EmitAddrTemplate go rewrite node as address
 
 MatchStoreOp        cmpx      #$0057    test operator code 0x57
@@ -2657,7 +2695,7 @@ EmitAddrTemplate    pshs      u         push node pointer for emit
                     ldd       #$0079    template code y
                     pshs      d         push it
                     lbsr      GenOperand emit code template
-                    leas      $08,s     drop pushed operands
+                    leas      8,s        drop pushed operands
                     ldd       #$0070    new operator 0x70
                     ldx       $08,s     reload node pointer
                     std       $06,x     set node operator field
@@ -2675,7 +2713,7 @@ GenAddrOffset       pshs      u         save node pointer
 
 GenOffsetPart       pshs      u         push node pointer argument
                     lbsr      ResolveNegFlag evaluate the subtree
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $08,u     load node offset value
                     beq       GenIndexEmit zero offset, skip emit
                     ldd       $08,u     reload offset value
@@ -2687,13 +2725,13 @@ GenOffsetPart       pshs      u         push node pointer argument
                     ldd       #$0074    template code t
                     pshs      d         push it
                     lbsr      GenOperand emit code template
-                    leas      $08,s     drop pushed operands
+                    leas      8,s        drop pushed operands
 GenIndexEmit        ldd       #$0071    template code q
                     pshs      d         push it
                     ldd       #$007A    template code z
                     pshs      d         push it
                     lbsr      GenOperand emit code template
-                    leas      $04,s     drop pushed operands
+                    leas      4,s        drop pushed operands
                     ldd       #$806E    new operator with evaluated flag
                     std       $06,u     set node operator field
                     puls      pc,u      return
@@ -2702,12 +2740,12 @@ GenLoadLeaf         pshs      u         save node pointer
                     ldd       #$FFB0    frame size for stack check
                     lbsr      stkcheck  verify stack room
                     ldu       $04,s     load node pointer argument
-                    leas      -$04,s    allocate local slots
+                    leas      -4,s       allocate local slots
                     ldd       $0a,u     load left child pointer
                     std       $02,s     save child pointer local
                     pshs      d         push child pointer
                     lbsr      GenLeafAddr generate leaf address
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldx       $02,s     reload child pointer
                     ldd       $06,x     load child operator field
                     std       ,s        save operator local
@@ -2731,7 +2769,7 @@ EmitConstLoad       ldx       $02,s     reload child pointer
                     ldd       #$0075    template code u
                     pshs      d         push it
                     lbsr      GenOperand emit code template
-                    leas      $08,s     drop pushed operands
+                    leas      8,s        drop pushed operands
                     bra       SetOp8093 continue after emit
 
 ReportBadOp         leax      MsgIndirect1,pcr point to error message string
@@ -2739,7 +2777,7 @@ ReportBadOp         leax      MsgIndirect1,pcr point to error message string
                     ldd       $04,s     push offending operator
                     pshs      d         push it
                     lbsr      BuildLabelText report compiler error
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     bra       SetOp8093 continue after error
 
 DispatchEvalOp      cmpx      #$0034    operator is a constant
@@ -2798,7 +2836,7 @@ EmitRegLoad         ldd       $02,s     load child pointer operand
                     ldd       #$0075    template code u
                     pshs      d         push it
                     lbsr      GenOperand emit code template
-                    leas      $08,s     drop pushed operands
+                    leas      8,s        drop pushed operands
                     ldd       #$0093    result operator 0x93
                     std       ,s        store operator local
                     clra                zero high byte
@@ -2819,7 +2857,7 @@ ReportBadOp2        leax      MsgIndirect2,pcr point to error message string
                     pshs      x         push string pointer
                     pshs      u         push node pointer
                     lbsr      BuildLabelText report compiler error
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     ldd       #$0093    result operator 0x93
 StoreResultOp       std       ,s        store operator local
                     bra       SetNodeOp finish node update
@@ -2846,18 +2884,18 @@ DispatchUnevalOp    cmpx      #$006F    operator 0x6f
 
 SetNodeOp           ldd       ,s        load final operator
                     std       $06,u     set node operator field
-LeafEpilogue        leas      $04,s     release local slots
+LeafEpilogue        leas      4,s        release local slots
                     puls      pc,u      return
 
 GenBinaryNode       pshs      u         save node pointer
                     ldd       #$FFAC    frame size for stack check
                     lbsr      stkcheck  verify stack room
-                    leas      -$08,s    allocate local slots
+                    leas      -8,s       allocate local slots
                     ldx       $0C,s     load node pointer argument
                     ldu       $0a,x     load right child pointer
                     pshs      u         push child pointer
                     lbsr      GenExpr   evaluate the child
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldx       $0C,s     reload node pointer
                     ldd       $06,x     load node operator
                     std       $02,s     save operator local
@@ -2881,7 +2919,7 @@ EmitLeftLoad        ldd       $0e,s     load result operator local
                     ldd       #$0075    template code u
                     pshs      d         push it
                     lbsr      GenOperand emit code template
-                    leas      $08,s     drop pushed operands
+                    leas      8,s        drop pushed operands
                     bra       LoadNodeValue continue
 
 CopyResultOp        ldd       ,s        load result operator
@@ -2911,7 +2949,7 @@ EmitLoadTemplate    pshs      u         push child pointer
                     ldd       #$0075    template code u
                     pshs      d         push it
                     lbsr      GenOperand emit code template
-                    leas      $08,s     drop pushed operands
+                    leas      8,s        drop pushed operands
                     ldd       $0e,s     load result operator local
                     std       ,s        save it
 LoadNodeValue       ldx       $0C,s     load node pointer
@@ -2946,7 +2984,7 @@ EmitStoreT          ldd       $06,s     load value operand
                     ldd       #$0074    register template t
 EmitTemplateTail    pshs      d         push final template code
                     lbsr      GenOperand emit code template
-                    leas      $08,s     drop pushed operands
+                    leas      8,s        drop pushed operands
                     bra       EmitAddrY continue
 
 DispatchNegOp       cmpx      #$003D    operator 0x3d
@@ -2963,7 +3001,7 @@ EmitAddrY           pshs      u         push child pointer
                     ldd       #$0079    template code y
                     pshs      d         push it
                     lbsr      GenOperand emit code template
-                    leas      $08,s     drop pushed operands
+                    leas      8,s        drop pushed operands
                     ldx       $02,s     load node operator
                     bra       DispatchStoreOp dispatch on operator
 
@@ -2983,7 +3021,7 @@ EmitConstStore      ldd       ,s        load operator local
                     ldd       #$0051    immediate template 0x51
                     pshs      d         push it
                     lbsr      GenOperand emit code template
-                    leas      $08,s     drop pushed operands
+                    leas      8,s        drop pushed operands
                     bra       FinishBinary continue
 
 NegateStoreValue    ldd       $06,s     load value operand
@@ -3014,7 +3052,7 @@ GenDerefNode        pshs      u         save node pointer
                     ldu       $04,s     load node pointer argument
                     pshs      u         push node pointer
                     bsr       GenLeafAddr generate leaf address
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $06,u     load node operator
                     cmpd      #$0071    is it 0x71
                     bne       EmitDerefLoad no, emit load
@@ -3028,7 +3066,7 @@ EmitDerefLoad       pshs      u         push node pointer
                     ldd       #$0075    template code u
                     pshs      d         push it
                     lbsr      GenOperand emit code template
-                    leas      $08,s     drop pushed operands
+                    leas      8,s        drop pushed operands
 SetOp71             ldd       #$0071    normalize operator to 0x71
                     std       $06,u     set node operator field
                     puls      pc,u      return
@@ -3036,7 +3074,7 @@ SetOp71             ldd       #$0071    normalize operator to 0x71
 GenLeafAddr         pshs      u         save node pointer
                     ldd       #$FFAC    frame size for stack check
                     lbsr      stkcheck  verify stack room
-                    leas      -$08,s    allocate local slots
+                    leas      -8,s       allocate local slots
                     ldx       $0C,s     load node pointer argument
                     ldu       $0a,x     load left child pointer
                     ldx       $0C,s     reload node pointer
@@ -3060,7 +3098,7 @@ CaseBinaryOp        ldd       #$0071    operator 0x71
                     ldd       $0e,s     load operand
                     pshs      d         push argument
                     lbsr      GenBinaryNode generate binary op
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     lbra      GenExit   return via epilogue
 
 EmitTemplate7F      pshs      u         push child pointer
@@ -3071,7 +3109,7 @@ EmitTemplate7F      pshs      u         push child pointer
                     ldd       #$007F    template code 0x7f
                     pshs      d         push it
                     lbsr      GenOperand emit code template
-                    leas      $08,s     drop pushed operands
+                    leas      8,s        drop pushed operands
                     clra                zero high byte
                     clrb                zero low byte
                     lbra      StoreNodeVal2 continue with zero result
@@ -3101,7 +3139,7 @@ Op50Float           ldx       $06,s     load node pointer
                     bne       Op50Emit  branch if not literal
                     pshs      u         push node
                     lbsr      GenLeafAddr recurse to generate subtree
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $06,u     load operand
                     std       ,s        save it locally
                     ldx       $06,s     reload node pointer
@@ -3111,17 +3149,17 @@ Op50Float           ldx       $06,s     load node pointer
 Op50Emit            ldd       $06,s     load node pointer
                     pshs      d         push it
                     lbsr      ForceReg70 call codegen helper
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     pshs      u         push node
                     lbsr      GenLeafAddr recurse to generate subtree
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $02,s     load saved direction flag
                     cmpd      #$0051    compare against 0x51
                     bne       LoadOperand branch if not
                     ldd       #$0043    conversion opcode 0x43
                     pshs      d         push it
                     lbsr      GenOperand emit instruction
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
 LoadOperand         ldd       $06,u     load operand
                     pshs      d         push it
                     ldd       #$0070    operand code 0x70
@@ -3129,7 +3167,7 @@ LoadOperand         ldd       $06,u     load operand
                     ldd       #$007B    opcode 0x7B
                     pshs      d         push it
                     lbsr      GenOperand emit instruction
-                    leas      $06,s     drop three arguments
+                    leas      6,s        drop three arguments
                     lbra      ZeroResult zero result and finish
 
 Op50Swap            ldd       $02,s     load direction flag
@@ -3139,12 +3177,12 @@ Op50Swap            ldd       $02,s     load direction flag
                     ldx       $06,s     load other node
                     cmpd      $12,x     compare weights
                     bge       Op50Leaf  skip swap if greater equal
-                    leas      -$02,s    make room on stack
+                    leas      -2,s       make room on stack
                     stu       ,s        save node pointer
                     ldu       $08,s     load other pointer
                     ldd       ,s        load saved node
                     std       $08,s     swap the operands
-                    leas      $02,s     drop temporary
+                    leas      2,s        drop temporary
 Op50Leaf            ldd       $06,s     load node pointer
                     pshs      d         push it
                     lbsr      IsSimpleAddr check leaf condition
@@ -3161,7 +3199,7 @@ Op50Default         leax      $08,s     point at result slot
 
 Op50Recurse         pshs      u         push node
                     lbsr      GenLeafAddr recurse to generate subtree
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $06,u     load operand type
                     anda      #$7f      mask off high bit
                     tfr       d,x       move subtype into x
@@ -3177,7 +3215,7 @@ SubOp70             ldd       $02,s     load direction flag
                     ldd       $06,s     load node pointer
                     pshs      d         push it
                     lbsr      ForceReg71 call codegen helper
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     clra                clear high byte
                     clrb                clear low byte
                     std       $08,u     zero value field
@@ -3192,7 +3230,7 @@ EmitConvert         pshs      u         push node
                     ldd       #$0075    conversion opcode 0x75
                     pshs      d         push it
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop four arguments
+                    leas      8,s        drop four arguments
                     clra                clear high byte
                     clrb                clear low byte
                     std       $08,u     zero value field
@@ -3206,7 +3244,7 @@ XlateErr            leax      MsgXTranslate,pcr point at x-translate message
                     pshs      x         push message pointer
                     pshs      u         push node
                     lbsr      BuildLabelText report error
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     bra       EmitCommon join common emit
 
 SubDispatch         cmpx      #$0070    subtype 0x70
@@ -3240,7 +3278,7 @@ EmitCommon          ldx       $06,s     load node pointer
 EmitLoadCvt         ldd       $06,s     load node pointer
                     pshs      d         push it
                     lbsr      ForceReg70 call codegen helper
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $02,s     load direction flag
                     cmpd      #$0051    compare against 0x51
                     bne       EmitOffset branch if not
@@ -3253,7 +3291,7 @@ EmitLoadCvt         ldd       $06,s     load node pointer
                     ldd       #$0043    conversion opcode 0x43
                     pshs      d         push it
                     lbsr      GenOperand emit instruction
-                    leas      $06,s     drop three arguments
+                    leas      6,s        drop three arguments
                     bra       EmitOffset continue offset emit
 
 OffsetRestore       leas      -$08,x    restore stack from x
@@ -3264,7 +3302,7 @@ EmitOffset          ldd       ,s        load saved value
                     ldd       #$007B    opcode 0x7B
                     pshs      d         push it
                     lbsr      GenOperand emit instruction
-                    leas      $06,s     drop three arguments
+                    leas      6,s        drop three arguments
                     ldd       #$0071    result type 0x71
                     std       ,s        store as type
 ZeroResult          clra                clear high byte
@@ -3289,7 +3327,7 @@ DefaultRestore      leas      -$08,x    restore stack from x
 GenDefault2         ldd       $0C,s     load target node
                     pshs      d         push it
                     lbsr      GenExpr   call default helper
-DefaultDrop         leas      $02,s     drop argument
+DefaultDrop         leas      2,s        drop argument
                     bra       GenExit   exit generator
 
 NodeDispatch        cmpx      #$0042    operator 0x42
@@ -3325,7 +3363,7 @@ NodeDispatch        cmpx      #$0042    operator 0x42
 StoreNodeType       ldd       ,s        load saved type
                     ldx       $0C,s     load target node
                     std       $06,x     store type field
-GenExit             leas      $08,s     drop locals
+GenExit             leas      8,s        drop locals
                     puls      pc,u      restore and return
 
 IsFloatType         pshs      u         save u
@@ -3345,22 +3383,22 @@ RetFalse            clra                result false high
 IsFloatRet          puls      pc,u      restore and return
 
 MsgTranslation      fcc       /translation/
-                    fcb       $00
+                    fcb       C$NULL
 MsgPctXCR           fcb       $25,$78
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 MsgBinaryOp         fcc       /binary op./
-                    fcb       $00
+                    fcb       C$NULL
 MsgIndirect1        fcc       /indirection/
-                    fcb       $00
+                    fcb       C$NULL
 MsgIndirect2        fcc       /indirection/
-                    fcb       $00
+                    fcb       C$NULL
 MsgXTranslate       fcc       /x translate/
-                    fcb       $00
+                    fcb       C$NULL
 GenExpr2            pshs      u         save u
                     ldd       #$FFAE    stack frame size
                     lbsr      stkcheck  check stack space
                     ldu       $04,s     load node argument
-                    leas      -$04,s    allocate locals
+                    leas      -4,s       allocate locals
                     ldd       $06,u     load node operator
                     std       $02,s     save it locally
                     tfr       d,x       move operator into x
@@ -3378,7 +3416,7 @@ GenOp47             ldd       #$0001    flag value one
                     ldd       $0a,u     load node child
                     pshs      d         push it
                     bsr       GenExpr2  recurse to generate subtree
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     leax      $04,s     point at result
                     bra       Op47Merge merge
 
@@ -3395,7 +3433,7 @@ GenOp48             clra                zero high byte
                     ldd       $0a,u     load node child
                     pshs      d         push it
                     lbsr      GenExpr2  recurse to generate subtree
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     bra       Op48Merge merge
 
 Op47Merge           leas      -$04,x    restore stack from x
@@ -3424,7 +3462,7 @@ GenCompare2         ldd       $0e,s     load argument
                     ldd       $0a,s     load argument
                     pshs      d         push it
                     lbsr      GenCompare3 generate comparison code
-                    leas      $0a,s     drop arguments
+                    leas      10,s       drop arguments
                     lbra      GenCmpExit finish
 
 GenLogic            ldd       $08,u     load node value
@@ -3452,7 +3490,7 @@ EmitLogicOp         pshs      d         push operand
 GenIndirect         ldd       $0a,u     load node child
                     pshs      d         push it
                     lbsr      GenExpr   call codegen helper
-IndirectMerge       leas      $02,s     drop argument
+IndirectMerge       leas      2,s        drop argument
                     ldd       $0e,s     load argument
                     pshs      d         push it
                     ldd       $0e,s     load argument
@@ -3462,7 +3500,7 @@ IndirectMerge       leas      $02,s     drop argument
                     ldd       $0C,u     load node child
 EmitTernary         pshs      d         push it
                     lbsr      GenExpr2  recurse to generate subtree
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     lbra      GenCmpExit finish
 
 GenAddress          ldd       ,u        load node operator
@@ -3470,13 +3508,13 @@ GenAddress          ldd       ,u        load node operator
                     bne       GenAddrAlt branch if not
                     pshs      u         push node
                     lbsr      EvalOperand generate reference
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       #$008B    code 0x8B
                     pshs      d         push it
                     ldd       #$0088    opcode 0x88
                     pshs      d         push it
                     lbsr      GenOperand emit instruction
-                    leas      $04,s     drop two arguments
+                    leas      4,s        drop two arguments
                     bra       EmitLoadEA continue
 
 GenAddrAlt          ldd       ,u        load node operator
@@ -3491,7 +3529,7 @@ GenAddrSym          ldd       $06,u     load node operand
                     ldu       $0a,u     follow child pointer
 EmitSymRef          pshs      u         push node
                     lbsr      GenLongExpr generate reference
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       ,u        load operator
                     pshs      d         push it
                     ldd       #$008B    code 0x8B
@@ -3499,12 +3537,12 @@ EmitSymRef          pshs      u         push node
                     ldd       #$0087    opcode 0x87
                     pshs      d         push it
                     lbsr      GenOperand emit instruction
-                    leas      $06,s     drop three arguments
+                    leas      6,s        drop three arguments
                     bra       EmitLoadEA continue
 
 GenAddrExpr         pshs      u         push node
                     lbsr      GenSubtree generate address expression
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     bra       EmitLoadEA continue
 
                     leas      -$04,x    dead code, restore stack
@@ -3522,7 +3560,7 @@ EmitLea             pshs      d         push it
                     ldd       #$0082    base code 0x82
 EmitOperand         pshs      d         push it
                     lbsr      GenOperand emit instruction
-                    leas      $06,s     drop three arguments
+                    leas      6,s        drop three arguments
                     bra       GenCmpExit finish
 
 ExprDispatch        cmpx      #$0047    operator 0x47
@@ -3561,13 +3599,13 @@ ExprDispatch        cmpx      #$0047    operator 0x47
                     lbeq      GenIndirect go to that handler
                     lbra      GenAddress default handler
 
-GenCmpExit          leas      $04,s     drop locals
+GenCmpExit          leas      4,s        drop locals
                     puls      pc,u      restore and return
 
 GenCompare3         pshs      u         save frame pointer
                     ldd       #$FFAE    stack space needed
                     lbsr      stkcheck  check stack space
-                    leas      -$06,s    allocate locals
+                    leas      -6,s       allocate locals
                     ldx       $0C,s     load node pointer arg
                     ldd       $0a,x     load field from node
                     std       ,s        save into local
@@ -3585,7 +3623,7 @@ CmpArgStore         std       $02,s     store selected operand local
                     ldd       $0a,s     load compare operator local
                     pshs      d         pass as arg
                     lbsr      SwapCompareOp reverse the compare operator
-                    leas      $02,s     drop arg
+                    leas      2,s        drop arg
                     bra       CmpOpStored join
 
 CmpNoSwap           ldd       $0a,s     load compare operator local
@@ -3607,7 +3645,7 @@ CmpNotType8         ldd       [,s]      reload node type
 CmpType56           ldd       $0C,s     load node pointer
                     pshs      d         pass as arg
                     lbsr      GenLongNode handle type 5 or 6 node
-CmpEmitDone         leas      $02,s     drop arg
+CmpEmitDone         leas      2,s        drop arg
                     leax      $06,s     point at locals block
                     lbra      CmpEmitRewind finish emission
 
@@ -3643,7 +3681,7 @@ CmpSwapOperands     ldd       ,s        load local
                     ldd       $0a,s     load compare operator
                     pshs      d         pass as arg
                     lbsr      AdjustByType adjust operator by type
-                    leas      $02,s     drop arg
+                    leas      2,s        drop arg
                     std       $0a,s     store adjusted operator
 CmpRightOp          ldx       ,s        load node pointer
                     ldd       $06,x     load operator field
@@ -3654,13 +3692,13 @@ CmpRightOp          ldx       ,s        load node pointer
                     lbeq      CmpLeftConst branch if false
                     pshs      u         pass child pointer
                     lbsr      GenExpr   generate operand code
-                    leas      $02,s     drop arg
+                    leas      2,s        drop arg
                     ldx       $06,u     load child operator
                     bra       CmpDispatchOp dispatch on operator
 
 CmpGenIncr          pshs      u         pass child pointer
                     lbsr      EvalOperandTree generate operand code
-                    leas      $02,s     drop arg
+                    leas      2,s        drop arg
                     leax      $06,s     point at locals
                     bra       CmpRewind go emit
 
@@ -3672,7 +3710,7 @@ CmpGenPush          pshs      u         save child pointer
                     ldd       #$0075    mnemonic code
                     pshs      d         push arg
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop args
+                    leas      8,s        drop args
                     ldd       #$0070    register code
                     std       $06,u     set child result register
                     bra       CmpEmitNeg continue
@@ -3683,7 +3721,7 @@ CmpEmitNeg          ldd       $06,u     load child result register
                     ldd       #$007A    mnemonic code
                     pshs      d         push arg
                     lbsr      GenOperand emit instruction
-                    leas      $04,s     drop args
+                    leas      4,s        drop args
                     ldd       #$006E    register code
                     std       $06,u     set child result register
                     lbra      CmpEmitTest continue emission
@@ -3712,13 +3750,13 @@ CmpLeftConst        pshs      u         pass child pointer
                     ldd       ,s        load node pointer
                     pshs      d         pass as arg
                     lbsr      GenSubtree generate subtree code
-                    leas      $02,s     drop arg
+                    leas      2,s        drop arg
                     lbra      CmpEmitBranch finish emission
 
 CmpEvalLeft         ldd       ,s        load node pointer
                     pshs      d         pass as arg
                     lbsr      EvalOperandTree generate operand code
-                    leas      $02,s     drop arg
+                    leas      2,s        drop arg
                     ldx       ,s        load node pointer
                     ldd       $06,x     load operator field
                     std       $04,s     save it
@@ -3735,7 +3773,7 @@ CmpEvalLeft         ldd       ,s        load node pointer
                     beq       CmpConvertLeft branch if not constant
 CmpGenLeft          pshs      u         pass child pointer
                     lbsr      GenExpr   generate operand code
-                    leas      $02,s     drop arg
+                    leas      2,s        drop arg
                     bra       CmpEmitTest continue
 
 CmpConvertLeft      ldd       $04,s     load operator
@@ -3743,20 +3781,20 @@ CmpConvertLeft      ldd       $04,s     load operator
                     ldd       #$007A    mnemonic code
                     pshs      d         push arg
                     lbsr      GenOperand emit instruction
-                    leas      $04,s     drop args
+                    leas      4,s        drop args
                     ldd       #$006E    register code
                     ldx       ,s        load node pointer
                     std       $06,x     set result register
                     pshs      u         pass child pointer
                     lbsr      EvalOperandTree generate operand code
-                    leas      $02,s     drop arg
+                    leas      2,s        drop arg
                     ldd       $06,u     load child result register
                     std       $04,s     save it
                     ldu       ,s        load node pointer into u
                     ldd       $0a,s     load compare operator
                     pshs      d         push arg
                     lbsr      AdjustByType adjust operator by type
-                    leas      $02,s     drop arg
+                    leas      2,s        drop arg
                     std       $0a,s     store adjusted operator
 CmpEmitTest         pshs      u         save pointer
                     ldd       #$0077    operand descriptor
@@ -3766,7 +3804,7 @@ CmpEmitTest         pshs      u         save pointer
                     ldd       #$0081    mnemonic code
                     pshs      d         push arg
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop args
+                    leas      8,s        drop args
                     bra       CmpEmitBranch finish
 
 CmpEmitRewind       leas      -$06,x    rewind pointer
@@ -3777,8 +3815,8 @@ CmpEmitBranch       ldd       $02,s     load target operand
                     ldd       #$0082    mnemonic code
                     pshs      d         push arg
                     lbsr      GenOperand emit the branch instruction
-                    leas      $06,s     drop args
-                    leas      $06,s     drop locals
+                    leas      6,s        drop args
+                    leas      6,s        drop locals
                     puls      pc,u      restore and return
 
 NodeIsConst         pshs      u         save frame pointer
@@ -3794,7 +3832,7 @@ ConstTrue           ldd       #$0001    return true
 NodeCheckDelegate   ldd       $04,s     load node pointer
                     pshs      d         pass as arg
                     lbsr      IsSmallSize test node property
-                    leas      $02,s     drop arg
+                    leas      2,s        drop arg
                     puls      pc,u      return result
 
 NodeConstDispatch   cmpx      #$0034    operator type $34
@@ -3823,7 +3861,7 @@ GenSubtree          pshs      u         save frame pointer
                     ldd       #$FFB0    stack space needed
                     lbsr      stkcheck  check stack space
                     ldu       $04,s     load node pointer arg
-                    leas      -$04,s    allocate locals
+                    leas      -4,s       allocate locals
                     clra                zero
                     clrb                zero
                     std       ,s        clear the flag local
@@ -3906,7 +3944,7 @@ SubFlagZero         clra                zero result
                     std       GlbVar0019 save computed flag global
                     pshs      u         pass node pointer
                     lbsr      GenExpr   generate operand code
-                    leas      $02,s     drop arg
+                    leas      2,s        drop arg
                     ldx       $06,u     load operator field
                     bra       SubEmitDispatch dispatch on operator
 
@@ -3933,7 +3971,7 @@ SubEmitLoad         pshs      u         save pointer
                     ldd       #$0075    mnemonic code
 SubEmitArg          pshs      d         push arg
                     lbsr      GenOperand emit instruction
-                    leas      $08,s     drop args
+                    leas      8,s        drop args
                     bra       SubGenDone done
 
 SubEmitDispatch     cmpx      #$0071    operator type $71
@@ -3948,7 +3986,7 @@ SubEmitDispatch     cmpx      #$0071    operator type $71
                     beq       SubFollowChild handle it
                     bra       SubEmitLoad default emit
 
-SubGenDone          leas      $04,s     drop locals
+SubGenDone          leas      4,s        drop locals
                     puls      pc,u      restore and return
 
 SwapCompareOp       pshs      u         save frame pointer
@@ -4036,18 +4074,18 @@ EvalOperand         pshs      u         save the frame pointer
                     ldd       $04,s     fetch the node pointer
                     pshs      d         pass node as argument
                     bsr       GenExpr3  generate code for the node
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $04,s     fetch the node pointer again
                     pshs      d         pass node as argument
                     lbsr      EmitLoad  finish emission for the node
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     puls      pc,u      restore and return
 
 GenExpr3            pshs      u         save the frame pointer
                     ldd       #$FFAE    stack space needed
                     lbsr      stkcheck  verify stack headroom
                     ldu       $04,s     fetch the node pointer
-                    leas      -$06,s    reserve local slots
+                    leas      -6,s       reserve local slots
                     ldd       $06,u     load the node operator code
                     std       $02,s     save operator in a local
                     tfr       d,x       operator into index for dispatch
@@ -4055,10 +4093,10 @@ GenExpr3            pshs      u         save the frame pointer
 
 GenOp42             pshs      u         save the frame pointer
                     lbsr      GenLoadLeaf process the node
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     pshs      u         save the frame pointer
                     lbsr      ResolveNegFlag process the node again
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldx       $06,u     reload the node operator
                     bra       GenOp42Check check the result register type
 
@@ -4070,7 +4108,7 @@ GenOp42Emit         ldd       $08,u     load the left child
                     ldd       #$007B    push operand code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     lbra      SetRegResult set register result
 
 GenOp42Check        cmpx      #$0093    result register type $0093
@@ -4084,14 +4122,14 @@ GenOp42Check        cmpx      #$0093    result register type $0093
 GenNegOp            ldd       $0a,u     load the child pointer
                     pshs      d         pass as argument
                     lbsr      ForceReg70 generate the subexpression
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       #$0086    result operator $0086
                     lbra      EmitFinalOp emit and finish
 
 GenOp91             ldd       $0a,u     load the child pointer
                     pshs      d         pass as argument
                     lbsr      GenLongExpr process the child
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $0a,u     load the child pointer
                     pshs      d         push as argument
                     ldd       #$0091    push operator code $0091
@@ -4099,19 +4137,19 @@ GenOp91             ldd       $0a,u     load the child pointer
                     ldd       #$0087    push mnemonic code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     lbra      EmitDoneLeaf finish and set leaf result
 
 GenOp83             ldd       $0a,u     load the child pointer
                     pshs      d         pass as argument
                     lbsr      ForceReg70 generate the subexpression
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       #$0083    push operator code $0083
                     pshs      d         as argument
                     ldd       #$0088    push mnemonic code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     bra       SetLeafResult set leaf result
 
 SetLeafFixup        leas      -$06,x    stack pointer fixup
@@ -4126,7 +4164,7 @@ GenLoadImm          ldd       $08,u     load the child value
                     ldd       #$0088    push mnemonic code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     ldd       #$0004    push size four
                     pshs      d         as argument
                     ldd       $08,u     push the child value
@@ -4143,13 +4181,13 @@ GenOp64             leax      EvalOperand,pcr pass EvalOperand as callback
 GenCompareOp        ldd       $0a,u     load the child pointer
                     pshs      d         pass as argument
                     lbsr      EvalOperand evaluate the operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $02,s     load the result register
                     pshs      d         push as argument
                     ldd       #$0088    push mnemonic code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-CompareDone         leas      $04,s     drop the arguments
+CompareDone         leas      4,s        drop the arguments
                     leax      $06,s     point past the locals
                     lbra      SetRegResultFixup set register result
 
@@ -4163,29 +4201,29 @@ GenLogicalOp        clra                zero high byte
                     ldd       #$007F    push operand code $007F
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     ldd       #$0071    push mnemonic code
                     pshs      d         as argument
                     ldd       #$007A    push operand code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldd       $0a,u     load the child pointer
                     pshs      d         pass as argument
                     lbsr      EvalOperand evaluate the operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $02,s     load the result register
                     pshs      d         push as argument
                     ldd       #$0088    push mnemonic code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldd       #$0089    push operand code
                     pshs      d         as argument
                     ldd       #$0088    push mnemonic code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldd       $02,s     reload the operator
                     cmpd      #$003E    which comparison variant
                     bne       CompareSwap not $003E, use other
@@ -4197,21 +4235,21 @@ CompareSwap         ldd       #$003E    result operator $003E
 
 GenOp65             pshs      u         save the frame pointer
                     lbsr      GenExprList process the node
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     lbra      EmitDoneLeaf finish and set leaf result
 
 GenAssignOp         ldx       $0a,u     left child pointer
                     ldd       $06,x     left child operator
                     cmpd      #$004A    is it a load node
                     bne       CheckRightLoad no, skip the swap
-                    leas      -$02,s    reserve a temporary
+                    leas      -2,s       reserve a temporary
                     ldd       $0a,u     load left child
                     std       ,s        stash it
                     ldd       $0C,u     load right child
                     std       $0a,u     move into left slot
                     ldd       ,s        reload stashed left
                     std       $0C,u     move into right slot
-                    leas      $02,s     drop the temporary
+                    leas      2,s        drop the temporary
 CheckRightLoad      ldx       $0C,u     right child pointer
                     ldd       $06,x     right child operator
                     cmpd      #$004A    is it a load node
@@ -4225,7 +4263,7 @@ CheckRightLoad      ldx       $0C,u     right child pointer
                     ldd       $02,x     load the symbol field
                     pshs      d         push as argument
                     lbsr      LookupConstSlot look it up
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       ,s        stash the result
                     beq       GenBinOp  none found, generic binop
                     ldd       #$0004    push size four
@@ -4233,7 +4271,7 @@ CheckRightLoad      ldx       $0C,u     right child pointer
                     ldd       $06,s     push the lookup result
                     pshs      d         as argument
                     lbsr      InsertFreeBlock reserve storage
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldd       $0C,u     load right child
                     std       $04,s     save pointer local
                     ldd       ,s        reload stashed result
@@ -4264,19 +4302,19 @@ GenBinOp            ldd       $0a,u     load left child
                     ldd       $04,s     reload the pointer
                     pshs      d         push as argument
                     lbsr      LoadLongConst handle the load node
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     bra       BinOpEvalRight evaluate the right operand
 
 BinOpEvalLeft       ldd       $04,s     reload the pointer
                     pshs      d         push as argument
                     lbsr      EvalOperand evaluate the operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       #$006E    push mnemonic code
                     pshs      d         as argument
                     ldd       #$0088    push operand code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
 BinOpEvalRight      ldd       $0C,u     load right child
                     pshs      d         push as argument
                     lbsr      EvalOperand evaluate the operand
@@ -4286,40 +4324,40 @@ GenOp56Fixup        leas      -$06,x    stack pointer fixup
 GenOp56             ldd       $0a,u     load left child
                     pshs      d         push as argument
                     lbsr      EvalOperand evaluate the operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       #$0071    push mnemonic code
                     pshs      d         as argument
                     ldd       #$007A    push operand code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldd       $0C,u     load right child
                     pshs      d         push as argument
                     lbsr      ForceReg70 generate the subexpression
-BinOpEmitTail       leas      $02,s     drop the argument
+BinOpEmitTail       leas      2,s        drop the argument
                     ldd       $02,s     load the store type
 EmitFinalOp         pshs      d         push as argument
                     ldd       #$0088    push mnemonic code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
 EmitDoneLeaf        leax      $06,s     point past the locals
                     lbra      SetLeafFixup set leaf result
 
 GenOp78             ldd       $0a,u     load left child
                     pshs      d         push as argument
                     lbsr      EvalOperand evaluate the operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       #$0071    push mnemonic code
                     pshs      d         as argument
                     ldd       #$007A    push operand code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldd       $0C,u     load right child
                     pshs      d         push as argument
                     lbsr      EvalOperand evaluate the operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     leax      $06,s     point past the locals
                     bra       DefaultFixup emit the default tail
 
@@ -4328,13 +4366,13 @@ GenDefaultOp        leas      -$06,x    stack pointer fixup
                     std       $04,s     save pointer local
                     pshs      d         push as argument
                     lbsr      EvalOperand evaluate the operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       #$0071    push mnemonic code
                     pshs      d         as argument
                     ldd       #$007A    push operand code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldd       $02,s     reload the operator
                     addd      #$FFB0    adjust the operator code
                     std       $06,u     store into the node
@@ -4343,7 +4381,7 @@ GenDefaultOp        leas      -$06,x    stack pointer fixup
                     std       $06,x     store the operator field
                     pshs      u         save the frame pointer
                     lbsr      GenExpr3  recurse to generate code
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     bra       EmitDefaultTail emit the default tail
 
 DefaultFixup        leas      -$06,x    stack pointer fixup
@@ -4352,7 +4390,7 @@ EmitDefaultTail     ldd       #$0089    push operand code
                     ldd       #$0088    push mnemonic code
                     pshs      d         as argument
                     lbsr      GenOperand emit the instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     bra       SetRegResult set register result
 
 SetRegResultFixup   leas      -$06,x    stack pointer fixup
@@ -4373,7 +4411,7 @@ GenExprErr          leax      MsgLongs,pcr point at the error message
                     pshs      x         push the message
                     pshs      u         push the frame pointer
                     lbsr      BuildLabelText report the error
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     lbra      GenExprDone2 done
 
 GenExprDispatch     cmpx      #$0080    already-generated result $0080
@@ -4448,7 +4486,7 @@ GenExprDispatch     cmpx      #$0080    already-generated result $0080
                     lbeq      GenOp78   handle it
                     lbra      GenOpFallback otherwise fall back
 
-GenExprDone2        leas      $06,s     deallocate the locals
+GenExprDone2        leas      6,s        deallocate the locals
                     puls      pc,u      restore and return
 
 EmitLoad            pshs      u         save the frame pointer
@@ -4467,7 +4505,7 @@ EmitConv34          ldd       $04,s     load node argument
                     ldd       #$007F    format code
                     pshs      d         push format
                     lbsr      GenOperand emit instruction line
-                    leas      $08,s     drop four emit args
+                    leas      8,s        drop four emit args
                     bra       ConvDone  conversion done, exit
 
 EmitConv94          ldd       $04,s     load node argument
@@ -4477,7 +4515,7 @@ EmitConv94          ldd       $04,s     load node argument
                     ldd       #$007B    format code
                     pshs      d         push format
                     lbsr      GenOperand emit instruction line
-                    leas      $06,s     drop three emit args
+                    leas      6,s        drop three emit args
                     bra       ConvDone  conversion done, exit
 
 EmitTypeConv        cmpx      #$0034    match node type $0034
@@ -4492,7 +4530,7 @@ LoadLongConst       pshs      u         save frame pointer
                     ldd       #$FFB2    stack headroom needed
                     lbsr      stkcheck  check stack space
                     ldu       $04,s     node pointer argument
-                    leas      -$02,s    reserve local slot
+                    leas      -2,s       reserve local slot
                     ldd       $08,u     long value pointer field
                     std       ,s        save pointer local
                     ldx       ,s        pointer to value bytes
@@ -4511,13 +4549,13 @@ LoadLongConst       pshs      u         save frame pointer
                     ldd       #$0075    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $08,s     drop four args
+                    leas      8,s        drop four args
                     ldd       #$0070    operand code
                     pshs      d         push
                     ldd       #$007A    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     ldd       [,s]      load low word via pointer
                     pshs      d         push emit operand
                     ldd       #$0036    template code
@@ -4527,7 +4565,7 @@ LoadLongConst       pshs      u         save frame pointer
                     ldd       #$0075    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $08,s     drop four args
+                    leas      8,s        drop four args
                     bra       EmitLongLoad join common tail
 
 ZeroLongPath        clra                zero high word
@@ -4540,51 +4578,51 @@ ZeroLongPath        clra                zero high word
                     ldd       #$0075    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $08,s     drop four args
+                    leas      8,s        drop four args
                     ldd       #$0070    operand code
                     pshs      d         push
                     ldd       #$007A    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
 EmitLongLoad        ldd       #$0070    operand code
                     pshs      d         push
                     ldd       #$007A    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     ldd       #$0004    length four
                     pshs      d         push length
                     ldd       $02,s     value pointer local
                     pshs      d         push pointer
                     lbsr      InsertFreeBlock emit long constant data
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     clra                clear D
                     clrb                clear low byte
                     std       $08,u     clear value pointer field
-                    leas      $02,s     release local slot
+                    leas      2,s        release local slot
                     puls      pc,u      return
 
 MsgLongs            fcc       /longs/
-                    fcb       $00
+                    fcb       C$NULL
 GenLongExpr         pshs      u         save frame pointer
                     ldd       #$FFBA    stack headroom needed
                     lbsr      stkcheck  check stack space
                     ldd       $04,s     node argument
                     pshs      d         push argument
                     bsr       GenLongNode generate long node
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $04,s     node argument again
                     pshs      d         push argument
                     lbsr      EmitLoad  post-process result
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     puls      pc,u      return
 
 GenLongNode         pshs      u         save frame pointer
                     ldd       #$FFAE    stack headroom needed
                     lbsr      stkcheck  check stack space
                     ldu       $04,s     node pointer argument
-                    leas      -$08,s    reserve eight-byte locals
+                    leas      -8,s       reserve eight-byte locals
                     ldd       ,u        node type field
                     std       $02,s     save node type local
                     ldd       $06,u     operator code field
@@ -4594,13 +4632,13 @@ GenLongNode         pshs      u         save frame pointer
 
 GenSimpleLong       pshs      u         save frame pointer
                     lbsr      GenExpr3  handle simple node
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     lbra      GenLongDone done
 
 GenLongDeref        ldd       $0a,u     left child pointer
                     pshs      d         push child
                     lbsr      ForceReg70 evaluate child expression
-                    leas      $02,s     drop child
+                    leas      2,s        drop child
                     bra       EmitResult87 join result emit
 
 SetResultRegA       leas      -$08,x    reset stack to saved point
@@ -4609,7 +4647,7 @@ EmitResult87        ldd       $06,s     result operand
                     ldd       #$0087    format code
                     pshs      d         push format
                     lbsr      GenOperand emit instruction line
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     bra       SetResultD set result register
 
 SetResDReset        leas      -$08,x    reset stack to saved point
@@ -4625,7 +4663,7 @@ GenLongEval         ldd       $0a,u     child pointer
 GenLongChild        ldd       $0a,u     child pointer
                     pshs      d         push child
                     lbsr      GenLongExpr generate long expression
-GenLongChildDone    leas      $02,s     drop child
+GenLongChildDone    leas      2,s        drop child
                     leax      $08,s     save teardown point in X
                     bra       SetResultRegA emit result
 
@@ -4636,7 +4674,7 @@ GenLongIndex        ldd       $08,u     value field
                     ldd       #$0087    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $06,s     drop three args
+                    leas      6,s        drop three args
                     ldd       #$0093    result register code
                     std       $06,u     store node result
                     ldd       #$0008    length eight
@@ -4644,20 +4682,20 @@ GenLongIndex        ldd       $08,u     value field
                     ldd       $08,u     value pointer
                     pshs      d         push pointer
                     lbsr      InsertFreeBlock emit long constant data
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     lbra      ClearAndDone finish and clear
 
 GenLongApply        leax      GenLongExpr,pcr point to long-expr handler
                     pshs      x         push function pointer
                     pshs      u         push node pointer
                     lbsr      GenBoolBranchInd apply generic handler
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     bra       UnaryDone finish
 
 GenLongUnary        ldd       $0a,u     child pointer
                     pshs      d         push child
                     lbsr      GenLongExpr generate long expression
-                    leas      $02,s     drop child
+                    leas      2,s        drop child
                     ldd       $02,s     result operand
                     pshs      d         push
                     ldd       $08,s     prior operand
@@ -4665,7 +4703,7 @@ GenLongUnary        ldd       $0a,u     child pointer
                     ldd       #$0087    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $06,s     drop three args
+                    leas      6,s        drop three args
 UnaryDone           leax      $08,s     save teardown point in X
                     lbra      SetResultReset finish result
 
@@ -4676,17 +4714,17 @@ GenLongCompare      ldd       #$0080    register code
                     ldd       #$007F    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $06,s     drop three args
+                    leas      6,s        drop three args
                     ldd       #$0071    operand code
                     pshs      d         push
                     ldd       #$007A    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     ldd       $0a,u     child pointer
                     pshs      d         push child
                     lbsr      GenLongExpr generate long expression
-                    leas      $02,s     drop child
+                    leas      2,s        drop child
                     ldd       $02,s     result operand
                     pshs      d         push
                     ldd       $08,s     prior operand
@@ -4694,7 +4732,7 @@ GenLongCompare      ldd       #$0080    register code
                     ldd       #$0087    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $06,s     drop three args
+                    leas      6,s        drop three args
                     ldd       $02,s     result operand
                     pshs      d         push
                     ldd       #$0089    operand code
@@ -4702,7 +4740,7 @@ GenLongCompare      ldd       #$0080    register code
                     ldd       #$0087    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $06,s     drop three args
+                    leas      6,s        drop three args
                     ldd       $02,s     result operand
                     pshs      d         push
                     ldd       $08,s     operator code
@@ -4716,51 +4754,51 @@ EmitCmpOp           pshs      d         push compare op
                     ldd       #$0087    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $06,s     drop three args
+                    leas      6,s        drop three args
                     bra       BinaryDone comparison done
 
 GenLongSpecial      pshs      u         push node pointer
                     lbsr      GenExprList handle special node
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     bra       BinaryDone comparison done
 
 GenLongBinary       ldd       $0a,u     left child pointer
                     pshs      d         push child
                     lbsr      GenLongExpr generate long expression
-                    leas      $02,s     drop child
+                    leas      2,s        drop child
                     ldd       #$006E    operand code
                     pshs      d         push
                     ldd       #$0087    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     ldd       $0C,u     right child pointer
                     pshs      d         push child
                     lbsr      GenLongExpr generate long expression
-                    leas      $02,s     drop child
+                    leas      2,s        drop child
                     ldd       $06,s     result operand
                     pshs      d         push
                     ldd       #$0087    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
 BinaryDone          leax      $08,s     save teardown point in X
                     lbra      SetResDReset set result register
 
 GenLongShift        ldd       $0a,u     left child pointer
                     pshs      d         push child
                     lbsr      GenLongExpr generate long expression
-                    leas      $02,s     drop child
+                    leas      2,s        drop child
                     ldd       #$0071    operand code
                     pshs      d         push
                     ldd       #$007A    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     ldd       $0C,u     right child pointer
                     pshs      d         push child
                     lbsr      GenLongExpr generate long expression
-                    leas      $02,s     drop child
+                    leas      2,s        drop child
                     leax      $08,s     save teardown point in X
                     lbra      ShiftDone finish shift
 
@@ -4774,13 +4812,13 @@ GenLongAssign       leas      -$08,x    reset stack to saved point
                     ldd       $0a,x     grandchild pointer
                     pshs      d         push
                     lbsr      GenLongExpr generate long expression
-                    leas      $02,s     drop
+                    leas      2,s        drop
                     ldd       #$0071    operand code
                     pshs      d         push
                     ldd       #$007A    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     ldd       #$008C    operand code
                     pshs      d         push
                     ldd       #$0087    format code
@@ -4789,13 +4827,13 @@ GenLongAssign       leas      -$08,x    reset stack to saved point
 AssignPlain         ldd       $04,s     child pointer
                     pshs      d         push child
                     lbsr      GenLongExpr generate long expression
-                    leas      $02,s     drop child
+                    leas      2,s        drop child
                     ldd       #$0071    operand code
                     pshs      d         push
                     ldd       #$007A    format code
 EmitAssign          pshs      d         push format
                     lbsr      GenOperand emit instruction line
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     ldd       $06,s     result operand
                     addd      #$FFB0    add frame bias
                     std       $06,u     store result operand
@@ -4804,7 +4842,7 @@ EmitAssign          pshs      d         push format
                     std       $06,x     set child result
                     pshs      u         push node pointer
                     lbsr      GenLongNode recurse generate node
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $02,s     node type field
                     cmpd      #$0005    is indirect type five
                     bne       EmitStore89 no, skip extra store
@@ -4813,7 +4851,7 @@ EmitAssign          pshs      d         push format
                     ldd       #$0087    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     bra       EmitStore89 continue
 
 ShiftDone           leas      -$08,x    reset stack to saved point
@@ -4824,7 +4862,7 @@ EmitStore89         ldd       $02,s     result operand
                     ldd       #$0087    format code
                     pshs      d         push
                     lbsr      GenOperand emit instruction line
-                    leas      $06,s     drop three args
+                    leas      6,s        drop three args
                     bra       SetResult93 finish result
 
 SetResultReset      leas      -$08,x    reset stack to saved point
@@ -4845,7 +4883,7 @@ FloatFallback       leax      MsgFloats,pcr point to floats message
                     pshs      x         push message pointer
                     pshs      u         push node pointer
                     lbsr      BuildLabelText report unsupported error
-                    leas      $04,s     drop two args
+                    leas      4,s        drop two args
                     lbra      GenLongDone done
 
 DispatchLongOp      cmpx      #$0080    match operator $0080
@@ -4910,13 +4948,13 @@ DispatchLongOp      cmpx      #$0080    match operator $0080
                     lbeq      GenLongShift shift case
                     lbra      GenLongStore default store case
 
-GenLongDone         leas      $08,s     begin epilogue teardown
+GenLongDone         leas      8,s        begin epilogue teardown
                     puls      pc,u      restore and return
 
 MsgFloats           fcc       /floats/
-                    fcb       $00
+                    fcb       C$NULL
 Printf              pshs      u         save u register
-                    leax      $00CE,y   point at stdout file structure
+                    leax      Stdout,y  point at stdout file structure
                     stx       GlbVar001B set output pointer
                     ldd       #$0001    select file output mode
                     std       GlbVar0021 store output mode
@@ -4935,7 +4973,7 @@ fprintf             pshs      u         save u register
                     ldd       $08,s     get format string pointer
 PrintfTail          pshs      d         push format string pointer
                     bsr       doprnt    run the formatter
-                    leas      $04,s     drop the pushed arguments
+                    leas      4,s        drop the pushed arguments
                     puls      pc,u      restore and return
 
                     pshs      u         save u register
@@ -4948,15 +4986,15 @@ PrintfTail          pshs      d         push format string pointer
                     ldd       $08,s     get format string pointer
                     pshs      d         push format string pointer
                     bsr       doprnt    run the formatter
-                    leas      $04,s     drop the pushed arguments
+                    leas      4,s        drop the pushed arguments
                     clra                zero high byte
                     clrb                zero terminator
-                    stb       [$1B,y]   null-terminate the buffer via output pointer global
+                    stb       [GlbVar001B,y]   null-terminate the buffer via output pointer global
                     puls      pc,u      restore and return
 
 doprnt              pshs      u         save u register
                     ldu       $04,s     load variadic argument pointer
-                    leas      -$0b,s    reserve local frame
+                    leas      -11,s      reserve local frame
                     bra       FmtLoop   enter format loop
 
 PrntLiteral         ldb       $08,s     get current format char
@@ -4965,7 +5003,7 @@ PrntLiteral         ldb       $08,s     get current format char
                     sex                 sign-extend to d
                     pshs      d         push the character
                     lbsr      EmitByte  output the character
-                    leas      $02,s     drop pushed char
+                    leas      2,s        drop pushed char
 FmtLoop             ldb       ,u+       fetch next format char
                     stb       $08,s     save current char
                     cmpb      #$25      is it a percent
@@ -5012,7 +5050,7 @@ WidthDigit          ldd       $06,s     current width
                     stb       $08,s     save it
 WidthScanLoop       ldb       $08,s     get current char
                     sex                 sign-extend
-                    leax      $0192,y   point at ctype table
+                    leax      CtypeTab,y point at ctype table
                     leax      d,x       index by character
                     ldb       ,x        load class bits
                     clra                clear high byte
@@ -5039,7 +5077,7 @@ PrecScanLoop        ldb       ,u+       fetch next char
                     stb       $08,s     save it
                     ldb       $08,s     reload char
                     sex                 sign-extend
-                    leax      $0192,y   point at ctype table
+                    leax      CtypeTab,y point at ctype table
                     leax      d,x       index by character
                     ldb       ,x        load class bits
                     clra                clear high byte
@@ -5111,7 +5149,7 @@ StrFieldOut         ldd       $06,s     field width
                     ldd       $08,s     string pointer
                     pshs      d         push string pointer
                     lbsr      PutStrFieldN output padded field
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     bra       FieldDone back to format loop
 
 StrFieldSimple      ldd       $06,s     field width
@@ -5119,14 +5157,14 @@ StrFieldSimple      ldd       $06,s     field width
                     ldd       $0b,s     string pointer
                     pshs      d         push string pointer
 OutputField         lbsr      PutStrField output padded field
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
 FieldDone           lbra      FmtLoop   back to format loop
 
 FmtDefaultChar      ldb       $08,s     get conversion char
                     sex                 sign-extend
 PutConvChar         pshs      d         push the character
                     lbsr      EmitByte  output the character
-                    leas      $02,s     drop pushed char
+                    leas      2,s        drop pushed char
                     lbra      FmtLoop   back to format loop
 
 ConvDispatch        cmpx      #$0064    is it the d letter
@@ -5139,11 +5177,11 @@ ConvDispatch        cmpx      #$0064    is it the d letter
                     lbeq      FmtString handle string
                     bra       FmtDefaultChar else emit char literally
 
-DoprntDone          leas      $0b,s     release local frame
+DoprntDone          leas      11,s       release local frame
                     puls      pc,u      restore and return
 
 IntToDecimal        pshs      u,d       save regs and value
-                    leax      $0286,y   point at conversion buffer
+                    leax      ConversionBuffer,y   point at conversion buffer
                     stx       ,s        save buffer pointer
                     ldd       $06,s     the value
                     bge       ConvMagnitude non-negative then convert
@@ -5155,10 +5193,10 @@ IntToDecimal        pshs      u,d       save regs and value
                     bge       EmitMinus ok then emit sign
                     leax      StrMinInt,pcr point at overflow string
                     pshs      x         push it
-                    leax      $0286,y   point at conversion buffer
+                    leax      ConversionBuffer,y   point at conversion buffer
                     pshs      x         push buffer
                     lbsr      StrCopy   copy the string
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     lbra      RepeatByteDone return the buffer
 
 EmitMinus           ldd       #$002D    minus sign
@@ -5171,8 +5209,8 @@ ConvMagnitude       ldd       $06,s     the magnitude
                     ldd       $02,s     buffer pointer
                     pshs      d         push buffer
                     bsr       UnsignedToDec convert magnitude to digits
-                    leas      $04,s     drop the arguments
-                    leax      $0286,y   point at conversion buffer
+                    leas      4,s        drop the arguments
+                    leax      ConversionBuffer,y   point at conversion buffer
                     tfr       x,d       return the buffer pointer
                     lbra      RepeatByteDone return
 
@@ -5190,11 +5228,11 @@ DecSeedLoop         ldd       ,s        digit accumulator
                     addd      #$0001    increment
                     std       ,s        save it
                     ldd       $0C,s     remaining value
-                    subd      >$0043,y  subtract seed power of ten
+                    subd      >Pow10,y  subtract seed power of ten
                     std       $0C,s     save remainder
 DecSeedCheck        ldd       $0C,s     remaining value
                     blt       DecSeedLoop still short then adjust again
-                    leax      >$0043,y  point at divisor table
+                    leax      >Pow10,y  point at divisor table
                     stx       $04,s     save table pointer
                     bra       DecDivLoop enter division loop
 
@@ -5233,13 +5271,13 @@ DecDivLoop          ldd       $04,s     table pointer
                     clrb                zero low byte
                     stb       ,u        null-terminate the buffer
                     ldd       $0a,s     return buffer pointer
-                    leas      $06,s     release locals
+                    leas      6,s        release locals
                     puls      pc,u      restore and return
 
 IntToHex            pshs      u,x,d     save regs and value
-                    leax      $0286,y   point at conversion buffer
+                    leax      ConversionBuffer,y   point at conversion buffer
                     stx       $02,s     save buffer pointer
-                    leau      $0290,y   point at temp hex buffer
+                    leau      TempHexBuffer,y   point at temp hex buffer
 HexNibbleLoop       ldd       $08,s     the value
                     clra                clear high byte
                     andb      #$0f      isolate low nibble
@@ -5275,23 +5313,23 @@ HexReverseLoop      ldb       ,u        get char from temp
                     stb       -$01,x    copy char to buffer
 HexReverseCheck     leau      -$01,u    step back in temp
                     pshs      u         save pointer
-                    leax      $0290,y   start of temp buffer
+                    leax      TempHexBuffer,y   start of temp buffer
                     cmpx      ,s++      reached the start
                     bls       HexReverseLoop not yet then copy more
                     clra                zero high byte
                     clrb                zero low byte
                     stb       [$02,s]   null-terminate buffer
-                    leax      $0286,y   point at conversion buffer
+                    leax      ConversionBuffer,y   point at conversion buffer
                     tfr       x,d       return the pointer
                     lbra      EmitByteCleanup return
 
 PutStrField         pshs      u         save u register
                     ldu       $06,s     load field width
-                    leas      -$02,s    reserve local
+                    leas      -2,s       reserve local
                     ldd       $06,s     string pointer
                     pshs      d         push for strlen
                     lbsr      StrLen    get string length
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     nega                negate high byte
                     negb                negate low byte
                     sbca      #$00      finish the negation
@@ -5303,7 +5341,7 @@ PutStrField         pshs      u         save u register
 PadLeadLoop         ldd       GlbVar001F pad character
                     pshs      d         push it
                     lbsr      EmitByte  output pad char
-                    leas      $02,s     drop char
+                    leas      2,s        drop char
 PadLeadCheck        tfr       u,d       pad count
                     leau      -$01,u    decrement
                     std       -$02,s    save remaining
@@ -5313,7 +5351,7 @@ PadLeadCheck        tfr       u,d       pad count
 FieldCharLoop       ldd       ,s        current char
                     pshs      d         push it
                     lbsr      EmitByte  output the char
-                    leas      $02,s     drop char
+                    leas      2,s        drop char
 FieldCharNext       ldx       $06,s     string pointer
                     leax      $01,x     advance
                     stx       $06,s     save it
@@ -5328,7 +5366,7 @@ FieldCharNext       ldx       $06,s     string pointer
 PadTrailLoop        ldd       GlbVar001F pad character
                     pshs      d         push it
                     lbsr      EmitByte  output pad char
-                    leas      $02,s     drop char
+                    leas      2,s        drop char
 PadTrailCheck       tfr       u,d       remaining pad count
                     leau      -$01,u    decrement
                     std       -$02,s    save remaining
@@ -5337,7 +5375,7 @@ PadTrailCheck       tfr       u,d       remaining pad count
 
 PutStrFieldN        pshs      u         save u register
                     ldu       $04,s     buffer pointer
-                    leas      -$02,s    reserve local
+                    leas      -2,s       reserve local
                     ldd       $0a,s     field width
                     subd      $08,s     minus the length
                     std       ,s        save pad count
@@ -5348,7 +5386,7 @@ PutStrFieldN        pshs      u         save u register
 FieldNPadLoop       ldd       GlbVar001F pad character
                     pshs      d         push it
                     bsr       EmitByte  output pad char
-                    leas      $02,s     drop char
+                    leas      2,s        drop char
 FieldNPadCheck      ldd       ,s        pad count
                     addd      #$FFFF    decrement
                     std       ,s        save it
@@ -5360,7 +5398,7 @@ FieldNCharLoop      ldb       ,u+       next char
                     sex                 sign-extend
                     pshs      d         push char
                     bsr       EmitByte  output the char
-                    leas      $02,s     drop char
+                    leas      2,s        drop char
 FieldNCharCheck     ldd       $08,s     remaining length
                     addd      #$FFFF    decrement
                     std       $08,s     save it
@@ -5373,13 +5411,13 @@ FieldNCharCheck     ldd       $08,s     remaining length
 RepeatByteLoop      ldd       GlbVar001F fetch the byte value to repeat
                     pshs      d         pass value as argument
                     bsr       EmitByte  emit one byte
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 RepeatByteCond      ldd       ,s        load loop counter from stack
                     addd      #$FFFF    decrement the counter
                     std       ,s        store counter back
                     subd      #$FFFF    restore value for the test
                     bgt       RepeatByteLoop loop while counter still positive
-RepeatByteDone      leas      $02,s     drop the counter
+RepeatByteDone      leas      2,s        drop the counter
                     puls      pc,u      return to caller
 
 EmitByte            pshs      u         save frame pointer
@@ -5398,29 +5436,29 @@ EmitByteBuffered    ldd       GlbVar001B load buffer pointer
                     ldd       $06,s     fetch the byte argument
                     pshs      d         pass the value
                     lbsr      GenOperand3 write byte through helper
-EmitByteCleanup     leas      $04,s     drop the helper arguments
+EmitByteCleanup     leas      4,s        drop the helper arguments
 EmitByteRet         puls      pc,u      return to caller
 
 StrMinInt           fcc       /-32768/
-                    fcb       $00
+                    fcb       C$NULL
                     pshs      u,x,d     save registers and make room
                     ldd       $08,s     fetch the requested size
                     pshs      d         pass size
                     lbsr      SizeToQuads round size up to quad units
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       ,s        save rounded size as request
                     lbeq      AllocFail fail if rounded size is zero
-                    ldd       >$004b,y  load free-list root pointer
+                    ldd       >FreeRoot,y load free-list root pointer
                     std       $02,s     save as current node
                     bne       AllocScanInit if list exists, start scanning
-                    leax      $029a,y   point at the arena base
+                    leax      ArenaBase,y   point at the arena base
                     stx       $02,s     set as current node
                     tfr       x,d       copy the pointer
-                    std       >$004b,y  initialise free-list root
-                    std       $029a,y   self-link the first node
+                    std       >FreeRoot,y initialise free-list root
+                    std       ArenaBase,y   self-link the first node
                     clra                clear high byte
                     clrb                clear low byte
-                    std       $029C,y   clear the node size
+                    std       NodeSize,y   clear the node size
 AllocScanInit       ldu       [$02,s]   load current node pointer
 AllocScanLoop       ldd       $02,u     load this node's size
                     cmpd      ,s        compare against request
@@ -5443,7 +5481,7 @@ SplitBlock          ldd       $02,u     load node size
                     ldd       ,s        load request size
                     std       $02,u     record allocated block size
 TakeBlock           ldd       $02,s     load current node pointer
-                    std       >$004b,y  update the free-list root
+                    std       >FreeRoot,y update the free-list root
                     stu       $02,s     save the allocated block
                     bra       ClearBlockCond go clear the block
 
@@ -5461,12 +5499,12 @@ ClearBlockCond      ldd       $08,s     load remaining byte count
                     tfr       u,d       return the block pointer
                     bra       AllocRet  go to return
 
-AllocEndOfList      cmpu      >$004b,y  reached the list root again
+AllocEndOfList      cmpu      >FreeRoot,y reached the list root again
                     bne       AllocNext not root, continue the scan
                     ldd       ,s        load request size
                     pshs      d         pass size
                     bsr       GrowArena grow the arena
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     tfr       d,u       new block pointer
                     stu       -$02,s    save the new block
                     bne       AllocNext got memory, retry scan
@@ -5478,7 +5516,7 @@ AllocNext           stu       $02,s     set current node
                     ldu       ,u        follow the next link
                     lbra      AllocScanLoop continue the scan loop
 
-AllocRet            leas      $04,s     drop the locals
+AllocRet            leas      4,s        drop the locals
                     puls      pc,u      return the block
 
 SizeToQuads         pshs      u         save register
@@ -5506,7 +5544,7 @@ GrowArena           pshs      u,d       save registers
                     std       ,s        save result
                     pshs      d         pass value
                     lbsr      GrowHeap  request memory from the system
-                    leas      $02,s     drop arguments
+                    leas      2,s        drop arguments
                     tfr       d,u       new memory pointer
                     cmpu      #$FFFF    check for allocation failure
                     bne       GrowArenaOk got memory, continue
@@ -5518,8 +5556,8 @@ GrowArenaOk         ldd       ,s        load the size
                     pshs      d         pass size
                     pshs      u         pass new block
                     bsr       InsertFreeBlock insert block into free list
-                    leas      $04,s     drop arguments
-                    ldd       >$004b,y  return the free-list root
+                    leas      4,s        drop arguments
+                    ldd       >FreeRoot,y return the free-list root
                     lbra      MemDone   go to return
 
 InsertFreeBlock     pshs      u,d       save registers
@@ -5528,9 +5566,9 @@ InsertFreeBlock     pshs      u,d       save registers
                     ldd       $08,s     load the size
                     pshs      d         pass size
                     lbsr      SizeToQuads round to quad units
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     std       $08,s     save rounded size
-                    ldd       >$004b,y  load free-list root
+                    ldd       >FreeRoot,y load free-list root
                     bra       InsertScanCond enter the insertion scan
 
 InsertScanLoop      ldd       ,s        load current node
@@ -5589,13 +5627,13 @@ InsertNoMergePrev   stu       [,s]      link previous to the block
 InsertStoreSize     ldd       $08,s     load block size
                     std       $02,u     store the block size
                     ldd       ,s        load current pointer
-                    std       >$004b,y  update the free-list root
-MemDone             leas      $02,s     drop the local
+                    std       >FreeRoot,y update the free-list root
+MemDone             leas      2,s        drop the local
                     puls      pc,u      return to caller
 
 GenOperand          pshs      u         save frame pointer
                     ldu       $0a,s     load the node pointer
-                    leas      -$08,s    make room for locals
+                    leas      -8,s       make room for locals
                     ldd       $0C,s     load the operation code
                     cmpd      #$0088    check for special op $88
                     bne       GenCheck87 not $88, try next
@@ -5628,7 +5666,7 @@ GenPushChar         ldd       $0e,s     load argument
                     ldd       GlbVar0005 load output file handle
                     pshs      d         pass file handle
                     lbsr      fprintf   emit the pshs instruction
-                    leas      $06,s     drop arguments
+                    leas      6,s        drop arguments
                     ldd       GlbVar000D load current stack offset
                     subd      #$0002    account for the push
                     std       GlbVar000D save updated offset
@@ -5647,7 +5685,7 @@ GenLoadByte         ldd       $10,s     load argument
                     ldd       #$0081    opcode constant
                     pshs      d         pass value
                     lbsr      GenOperand recurse to generate operand
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     ldd       $0e,s     load argument
                     std       $10,s     store as node argument
                     ldd       #$005A    set operation constant
@@ -5655,7 +5693,7 @@ GenLoadByte         ldd       $10,s     load argument
 EmitLbMnem          leax      OpLb,pcr  point at the long-branch mnemonic
                     pshs      x         pass mnemonic
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $0e,s     load operand
                     pshs      d         pass operand
                     lbsr      CondMnemonic emit the operand
@@ -5671,7 +5709,7 @@ GenReturn2          pshs      u         save register
                     ldd       $10,s     load argument
                     pshs      d         pass argument
                     lbsr      GenLogicOp generate the return sequence
-                    leas      $06,s     drop arguments
+                    leas      6,s        drop arguments
                     lbra      GenOpExit go to shared exit
 
 GenMult             leax      RtnCcmult,pcr point at the ccmult helper name
@@ -5709,50 +5747,50 @@ GenComa             leax      OpComD,pcr point at the coma mnemonic
 GenLeax             leax      OpLeax,pcr point at the leax mnemonic
                     pshs      x         pass mnemonic
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       GlbVar000D load stack offset
                     nega                negate high byte
                     negb                negate low byte
                     sbca      #$00      finish the negation
                     pshs      d         pass negated offset
                     lbsr      EmitDecimal emit the number operand
-                    leas      $02,s     drop argument
-                    ldd       >$004f,y  load frame-register name
+                    leas      2,s        drop argument
+                    ldd       >SSuffixString,y  load frame-register name
                     pshs      d         pass operand
                     lbsr      EmitString emit the register operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     lbsr      EmitNewline emit a newline
-EmitStackAdjust     ldd       >$0053,y  load stack-pointer register name
+EmitStackAdjust     ldd       >StackPointerRegister,y  load stack-pointer register name
                     pshs      d         pass operand
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $0e,s     load operand
                     bra       EmitOperandTail2 go emit final operand
 
-GenLeasFrame        ldd       >$0053,y  load stack-pointer register name
+GenLeasFrame        ldd       >StackPointerRegister,y  load stack-pointer register name
                     pshs      d         pass operand
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $10,s     load argument
                     pshs      d         pass operand
                     lbsr      EmitLocalLabelLine emit the operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $0e,s     load argument
                     pshs      d         pass operand
                     lbsr      EmitLocalLabelLine emit the operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     leax      OpLeas,pcr point at the leas mnemonic
                     pshs      x         pass mnemonic
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       GlbVar000D load stack offset
                     pshs      d         pass value
                     lbsr      EmitDecimal emit the number operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     leax      OpCommaX,pcr point at the ,x operand suffix
                     pshs      x         pass operand
 EmitOperandTail     lbsr      EmitString emit the string operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $10,s     load operand
 EmitOperandTail2    pshs      d         pass operand
                     lbsr      EmitLocalLabelLine emit the operand
@@ -5768,10 +5806,10 @@ GenJsrCall          ldd       #$0004    size constant four
                     ldd       $08,x     load the offset value
                     std       $04,s     save it
                     beq       GenIndirectJsr zero offset, use general path
-                    ldd       >$0051,y  load mnemonic register name
+                    ldd       >PushMnemonicPointer,y  load mnemonic register name
                     pshs      d         pass operand
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     clra                clear high byte
                     clrb                clear low byte
                     pshs      d         pass zero
@@ -5784,7 +5822,7 @@ GenJsrCall          ldd       #$0004    size constant four
 GenIndirectJsr      leax      OpJsr,pcr point at the jsr mnemonic
                     pshs      x         pass mnemonic
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     clra                clear high byte
                     clrb                clear low byte
                     pshs      d         pass zero
@@ -5793,7 +5831,7 @@ GenIndirectJsr      leax      OpJsr,pcr point at the jsr mnemonic
                     ldd       $12,s     load argument
                     pshs      d         pass argument
                     lbsr      EmitAddrMode emit the indirect-call operand
-                    leas      $06,s     drop arguments
+                    leas      6,s        drop arguments
                     lbra      EmitLineDone go to shared exit
 
 GenSex              leax      OpSex,pcr point at the sex mnemonic
@@ -5802,7 +5840,7 @@ GenSex              leax      OpSex,pcr point at the sex mnemonic
 GenLoadConst        leax      OpLd,pcr  point at the ld mnemonic
                     pshs      x         pass mnemonic
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       #$0002    size constant two
                     pshs      d         pass value
                     ldd       $12,s     load argument
@@ -5827,32 +5865,32 @@ EmitOperandStr      pshs      x         push operand string pointer
 EmitLdy             leax      OpLdy,pcr point to ldy mnemonic
                     pshs      x         push mnemonic pointer
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     leax      $08,s     point past local frame
                     bra       LdyLduBody join common body
 
 EmitLdu             leax      OpLdu,pcr point to ldu mnemonic
                     pshs      x         push mnemonic pointer
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     bra       LdyLduEmit join common emit
 
 LdyLduBody          leas      -$08,x    restore stack to frame
 LdyLduEmit          ldd       $0e,s     load node operand field
                     pshs      d         pass as argument
                     lbsr      EmitDecimal emit operand
-                    leas      $02,s     drop the argument
-                    ldd       >$004f,y  load global temp field
+                    leas      2,s        drop the argument
+                    ldd       >SSuffixString,y  load global temp field
                     pshs      d         pass as argument
                     lbsr      EmitString emit register operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 EmitLineDone        lbsr      EmitNewline finish emitting the line
                     lbra      GenOpExit return to generator loop
 
 EmitLeax            leax      OpLeax2,pcr point to leax mnemonic
                     pshs      x         push mnemonic pointer
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldx       $0e,s     load operand node
                     bra       LeaxOperandSel dispatch on operand type
 
@@ -5957,7 +5995,7 @@ GenNodeDispatch     cmpx      #$007A    is operator 0x7a
                     ldd       $0e,s     load left operand field
                     pshs      d         pass it
                     lbsr      RegToLetter resolve register
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $06,s     save the register
                     ldd       $10,s     load node pointer
                     cmpd      #$0077    is it indexed type
@@ -5974,7 +6012,7 @@ GenNodeDispatch     cmpx      #$007A    is operator 0x7a
                     ldd       $12,s     load node pointer
                     pshs      d         push it
                     lbsr      GenOperand generate subexpression
-                    leas      $08,s     drop four arguments
+                    leas      8,s        drop four arguments
                     ldx       $0C,s     load result type
                     bra       SignExtendSel select sign-extend op
 
@@ -5987,7 +6025,7 @@ EmitAdca            leax      OpAdca0,pcr point to adca #0
 EmitSbca            leax      OpSbca0,pcr point to sbca #0
 SignExtendEmit      pshs      x         push string pointer
                     lbsr      EmitSpaceStrLine emit the string
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     bra       SetResultTypeD set result type
 
 SignExtendSel       cmpx      #$0075    is type 0x75
@@ -6032,7 +6070,7 @@ EmitStore           ldd       $0e,s     load operand type
                     ldd       $06,s     load the register
                     pshs      d         pass it
                     lbsr      EmitLeaPrefix resolve operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $02,s     load saved type
                     pshs      d         pass it
                     lbsr      RegToLetter resolve register
@@ -6049,7 +6087,7 @@ EmitStoreDirect     ldd       #$0064    push type 0x64
                     lbsr      RegToLetter resolve register
                     std       ,s        save the result
                     lbsr      EmitTfrRegs emit operand
-                    leas      $04,s     drop two arguments
+                    leas      4,s        drop two arguments
                     ldd       ,s        load the result
                     lbeq      GenOpExit nothing to do, return
                     ldd       ,s        reload the result
@@ -6106,7 +6144,7 @@ EmitLoadDefault     ldd       $0e,s     load operand type
                     leax      OpClraClrb,pcr point to clra string
                     pshs      x         push the string
 EmitStrTail         lbsr      EmitSpaceStrLine emit the string
-EmitStrDone         leas      $02,s     drop the argument
+EmitStrDone         leas      2,s        drop the argument
                     lbra      GenOpExit return to loop
 
 EmitLdFall          leax      OpLd2,pcr point to ld mnemonic
@@ -6124,13 +6162,13 @@ FprintfEmitTail     pshs      x         push format string
                     ldd       GlbVar0005 output file handle
                     pshs      d         push it
                     lbsr      fprintf   emit the store
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     lbra      GenOpExit return to loop
 
 EmitCmp             leax      OpCmp,pcr point to cmp mnemonic
                     pshs      x         push mnemonic
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $06,s     load the register
                     cmpd      #$0062    is it register 0x62
                     bne       FrameSetup8 no, continue
@@ -6157,7 +6195,7 @@ IndirectCompare     ldd       $10,s     load node type
                     ldd       $08,s     load the operand
 EmitBinaryTail      pshs      d         pass it
                     lbsr      EmitTfrRegs emit operand
-BinaryDone2         leas      $04,s     drop two arguments
+BinaryDone2         leas      4,s        drop two arguments
                     lbra      GenOpExit return to loop
 
 EmitSt              leax      OpSt,pcr  point to st mnemonic
@@ -6166,14 +6204,14 @@ EmitSt              leax      OpSt,pcr  point to st mnemonic
 EmitSub             leax      OpSub,pcr point to sub mnemonic
 EmitMnemonicTail    pshs      x         push mnemonic
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 FrameSetup8         leax      $08,s     point past local frame
                     bra       FrameBody join common body
 
 EmitAddConst        ldd       #$0043    push type 0x43
                     pshs      d         push it
                     lbsr      GenOperand generate subexpression
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 EmitAddTail         leax      OpAdd,pcr point to add mnemonic
                     lbra      LeaEmitTail emit mnemonic tail
 
@@ -6191,11 +6229,11 @@ IndirectAdd         ldd       $10,s     load node type
 EmitOffsetLoad      ldd       $06,s     load the register
                     pshs      d         pass it
                     lbsr      EmitLeaPrefix resolve operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       #$003E    push char >
                     pshs      d         push it
                     lbsr      EmitChar  emit the prefix
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $02,s     load saved type
                     cmpd      #$0023    is it type 0x23
                     bne       AddOffset4 no, add offset
@@ -6209,12 +6247,12 @@ AddOffset4          ldd       $08,u     load address field
                     addd      #$0004    add four to it
                     pshs      d         pass it
                     lbsr      EmitSymbol2 emit label reference
-OffsetEmitTail      leas      $02,s     drop the argument
+OffsetEmitTail      leas      2,s        drop the argument
                     ldd       $14,u     load node field
                     pshs      d         pass it
                     lbsr      EmitSignedOffset emit operand
-                    leas      $02,s     drop the argument
-                    ldd       >$004d,y  load global field
+                    leas      2,s        drop the argument
+                    ldd       >GlobalField,y  load global field
                     pshs      d         pass it
                     lbsr      EmitString emit register operand
                     lbra      EmitArgTerm finish and return
@@ -6228,7 +6266,7 @@ OffsetTypeSel       cmpx      #$0021    is type 0x21
 EmitLea2            leax      OpLea,pcr point to lea mnemonic
 LeaEmitTail         pshs      x         push mnemonic
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 BuildCallFrame      clra                zero high byte
                     clrb                zero low byte
                     pshs      d         push null argument
@@ -6251,44 +6289,44 @@ FprintfExg          pshs      x         push format string
                     ldd       GlbVar0005 output file handle
                     pshs      d         push it
                     lbsr      fprintf   emit the instruction
-GenCleanupDone      leas      $08,s     drop the arguments
+GenCleanupDone      leas      8,s        drop the arguments
                     lbra      GenOpExit return to loop
 
 EmitStoreIndexed    ldd       $06,s     load the register
                     pshs      d         pass it
                     lbsr      EmitLeaPrefix resolve operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldx       $10,s     load node pointer
                     bra       LeaOpDispatch continue generation
 
 EmitDComma          leax      OpDComma,pcr point to d, string
                     pshs      x         push the string
                     lbsr      EmitString emit register operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     leax      $08,s     point past local frame
                     bra       CaseLeaAdjust join common body
 
 PushNodeEmit        pshs      u         push node pointer
                     lbsr      EmitDecimal emit operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       #$002C    load comma character constant
                     pshs      d         push it as argument
                     lbsr      EmitChar  emit the character
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     bra       EmitLeaArg join common emit path
 
 CaseLeaAdjust       leas      -$08,x    adjust operand pointer by minus eight
 EmitLeaArg          ldd       $06,s     load operand field from stack
                     pshs      d         push it as argument
                     lbsr      EmitChar  emit the operand
-EmitArgTerm         leas      $02,s     drop the argument
+EmitArgTerm         leas      2,s        drop the argument
                     lbsr      EmitNewline emit line terminator
                     lbra      GenOpExit return through common exit
 
 EmitLeaString       leax      MsgLeaArg,pcr point at 'LEA arg' string
                     pshs      x         push string argument
                     lbsr      EmitValueRef emit the string
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     lbra      GenOpExit return through common exit
 
 LeaOpDispatch       cmpx      #$0070    test for operand form $70
@@ -6297,10 +6335,10 @@ LeaOpDispatch       cmpx      #$0070    test for operand form $70
                     beq       PushNodeEmit handle that form
                     bra       EmitLeaString otherwise emit lea string
 
-EmitNodeField       ldd       >$0057,y  load node field at y+$57
+EmitNodeField       ldd       >NodeFieldY,y  load node field at y+$57
                     pshs      d         push as argument
                     lbsr      EmitValueRef emit it
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     lbra      GenOpExit return through common exit
 
 GenLeaDispatch      cmpx      #$0075    test operator code
@@ -6364,7 +6402,7 @@ EmitTfrRegs         pshs      u         save frame register
                     ldd       GlbVar0005 load output stream
                     pshs      d         push stream argument
                     lbsr      fprintf   emit formatted transfer
-GenOpExit           leas      $08,s     drop the pushed arguments
+GenOpExit           leas      8,s        drop the pushed arguments
                     puls      pc,u      restore frame and return
 
 GenLongOp           pshs      u         save frame register
@@ -6380,13 +6418,13 @@ GenLongLeaf         ldd       #$0002    push size two
                     ldd       #$0075    push register u code
                     pshs      d         push it
                     lbsr      GenOperand emit long instruction
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     ldd       #$0070    push register d code
                     pshs      d         push it
                     ldd       #$007A    push operand code $7A
                     pshs      d         push it
                     lbsr      GenOperand emit long instruction
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     clra                clear high byte
                     clrb                clear low byte
                     pshs      d         push zero value
@@ -6397,7 +6435,7 @@ GenLongLeaf         ldd       #$0002    push size two
                     ldd       #$0075    push register u code
                     pshs      d         push it
                     lbsr      GenOperand emit long instruction
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     ldd       #$0070    push register d code
                     pshs      d         push it
                     ldd       #$007A    push operand code $7A
@@ -6443,7 +6481,7 @@ EmitLshl            leax      RtLshl,pcr point at '_lshl' string
 EmitLshr            leax      RtLshr,pcr point at '_lshr' string
 GenLongShift2       pshs      x         push mnemonic argument
                     lbsr      GenPushLong emit the instruction line
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       GlbVar000D load stack-depth global
                     subd      #$0002    account for popped two bytes
                     lbra      StoreStackDepth store depth and return
@@ -6471,7 +6509,7 @@ EmitLinc            leax      RtLinc,pcr point at '_linc' string
 EmitLdec            leax      RtLdec,pcr point at '_ldec' string
 GenLongUnary2       pshs      x         push mnemonic argument
                     lbsr      GenPushLong emit the instruction line
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       GlbVar000D load stack-depth global
                     subd      #$0004    account for popped four bytes
                     lbra      StoreStackDepth store depth and return
@@ -6485,15 +6523,15 @@ GenLongStack        ldd       #$0002    push size two
 GenLongError        leax      MsgCodgenLongs,pcr point at 'codgen - longs' message
                     pshs      x         push message argument
                     lbsr      EmitValueRef emit the error text
-                    leas      $02,s     drop the argument
-                    ldd       >$0057,y  load node field at y+$57
+                    leas      2,s        drop the argument
+                    ldd       >NodeFieldY,y  load node field at y+$57
                     pshs      d         push it
                     lbsr      EmitString emit operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $04,s     load operand from stack
                     pshs      d         push it
                     lbsr      EmitDecimal emit operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     lbsr      EmitNewline emit line terminator
                     lbra      GenLongRet return via long-error return
 
@@ -6566,13 +6604,13 @@ EmitDstack          ldd       #$0004    push size four
                     pshs      d         push it
                     pshs      u         push node pointer
 GenFloatStack       lbsr      GenSwitchCode emit float stack helper
-GenFloatExit        leas      $04,s     drop the arguments
+GenFloatExit        leas      4,s        drop the arguments
                     puls      pc,u      restore frame and return
 
 EmitDstackPop       leax      RtDstack,pcr point at '_dstack' string
                     pshs      x         push mnemonic argument
                     lbsr      GenPushOperand emit the float call
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       GlbVar000D load stack-depth global
                     subd      #$0008    account for popped eight bytes
                     lbra      StoreStackDepth store depth and return
@@ -6589,7 +6627,7 @@ EmitFloatLoadFmt    pshs      d         push chosen offset
                     ldd       GlbVar0005 load output stream
                     pshs      d         push stream argument
                     lbsr      fprintf   emit formatted float load
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     puls      pc,u      restore frame and return
 
 EmitFloatMove       cmpu      #$0005    is operand size five
@@ -6618,7 +6656,7 @@ EmitDdiv            leax      RtDdiv,pcr point at '_ddiv' string
 EmitDcmpr           leax      RtDcmpr,pcr point at '_dcmpr' string
 GenFloatBin         pshs      x         push mnemonic argument
                     lbsr      GenPushOperand emit the float call
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       GlbVar000D load stack-depth global
                     addd      #$0008    account for pushed eight bytes
                     lbra      StoreStackDepth store depth and return
@@ -6670,15 +6708,15 @@ GenFloatCallEmit    lbsr      GenPushOperand emit the float call
 GenFloatError       leax      MsgCodgenFloats,pcr point at 'codgen - floats' message
                     pshs      x         push message argument
                     lbsr      EmitValueRef emit the error text
-                    leas      $02,s     drop the argument
-                    ldd       >$0057,y  load node field at y+$57
+                    leas      2,s        drop the argument
+                    ldd       >NodeFieldY,y  load node field at y+$57
                     pshs      d         push it
                     lbsr      EmitString emit operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $04,s     load operand from stack
                     pshs      d         push it
                     lbsr      EmitDecimal emit operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     lbsr      EmitNewline emit line terminator
                     lbra      EmptyRet  return via float-error exit
 
@@ -6742,40 +6780,40 @@ GenSwitchCode       pshs      u,d       save registers on entry
                     leax      OpBsr,pcr point to 'bsr ' string
                     pshs      x         push string argument
                     lbsr      EmitSpaceStr emit 'bsr '
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       GlbVar000B load the label counter
                     addd      #$0001    advance to next label number
                     std       GlbVar000B store the label counter
                     std       ,s        keep label number local
                     pshs      d         push label number
                     lbsr      EmitLocalLabelLine emit '_<num>' label
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $08,s     load first argument
                     pshs      d         push it
                     ldd       $08,s     load second argument
                     pshs      d         push it
                     bsr       EmitCaseTable emit the case table
-                    leas      $04,s     drop the two arguments
+                    leas      4,s        drop the two arguments
                     ldd       ,s        reload label number
                     pshs      d         push it
                     lbsr      EmitLocalLabel emit '_<num>' symbol
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     leax      OpPulsX,pcr point to 'puls x' string
                     pshs      x         push it
                     lbsr      EmitSpaceStrLine emit 'puls x' line
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     lbra      DropArgRet return via common exit
 
 EmitCaseTable       pshs      u         save u on entry
                     ldu       $04,s     load table pointer argument
-                    leas      -$02,s    reserve a local
+                    leas      -2,s       reserve a local
                     lbsr      EmitFdb   compute table setup
                     ldd       $08,s     load the case count
                     cmpd      #$0001    is the count exactly one
                     bne       NotSingleCase no, handle multi/list case
                     pshs      u         push the table pointer
                     lbsr      EmitDecimal emit the single value
-CaseTableDone       leas      $02,s     drop the argument
+CaseTableDone       leas      2,s        drop the argument
                     lbra      EmitTableEnd finish the table
 
 NotSingleCase       cmpu      #$0000    is the table pointer null
@@ -6787,7 +6825,7 @@ NotSingleCase       cmpu      #$0000    is the table pointer null
 ZeroFillLoop        leax      FmtZeroComma,pcr point to '0,' string
                     pshs      x         push it
                     lbsr      EmitString emit '0,'
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 ZeroFillCheck       ldd       ,s        load the counter
                     addd      #$0001    increment it
                     std       ,s        store it back
@@ -6806,7 +6844,7 @@ ListModeInit        clra                clear the index high
 CaseValueLoop       ldd       ,u++      load next table entry
                     pshs      d         push the value
                     lbsr      EmitDecimal emit the number
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $08,s     load the count
                     addd      #$FFFF    compute count minus one
                     cmpd      ,s        is this the last entry
@@ -6814,7 +6852,7 @@ CaseValueLoop       ldd       ,u++      load next table entry
                     ldd       #$002C    ',' separator character
                     pshs      d         push it
                     lbsr      EmitChar  emit the comma
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 SkipComma           ldd       ,s        load the index
                     addd      #$0001    increment it
 CaseValueNext       std       ,s        store the index
@@ -6825,37 +6863,37 @@ EmitTableEnd        lbsr      EmitNewline emit a newline
                     lbra      DropArgRet return via common exit
 
 GenPushWord         pshs      u         save u on entry
-                    ldd       >$0051,y  load push mnemonic pointer
+                    ldd       >PushMnemonicPointer,y  load push mnemonic pointer
                     pshs      d         push it
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $04,s     load the operand
                     pshs      d         push it
                     lbsr      EmitSpaceStrLine emit operand and newline
-AdjustDepthWord     leas      $02,s     drop the argument
+AdjustDepthWord     leas      2,s        drop the argument
                     ldd       GlbVar000D load the stack depth
                     addd      #$0002    grow it by two
                     bra       StoreStackDepth go store the depth
 
 GenPushLong         pshs      u         save u on entry
-                    ldd       >$0051,y  load push mnemonic pointer
+                    ldd       >PushMnemonicPointer,y  load push mnemonic pointer
                     pshs      d         push it
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $04,s     load the operand
                     pshs      d         push it
                     lbsr      EmitSpaceStrLine emit operand and newline
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       GlbVar000D load the stack depth
                     addd      #$0004    grow it by four
 StoreStackDepth     std       GlbVar000D store the stack depth
                     puls      pc,u      return
 
 GenPushOperand      pshs      u         save u on entry
-                    ldd       >$0051,y  load push mnemonic pointer
+                    ldd       >PushMnemonicPointer,y  load push mnemonic pointer
                     pshs      d         push it
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $04,s     load the operand
                     pshs      d         push it
                     lbsr      EmitSpaceStrLine emit operand and newline
@@ -6863,7 +6901,7 @@ GenPushOperand      pshs      u         save u on entry
 
 GenLogicOp          pshs      u         save u on entry
                     ldu       $04,s     load node pointer argument
-                    leas      -$06,s    reserve locals
+                    leas      -6,s       reserve locals
                     clra                clear high byte
                     clrb                clear low byte
                     std       $02,s     clear the size flag
@@ -6911,14 +6949,14 @@ GenLoadHalves       ldd       $02,s     load the size flag
                     beq       GenLoadFull flag clear, full path
                     cmpu      #$0057    is operand in a register
                     bne       LoadEmitMnemonic no, skip register move
-                    ldd       >$0055,y  load register name
+                    ldd       >RegisterName,y  load register name
                     pshs      d         push it
                     lbsr      EmitSpaceStrLine emit operand and newline
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 LoadEmitMnemonic    ldd       $04,s     load the mnemonic
                     pshs      d         push it
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     clra                clear high byte
                     clrb                clear low byte
                     bra       GenLoadLowByte continue at low-byte emit
@@ -6926,7 +6964,7 @@ LoadEmitMnemonic    ldd       $04,s     load the mnemonic
 GenLoadFull         ldd       $04,s     load the mnemonic
                     pshs      d         push it
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     clra                clear high byte
                     clrb                clear low byte
                     pshs      d         push zero flag argument
@@ -6937,11 +6975,11 @@ GenLoadFull         ldd       $04,s     load the mnemonic
                     ldd       #$0061    'a' register operand code
                     pshs      d         push it
                     lbsr      EmitInsnOperand emit the a-half instruction
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     ldd       $04,s     load the mnemonic
                     pshs      d         push it
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       #$0001    set flag one
 GenLoadLowByte      pshs      d         push the flag argument
                     ldd       $10,s     load an argument
@@ -6951,7 +6989,7 @@ GenLoadLowByte      pshs      d         push the flag argument
                     ldd       #$0062    'b' register operand code
                     pshs      d         push it
                     lbsr      EmitInsnOperand emit the b-half instruction
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     lbra      OperandRet return via common exit
 
 GenMaskByte         ldd       $0e,s     load the operand
@@ -6965,7 +7003,7 @@ GenMaskByte         ldd       $0e,s     load the operand
 
 EmitLowClr          cmpu      #$0057    is operand a register
                     bne       GenMaskHigh no, done
-                    ldd       >$0055,y  load register name
+                    ldd       >RegisterName,y  load register name
                     pshs      d         push it
                     bra       EmitLowLine go emit the line
 
@@ -6976,13 +7014,13 @@ EmitLowCom          cmpu      #$0057    is operand a register
                     leax      OpComa,pcr select 'coma' mnemonic
                     pshs      x         push it
 EmitLowLine         lbsr      EmitSpaceStrLine emit the line
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     bra       GenMaskHigh done
 
 EmitLowMask         ldd       $04,s     load the mnemonic
                     pshs      d         push it
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     clra                clear high byte
                     clrb                clear low byte
                     pshs      d         push it
@@ -6993,7 +7031,7 @@ EmitLowMask         ldd       $04,s     load the mnemonic
                     ldd       #$0061    push it
                     pshs      d         push it
                     lbsr      EmitInsnOperand emit the instruction
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     bra       GenMaskHigh done
 
 DispatchLowByte     stx       -$02,s    store x as local
@@ -7020,13 +7058,13 @@ EmitHighCom         cmpu      #$0057    is operand a register
                     leax      OpComb,pcr select 'comb' mnemonic
 EmitHighLine        pshs      x         push the mnemonic
                     lbsr      EmitSpaceStrLine emit the line
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     lbra      OperandRet done
 
 EmitHighMask        ldd       $04,s     load the mnemonic
                     pshs      d         push it
                     lbsr      EmitSpaceStr emit the mnemonic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     clra                clear high byte
                     clrb                clear low byte
                     pshs      d         push it
@@ -7037,7 +7075,7 @@ EmitHighMask        ldd       $04,s     load the mnemonic
                     ldd       #$0062    push it
                     pshs      d         push it
                     lbsr      EmitInsnOperand emit the instruction
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     lbra      OperandRet done
 
 DispatchHighByte    stx       -$02,s    store x as local
@@ -7055,7 +7093,7 @@ GenStackPop         ldd       $04,s     load the operand
                     ldd       GlbVar0005 the output file
                     pshs      d         push it
                     lbsr      fprintf   emit the stack-pop instruction
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
                     ldd       GlbVar000D load the stack depth
                     addd      #$0002    shrink tracking by two
                     std       GlbVar000D store the stack depth
@@ -7084,11 +7122,11 @@ EmitInsnOperand     pshs      u         save u on entry
                     ldd       $04,s     load the mnemonic char
                     pshs      d         push it
                     lbsr      EmitChar  emit the mnemonic char
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       #$0020    space character
                     pshs      d         push it
                     lbsr      EmitChar  emit the space
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $0a,s     load an operand argument
                     pshs      d         push it
                     ldd       $0a,s     load an argument
@@ -7096,7 +7134,7 @@ EmitInsnOperand     pshs      u         save u on entry
                     ldd       $0a,s     load an argument
                     pshs      d         push it
                     bsr       EmitAddrMode emit the addressing mode
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     lbsr      EmitNewline emit a newline
                     puls      pc,u      return
 
@@ -7109,10 +7147,10 @@ EmitSignedOffset    pshs      u         save u on entry
                     ldd       #$002B    '+' character
                     pshs      d         push it
                     lbsr      EmitChar  emit the '+'
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 EmitOffsetValue     pshs      u         push the value
                     lbsr      EmitDecimal emit the number
-DropArgRet          leas      $02,s     drop the argument
+DropArgRet          leas      2,s        drop the argument
 PulsRet             puls      pc,u      return
 
 EmitAddrMode        pshs      u,y,x,d   save registers on entry
@@ -7124,7 +7162,7 @@ EmitAddrMode        pshs      u,y,x,d   save registers on entry
                     ldd       #$005B    '[' character
                     pshs      d         push it
                     lbsr      EmitChar  emit the '['
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 AddrModeInner       ldd       $0a,s     reload the mode byte
                     anda      #$7f      strip the indexed bit
                     tfr       d,x       move into x
@@ -7137,7 +7175,7 @@ EmitOperandField    ldu       $0C,s     load the node pointer
                     ldd       #$0023    '#' character
                     pshs      d         push it
                     lbsr      EmitChar  emit the '#'
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $0e,s     load an argument
                     pshs      d         push it
                     ldd       $0a,u     load a node field
@@ -7153,25 +7191,25 @@ EmitOffsetOperand   ldd       $0e,s     load the base offset
                     ldd       $06,u     load a node field
 EmitOperandMode     pshs      d         push it
                     bsr       EmitAddrMode emit the addressing mode
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     lbra      OperandRet done
 
 EmitImmHash         ldd       #$0023    '#' character
                     pshs      d         push it
                     lbsr      EmitChar  emit the '#'
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $0C,s     load the operand
                     lbra      PushConstOffset emit the immediate value
 
 EmitFloatAcc        leax      RtFlacc,pcr '_flacc' float accumulator symbol
                     pshs      x         push it
                     lbsr      EmitString emit '_flacc'
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $0e,s     load the offset
                     pshs      d         push it
                     lbsr      EmitSignedOffset emit the signed offset
-                    leas      $02,s     drop the argument
-                    ldd       >$004d,y  load a global
+                    leas      2,s        drop the argument
+                    ldd       >GlobalField,y  load a global
                     pshs      d         push it
                     lbsr      EmitString emit the string
                     lbra      OperandDone done
@@ -7191,8 +7229,8 @@ LoadNodeFieldX      ldx       ,s        load the node pointer
                     std       $0C,s     save the computed operand offset
                     pshs      d         push the offset for emission
                     lbsr      EmitDecimal emit the offset as decimal
-                    leas      $02,s     drop the argument
-                    ldd       >$004f,y  load the ',s' suffix string
+                    leas      2,s        drop the argument
+                    ldd       >SSuffixString,y  load the ',s' suffix string
                     lbra      PushModeSuffix emit the addressing suffix
 
 GenNumLabelBase     ldd       GlbType5Val test the no-prefix global flag
@@ -7208,12 +7246,12 @@ GenNumLabelBase     ldd       GlbType5Val test the no-prefix global flag
 SelectLtPrefix      ldd       #$003C    load the '<' direct prefix
 EmitAddrPrefix      pshs      d         push the prefix char
                     lbsr      EmitChar  emit the addressing prefix
-                    leas      $02,s     drop the char
+                    leas      2,s        drop the char
 EmitLocalLabelRef   ldx       ,s        get the node pointer
                     ldd       $04,x     load the local label number
                     pshs      d         push it
                     lbsr      EmitLocalLabel emit the '_<num>' label reference
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     leax      $06,s     point past the frame args
                     bra       RestoreLabelStack restore stack and continue
 
@@ -7230,19 +7268,19 @@ GenNamedBase        ldd       GlbType5Val test the no-prefix flag
 SelectLtPrefix2     ldd       #$003C    load the '<' direct prefix
 EmitAddrPrefix2     pshs      d         push the prefix char
                     lbsr      EmitChar  emit the addressing prefix
-                    leas      $02,s     drop the char
+                    leas      2,s        drop the char
 EmitSymbolBase      ldd       ,s        get the node pointer
                     addd      #$0004    point at the symbol name field
                     pshs      d         push the name pointer
                     lbsr      EmitSymbol2 emit the symbol name
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     bra       EmitOffsetAndMode continue with the offset suffix
 
 RestoreLabelStack   leas      -$06,x    restore stack after label path
 EmitOffsetAndMode   ldd       $0e,s     load the operand offset
                     pshs      d         push it
                     lbsr      EmitSignedOffset emit the signed offset
-                    leas      $02,s     drop it
+                    leas      2,s        drop it
                     ldd       $0a,s     load the operand type flags
                     anda      #$80      isolate the indirect bit
                     clrb                clear the low byte
@@ -7269,7 +7307,7 @@ CheckPcrMode        ldx       ,s        get the node pointer
                     pshs      x         push it
                     bra       EmitModeSuffix emit the suffix
 
-LoadRegSuffix       ldd       >$004d,y  load the register-relative suffix
+LoadRegSuffix       ldd       >GlobalField,y  load the register-relative suffix
 PushModeSuffix      pshs      d         push the suffix string
 EmitModeSuffix      lbsr      EmitString emit the addressing suffix
                     lbra      OperandDone operand emission done
@@ -7303,11 +7341,11 @@ GenIndexed2         ldd       $0C,s     load the base offset
                     std       $0C,s     save the combined offset
                     pshs      d         push it
                     lbsr      EmitDecimal emit the decimal offset
-                    leas      $02,s     drop it
+                    leas      2,s        drop it
                     ldd       #$002C    load the ',' separator
                     pshs      d         push it
                     lbsr      EmitChar  emit the comma
-                    leas      $02,s     drop it
+                    leas      2,s        drop it
                     ldd       $0a,s     load the operator code
                     anda      #$7f      mask off the flag bit
                     tfr       d,x       into x for dispatch
@@ -7322,7 +7360,7 @@ SelectRegY          ldd       #$0079    load the 'y' register char
 SelectRegU          ldd       #$0075    load the 'u' register char
 EmitIndexReg2       pshs      d         push the register char
                     lbsr      EmitChar  emit the index register
-                    leas      $02,s     drop it
+                    leas      2,s        drop it
                     lbra      OperandEpilog operand emission done
 
 IndexRegDispatch    cmpx      #$0093    indexed on X?
@@ -7333,14 +7371,14 @@ IndexRegDispatch    cmpx      #$0093    indexed on X?
                     beq       SelectRegU emit 'u'
                     bra       OperandEpilog none, just finish
 
-GenStackPush        ldd       >$004f,y  load the ',s' suffix string
+GenStackPush        ldd       >SSuffixString,y  load the ',s' suffix string
                     pshs      d         push it
                     lbsr      EmitString emit it
-                    leas      $02,s     drop it
+                    leas      2,s        drop it
                     leax      MsgPlusPlus,pcr load the '++' auto-increment
                     pshs      x         push it
                     lbsr      EmitString emit '++'
-                    leas      $02,s     drop it
+                    leas      2,s        drop it
                     ldd       GlbVar000D load the stack depth global
                     addd      #$0002    account for the push
                     std       GlbVar000D update the stack depth
@@ -7349,7 +7387,7 @@ GenStackPush        ldd       >$004f,y  load the ',s' suffix string
 DerefErr            leax      MsgDereference,pcr load the 'dereference' message
 EmitDiag            pshs      x         push the message pointer
                     lbsr      EmitValueRef report the diagnostic
-OperandDone         leas      $02,s     drop the argument
+OperandDone         leas      2,s        drop the argument
                     bra       OperandEpilog operand emission done
 
 OperandOpDispatch   cmpx      #$0077    indirect through pointer?
@@ -7378,7 +7416,7 @@ OperandEpilog       ldd       $0a,s     load the operand type flags
                     ldd       #$005D    load the ']' close bracket
                     pshs      d         push it
                     lbsr      EmitChar  emit the closing bracket
-EpilogDropChar      leas      $02,s     drop the char
+EpilogDropChar      leas      2,s        drop the char
                     lbra      OperandRet return from operand emitter
 
 CondMnemonic        pshs      u         save the frame pointer
@@ -7388,7 +7426,7 @@ CondMnemonic        pshs      u         save the frame pointer
 CondDefault         leax      MsgRelOp,pcr load the 'rel op' message
                     pshs      x         push it
                     lbsr      EmitValueRef report the diagnostic
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 CondEq              leax      CcEq,pcr  load the 'eq ' mnemonic
                     bra       CondReturn return it
 
@@ -7450,7 +7488,7 @@ EmitSpaceStr        pshs      u         save the frame pointer
                     ldd       #$0020    load a space char
                     pshs      d         push it
                     lbsr      GenOperand3 emit the leading space
-                    leas      $04,s     drop the args
+                    leas      4,s        drop the args
                     ldd       $04,s     load the string pointer
                     pshs      d         push it
                     bsr       EmitString emit the string
@@ -7482,7 +7520,7 @@ EmitString          pshs      u         save the frame pointer
                     ldd       GlbVar0005 load the output file
                     pshs      d         push it
                     lbsr      fprintf   print the string
-EmitStringRet       leas      $04,s     drop the args
+EmitStringRet       leas      4,s        drop the args
                     puls      pc,u      return
 
 EmitDecimal         pshs      u         save the frame pointer
@@ -7501,7 +7539,7 @@ EmitLocalLabel      pshs      u         save the frame pointer
                     ldd       #$005F    load the '_' prefix
                     pshs      d         push it
                     bsr       EmitChar  emit the underscore
-                    leas      $02,s     drop it
+                    leas      2,s        drop it
                     ldd       $04,s     load the label number
                     pshs      d         push it
                     bsr       EmitDecimal emit it as decimal
@@ -7521,31 +7559,31 @@ EmitStackAdjust2    pshs      u,d       save frame and value
                     leax      OpLeas2,pcr load the 'leas ' mnemonic
                     pshs      x         push it
                     lbsr      EmitSpaceStr emit ' leas '
-                    leas      $02,s     drop it
+                    leas      2,s        drop it
                     ldd       ,s        load the difference
                     pshs      d         push it
                     lbsr      EmitDecimal emit it as decimal
-                    leas      $02,s     drop it
-                    ldd       >$004f,y  load the ',s' suffix
+                    leas      2,s        drop it
+                    ldd       >SSuffixString,y  load the ',s' suffix
                     pshs      d         push it
                     lbsr      EmitString emit the suffix
-                    leas      $02,s     drop it
+                    leas      2,s        drop it
                     lbsr      EmitNewline emit a newline
 StackAdjustDone     ldd       $06,s     return the target depth
-EmitRet2            leas      $02,s     drop the locals
+EmitRet2            leas      2,s        drop the locals
                     puls      pc,u      return
 
 EmitLabelDef        pshs      u         save the frame pointer
                     ldd       $04,s     load the name pointer
                     pshs      d         push it
                     bsr       EmitSymbol2 emit the symbol name
-                    leas      $02,s     drop it
+                    leas      2,s        drop it
                     ldd       $06,s     load the colon flag
                     beq       EmitNewlineTail no colon wanted
                     ldd       #$003A    load a ':' char
                     pshs      d         push it
                     lbsr      EmitChar  emit the colon
-EmitNewlineRet      leas      $02,s     drop the char
+EmitNewlineRet      leas      2,s        drop the char
 EmitNewlineTail     lbsr      EmitNewline emit a newline
                     puls      pc,u      return
 
@@ -7557,14 +7595,14 @@ FprintfArg          pshs      x         push the format string
                     ldd       GlbVar0005 load the output file
                     pshs      d         push it
                     lbsr      fprintf   emit via fprintf
-OperandRet          leas      $06,s     drop the args
+OperandRet          leas      6,s        drop the args
                     puls      pc,u      return
 
 EmitLeaPcr          pshs      u         save the frame pointer
                     ldd       $04,s     load the register char
                     pshs      d         push it
                     bsr       EmitLeaPrefix emit ' leaR '
-                    leas      $02,s     drop it
+                    leas      2,s        drop it
                     ldd       $06,s     load the label number
                     pshs      d         push it
                     ldd       #$005F    load the '_' prefix
@@ -7574,281 +7612,281 @@ EmitLeaPcr          pshs      u         save the frame pointer
                     ldd       GlbVar0005 load the output file
                     pshs      d         push it
                     lbsr      fprintf   emit '_<num>,pcr'
-                    leas      $08,s     drop the args
+                    leas      8,s        drop the args
                     puls      pc,u      return
 
                     fcb       $2C,$79
-                    fcb       $00
+                    fcb       C$NULL
                     fcb       $2C,$73
-                    fcb       $00
+                    fcb       C$NULL
 OpLbsr              fcc       /lbsr /
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       /lbra /
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       /clra/
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       /unknown operator : /
-                    fcb       $00
+                    fcb       C$NULL
 FmtPshs             fcc       / pshs %c/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 OpLb                fcb       $6C,$62
-                    fcb       $00
+                    fcb       C$NULL
 OpPulsUPc           fcc       /puls u,pc/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 RtnCcmult           fcc       /ccmult/
-                    fcb       $00
+                    fcb       C$NULL
 RtnCcudiv           fcc       /ccudiv/
-                    fcb       $00
+                    fcb       C$NULL
 RtnCcdiv            fcc       /ccdiv/
-                    fcb       $00
+                    fcb       C$NULL
 RtnCcasl            fcc       /ccasl/
-                    fcb       $00
+                    fcb       C$NULL
 RtnCcasr            fcc       /ccasr/
-                    fcb       $00
+                    fcb       C$NULL
 RtnCclsr            fcc       /cclsr/
-                    fcb       $00
+                    fcb       C$NULL
 RtnCcumod           fcc       /ccumod/
-                    fcb       $00
+                    fcb       C$NULL
 RtnCcmod            fcc       /ccmod/
-                    fcb       $00
+                    fcb       C$NULL
 OpNegD              fcc       /nega/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / negb/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / sbca #0/
-                    fcb       $00
+                    fcb       C$NULL
 OpComD              fcc       /coma/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / comb/
-                    fcb       $00
+                    fcb       C$NULL
 OpLeax              fcc       /leax /
-                    fcb       $00
+                    fcb       C$NULL
 OpLeas              fcc       /leas /
-                    fcb       $00
+                    fcb       C$NULL
 OpCommaX            fcb       $2C,$78
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 OpJsr               fcc       /jsr /
-                    fcb       $00
+                    fcb       C$NULL
 OpSex               fcb       $73,$65,$78
-                    fcb       $00
+                    fcb       C$NULL
 OpLd                fcb       $6C,$64
-                    fcb       $00
+                    fcb       C$NULL
 OpAslbRola          fcc       /aslb/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / rola/
-                    fcb       $00
+                    fcb       C$NULL
 OpAsraRorb          fcc       /asra/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / rorb/
-                    fcb       $00
+                    fcb       C$NULL
 OpLsraRorb          fcc       /lsra/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / rorb/
-                    fcb       $00
+                    fcb       C$NULL
 OpLdy               fcc       /ldy /
-                    fcb       $00
+                    fcb       C$NULL
 OpLdu               fcc       /ldu /
-                    fcb       $00
+                    fcb       C$NULL
 OpLeax2             fcc       /leax /
-                    fcb       $00
+                    fcb       C$NULL
 FmtNumComma         fcc       /%d,%c/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 FmtDComma           fcc       /d,%c/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 OpSex2              fcb       $73,$65,$78
-                    fcb       $00
+                    fcb       C$NULL
 OpAdca0             fcc       /adca #0/
-                    fcb       $00
+                    fcb       C$NULL
 OpSbca0             fcc       /sbca #0/
-                    fcb       $00
+                    fcb       C$NULL
 FmtNumComma2        fcc       /%d,%c/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 OpClraClrb          fcc       /clra/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / clrb/
-                    fcb       $00
+                    fcb       C$NULL
 OpLd2               fcb       $6C,$64
-                    fcb       $00
+                    fcb       C$NULL
 FmtStStack          fcc       / st%c -2,s/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 OpCmp               fcb       $63,$6D,$70
-                    fcb       $00
+                    fcb       C$NULL
 OpSt                fcb       $73,$74
-                    fcb       $00
+                    fcb       C$NULL
 OpSub               fcb       $73,$75,$62
-                    fcb       $00
+                    fcb       C$NULL
 OpAdd               fcb       $61,$64,$64
-                    fcb       $00
+                    fcb       C$NULL
 OpLea               fcb       $6C,$65,$61
-                    fcb       $00
+                    fcb       C$NULL
 FmtExg              fcc       / exg %c,%c/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 OpDComma            fcb       $64,$2C
-                    fcb       $00
+                    fcb       C$NULL
 MsgLeaArg           fcc       /LEA arg/
-                    fcb       $00
+                    fcb       C$NULL
 FmtTfr              fcc       / tfr %c,%c/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 OpOrPointer4        fcc       /lda 0,x/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / ora 1,x/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / ora 2,x/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / ora 3,x/
-                    fcb       $00
+                    fcb       C$NULL
 RtLmove             fcc       /_lmove/
-                    fcb       $00
+                    fcb       C$NULL
 RtLadd              fcc       /_ladd/
-                    fcb       $00
+                    fcb       C$NULL
 RtLsub              fcc       /_lsub/
-                    fcb       $00
+                    fcb       C$NULL
 RtLmul              fcc       /_lmul/
-                    fcb       $00
+                    fcb       C$NULL
 RtLdiv              fcc       /_ldiv/
-                    fcb       $00
+                    fcb       C$NULL
 RtLmod              fcc       /_lmod/
-                    fcb       $00
+                    fcb       C$NULL
 RtLand              fcc       /_land/
-                    fcb       $00
+                    fcb       C$NULL
 RtLor               fcc       /_lor/
-                    fcb       $00
+                    fcb       C$NULL
 RtLxor              fcc       /_lxor/
-                    fcb       $00
+                    fcb       C$NULL
 RtLshl              fcc       /_lshl/
-                    fcb       $00
+                    fcb       C$NULL
 RtLshr              fcc       /_lshr/
-                    fcb       $00
+                    fcb       C$NULL
 RtLcmpr             fcc       /_lcmpr/
-                    fcb       $00
+                    fcb       C$NULL
 RtLneg              fcc       /_lneg/
-                    fcb       $00
+                    fcb       C$NULL
 RtLcompl            fcc       /_lcompl/
-                    fcb       $00
+                    fcb       C$NULL
 RtLitol             fcc       /_litol/
-                    fcb       $00
+                    fcb       C$NULL
 RtLutol             fcc       /_lutol/
-                    fcb       $00
+                    fcb       C$NULL
 RtLinc              fcc       /_linc/
-                    fcb       $00
+                    fcb       C$NULL
 RtLdec              fcc       /_ldec/
-                    fcb       $00
+                    fcb       C$NULL
 MsgCodgenLongs      fcc       /codgen - longs/
-                    fcb       $00
+                    fcb       C$NULL
 RtDstack            fcc       /_dstack/
-                    fcb       $00
+                    fcb       C$NULL
 FmtLdaReg           fcc       / lda %c,x/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 RtFmove             fcc       /_fmove/
-                    fcb       $00
+                    fcb       C$NULL
 RtDmove             fcc       /_dmove/
-                    fcb       $00
+                    fcb       C$NULL
 RtDadd              fcc       /_dadd/
-                    fcb       $00
+                    fcb       C$NULL
 RtDsub              fcc       /_dsub/
-                    fcb       $00
+                    fcb       C$NULL
 RtDmul              fcc       /_dmul/
-                    fcb       $00
+                    fcb       C$NULL
 RtDdiv              fcc       /_ddiv/
-                    fcb       $00
+                    fcb       C$NULL
 RtDcmpr             fcc       /_dcmpr/
-                    fcb       $00
+                    fcb       C$NULL
 RtDneg              fcc       /_dneg/
-                    fcb       $00
+                    fcb       C$NULL
 RtFinc              fcc       /_finc/
-                    fcb       $00
+                    fcb       C$NULL
 RtDinc              fcc       /_dinc/
-                    fcb       $00
+                    fcb       C$NULL
 RtFdec              fcc       /_fdec/
-                    fcb       $00
+                    fcb       C$NULL
 RtDdec              fcc       /_ddec/
-                    fcb       $00
+                    fcb       C$NULL
 RtDtof              fcc       /_dtof/
-                    fcb       $00
+                    fcb       C$NULL
 RtFtod              fcc       /_ftod/
-                    fcb       $00
+                    fcb       C$NULL
 RtLtod              fcc       /_ltod/
-                    fcb       $00
+                    fcb       C$NULL
 RtItod              fcc       /_itod/
-                    fcb       $00
+                    fcb       C$NULL
 RtUtod              fcc       /_utod/
-                    fcb       $00
+                    fcb       C$NULL
 RtDtol              fcc       /_dtol/
-                    fcb       $00
+                    fcb       C$NULL
 RtDtoi              fcc       /_dtoi/
-                    fcb       $00
+                    fcb       C$NULL
 MsgCodgenFloats     fcc       /codgen - floats/
-                    fcb       $00
+                    fcb       C$NULL
 OpBsr               fcc       /bsr /
-                    fcb       $00
+                    fcb       C$NULL
 OpPulsX             fcc       /puls x/
-                    fcb       $00
+                    fcb       C$NULL
 FmtZeroComma        fcb       $30,$2C
-                    fcb       $00
+                    fcb       C$NULL
 OpAnd               fcb       $61,$6E,$64
-                    fcb       $00
+                    fcb       C$NULL
 OpOr                fcb       $6F,$72
-                    fcb       $00
+                    fcb       C$NULL
 OpEor               fcb       $65,$6F,$72
-                    fcb       $00
+                    fcb       C$NULL
 OpComa              fcc       /coma/
-                    fcb       $00
+                    fcb       C$NULL
 OpClrb              fcc       /clrb/
-                    fcb       $00
+                    fcb       C$NULL
 OpComb              fcc       /comb/
-                    fcb       $00
+                    fcb       C$NULL
 FmtStackByteOps     fcc       / %sa ,s+/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / %sb ,s+/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 MsgCompilerTrouble  fcc       /compiler trouble/
-                    fcb       $00
+                    fcb       C$NULL
 RtFlacc             fcc       /_flacc/
-                    fcb       $00
+                    fcb       C$NULL
 FmtPcr              fcc       /,pcr/
-                    fcb       $00
+                    fcb       C$NULL
 MsgStorageError     fcc       /storage error/
-                    fcb       $00
+                    fcb       C$NULL
 MsgPlusPlus         fcb       $2B,$2B
-                    fcb       $00
+                    fcb       C$NULL
 MsgDereference      fcc       /dereference/
-                    fcb       $00
+                    fcb       C$NULL
 MsgRelOp            fcc       /rel op/
-                    fcb       $00
+                    fcb       C$NULL
 CcEq                fcb       $65,$71,$20
-                    fcb       $00
+                    fcb       C$NULL
 CcNe                fcb       $6E,$65,$20
-                    fcb       $00
+                    fcb       C$NULL
 CcLe                fcb       $6C,$65,$20
-                    fcb       $00
+                    fcb       C$NULL
 CcLt                fcb       $6C,$74,$20
-                    fcb       $00
+                    fcb       C$NULL
 CcGe                fcb       $67,$65,$20
-                    fcb       $00
+                    fcb       C$NULL
 CcGt                fcb       $67,$74,$20
-                    fcb       $00
+                    fcb       C$NULL
 CcLs                fcb       $6C,$73,$20
-                    fcb       $00
+                    fcb       C$NULL
 CcLo                fcb       $6C,$6F,$20
-                    fcb       $00
+                    fcb       C$NULL
 CcHs                fcb       $68,$73,$20
-                    fcb       $00
+                    fcb       C$NULL
 CcHi                fcb       $68,$69,$20
-                    fcb       $00
+                    fcb       C$NULL
 FmtNum              fcb       $25,$64
-                    fcb       $00
+                    fcb       C$NULL
 FmtName8            fcc       /%.8s/
-                    fcb       $00
+                    fcb       C$NULL
 OpLeas2             fcc       /leas /
-                    fcb       $00
+                    fcb       C$NULL
 FmtLeaReg           fcc       / lea%c /
-                    fcb       $00
+                    fcb       C$NULL
 FmtPcrRef           fcc       /%c%d,pcr/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 EmitValueRef        pshs      u         save the frame pointer
                     ldd       $04,s     load the caller argument
                     pshs      d         push as first argument
-                    ldd       $0282,y   load the global work pointer
+                    ldd       Label,y   load the global work pointer
                     pshs      d         push as second argument
                     bsr       BuildLabelText build the label text
                     lbra      FreeCleanup tail return through teardown
@@ -7856,34 +7894,34 @@ EmitValueRef        pshs      u         save the frame pointer
 EmitNodeRef         pshs      u         save the frame pointer
                     leax      MsgOutOfMemory,pcr point at the format string
                     pshs      x         push string argument
-                    ldd       $0282,y   load the global work pointer
+                    ldd       Label,y   load the global work pointer
                     pshs      d         push the node argument
                     bsr       EmitNodeFields emit the node fields
-                    leas      $04,s     drop the two arguments
+                    leas      4,s        drop the two arguments
                     lbsr      FatalExit flush the output line
                     puls      pc,u      restore and return
 
 BuildLabelText      pshs      u         save the frame pointer
-                    leas      -$32,s    reserve local buffer
+                    leas      -50,s      reserve local buffer
                     leax      MsgCompilerError,pcr point at the format string
                     pshs      x         push format argument
                     leax      $02,s     point at local buffer
                     pshs      x         push buffer destination
                     lbsr      StrCopy   format into the buffer
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldd       $38,s     load the caller value
                     pshs      d         push it
                     leax      $02,s     point at the buffer
                     pshs      x         push the buffer
                     lbsr      StrCat    append the formatted value
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     leax      ,s        point at buffer start
                     pshs      x         push the buffer pointer
                     ldd       $38,s     load the caller node
                     pshs      d         push the node
                     bsr       EmitNodeFields emit the node fields
-                    leas      $04,s     drop the arguments
-                    leas      $32,s     release the local buffer
+                    leas      4,s        drop the arguments
+                    leas      50,s       release the local buffer
                     puls      pc,u      restore and return
 
 EmitNodeFields      pshs      u         save the frame pointer
@@ -7898,25 +7936,25 @@ EmitNodeFields      pshs      u         save the frame pointer
                     lbra      CopyNodeDone tail return through teardown
 
 RingAdvance         pshs      u         save the frame pointer
-                    ldd       $02DA,y   load the ring head index
+                    ldd       HeadIndex,y   load the ring head index
                     addd      #$0001    advance to the next slot
                     pshs      d         push dividend
                     ldd       #$000A    ring size ten
                     lbsr      DivSignedSetup wrap index modulo ring size
-                    std       $02DA,y   store the wrapped index
-                    cmpd      $02DC,y   compare with the tail index
+                    std       HeadIndex,y   store the wrapped index
+                    cmpd      TailIndex,y   compare with the tail index
                     bne       RingStore skip if no collision
-                    ldd       $02DC,y   load the tail index
+                    ldd       TailIndex,y   load the tail index
                     addd      #$0001    advance the tail
                     pshs      d         push dividend
                     ldd       #$000A    ring size ten
                     lbsr      DivSignedSetup wrap tail modulo ring size
-                    std       $02DC,y   store the wrapped tail
-RingStore           ldd       $02DA,y   load the head index
+                    std       TailIndex,y   store the wrapped tail
+RingStore           ldd       HeadIndex,y   load the head index
                     pshs      d         push the index
                     ldd       #$0006    entry size six
                     lbsr      MulEntry  multiply to a byte offset
-                    leax      $029e,y   point at ring table base
+                    leax      RingTableBase,y   point at ring table base
                     leax      d,x       index to the slot
                     leau      ,x        keep the slot pointer
                     ldd       $04,s     load the caller value
@@ -7928,14 +7966,14 @@ RingStore           ldd       $02DA,y   load the head index
                     puls      pc,u      restore and return
 
 RingLookup          pshs      u,d       save frame and search key
-                    ldd       $02DA,y   load the head index
+                    ldd       HeadIndex,y   load the head index
                     bra       RingSetIndex enter scan at store
 
 RingLookupLoop      ldd       ,s        load the current index
                     pshs      d         push the index
                     ldd       #$0006    entry size six
                     lbsr      MulEntry  multiply to a byte offset
-                    leax      $029e,y   point at ring table base
+                    leax      RingTableBase,y   point at ring table base
                     leax      d,x       index to the slot
                     leau      ,x        keep the slot pointer
                     ldd       ,u        load the slot value
@@ -7951,24 +7989,24 @@ RingStepBack        ldd       ,s        load the current index
                     ldd       #$0009    wrap to the top slot
 RingSetIndex        std       ,s        store the index
 RingCheckTail       ldd       ,s        reload the index
-                    cmpd      $02DC,y   compare with the tail index
+                    cmpd      TailIndex,y   compare with the tail index
                     bne       RingLookupLoop keep scanning until tail
                     bsr       RingSentinel grab the sentinel pointer
                     fcb       $FF,$FF,$FF,$FF
 RingSentinel        puls      x         pop pointer to the sentinel
-RingReturn          leau      $0254,y   point at the result buffer
+RingReturn          leau      TempBuffer,y   point at the result buffer
                     pshs      u         push destination
                     lbsr      StoreLong copy name into the result
                     lbra      FreeTreeDone tail return through teardown
 
 EmitLabelRef        pshs      u         save the frame pointer
-                    leas      -$05,s    reserve local scratch
-                    leax      $0262,y   point at the name buffer
+                    leas      -5,s       reserve local scratch
+                    leax      FilenameBuffer,y   point at the name buffer
                     pshs      x         push source pointer
                     leax      FmtNameColon,pcr point at the format string
                     pshs      x         push format
                     lbsr      Printf    format into the buffer
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldd       $09,s     load the caller value
                     pshs      d         push it
                     ldd       $0f,s     load the caller field
@@ -7976,29 +8014,29 @@ EmitLabelRef        pshs      u         save the frame pointer
                     leax      FmtLineNum,pcr point at the format string
                     pshs      x         push format
                     lbsr      Printf    append formatted text
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     ldd       $0b,s     load the caller value
                     pshs      d         push it
                     leax      FmtBanner,pcr point at the format string
                     pshs      x         push format
                     lbsr      Printf    append formatted text
-                    leas      $04,s     drop the arguments
-                    ldd       $02DE,y   load the current label id
+                    leas      4,s        drop the arguments
+                    ldd       LabelId,y   load the current label id
                     bne       LabelExists reuse if already assigned
                     leax      StrModeR,pcr point at the label prefix
                     pshs      x         push prefix
-                    ldd       $0280,y   load the next label counter
+                    ldd       OutputNameAlready,y   load the next label counter
                     pshs      d         push counter
                     lbsr      CompareOperands allocate a new label
-                    leas      $04,s     drop the arguments
-                    std       $02DE,y   save the label id
+                    leas      4,s        drop the arguments
+                    std       LabelId,y   save the label id
                     beq       LabelSame skip body if none
 LabelExists         leax      $01,s     point at the scratch byte
                     pshs      x         push destination
                     ldd       $0f,s     load the caller key
                     pshs      d         push key
                     lbsr      RingLookup look up label in the ring
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     lbsr      StoreLong copy the name string
                     ldd       $02,x     load the high word
                     pshs      d         push it
@@ -8020,49 +8058,49 @@ LabelNew            clra                clear the high byte
                     pshs      d         push it
                     ldd       ,x        load the low word
                     pshs      d         push it
-                    ldd       $02DE,y   load the label id
+                    ldd       LabelId,y   load the label id
                     pshs      d         push it
                     lbsr      PlaceOperand register the new label
-                    leas      $08,s     drop the arguments
-EmitLabelLoop       leax      $00CE,y   point at the output buffer
+                    leas      8,s        drop the arguments
+EmitLabelLoop       leax      Stdout,y  point at the output buffer
                     pshs      x         push buffer
-                    ldd       $02DE,y   load the label id
+                    ldd       LabelId,y   load the label id
                     pshs      d         push id
                     lbsr      FetchByte fetch the next label char
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     stb       $02,s     store the returned char
                     sex                 sign extend to a word
                     pshs      d         push char
                     lbsr      GenOperand3 emit char to the buffer
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldb       ,s        reload the emitted char
-                    cmpb      #$0d      check for carriage return
+                    cmpb      #C$CR      check for carriage return
                     bne       EmitLabelLoop keep emitting until return
                     bra       PadCheck  enter the caret pad loop
 
-EmitPadLoop         leax      $00CE,y   point at the output buffer
+EmitPadLoop         leax      Stdout,y  point at the output buffer
                     pshs      x         push buffer
                     ldd       #$0020    space character
                     pshs      d         push space
                     lbsr      GenOperand3 emit a leading space
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
 PadCheck            ldd       $09,s     load the column counter
                     addd      #$FFFF    decrement the counter
                     std       $09,s     save the counter
                     subd      #$FFFF    test if still positive
                     bgt       EmitPadLoop keep padding spaces
-                    leax      $00CE,y   point at the output buffer
+                    leax      Stdout,y  point at the output buffer
                     pshs      x         push buffer
                     ldd       #$005E    caret character
                     pshs      d         push caret
                     lbsr      GenOperand3 emit the caret
-                    leas      $04,s     drop the arguments
-                    leax      $00CE,y   point at the output buffer
+                    leas      4,s        drop the arguments
+                    leax      Stdout,y  point at the output buffer
                     pshs      x         push buffer
                     ldd       #$000D    carriage return
                     pshs      d         push return
                     lbsr      GenOperand3 emit the line terminator
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     bra       BumpErrorCount join the counter update
 
 RestoreStack2       leas      -$05,x    balance the stack pointer
@@ -8071,21 +8109,21 @@ BumpErrorCount      ldd       GlbVar0009 load the error counter
                     std       GlbVar0009 save the error count
                     cmpd      #_start   compare with the error limit
                     ble       ErrorCountOk continue if under limit
-                    leax      $00CE,y   point at the output buffer
+                    leax      Stdout,y  point at the output buffer
                     pshs      x         push buffer
                     lbsr      SpillOperand flush the output
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     leax      MsgTooManyErrors,pcr point at the abort message
                     pshs      x         push message
-                    leax      $00DB,y   point at the stderr stream
+                    leax      Stderr,y  point at the stderr stream
                     pshs      x         push stream
                     lbsr      fprintf   print the abort message
-                    leas      $04,s     drop the arguments
+                    leas      4,s        drop the arguments
                     ldd       #$0001    exit status one
                     pshs      d         push status
                     lbsr      exit      abort compilation
-                    leas      $02,s     drop the argument
-ErrorCountOk        leas      $05,s     release the local scratch
+                    leas      2,s        drop the argument
+ErrorCountOk        leas      5,s        release the local scratch
                     puls      pc,u      restore and return
 
 WalkTreeChildren    pshs      u         save the frame pointer
@@ -8095,14 +8133,14 @@ WalkTreeChildren    pshs      u         save the frame pointer
                     ldd       $0a,u     load the left child pointer
                     pshs      d         push child
                     bsr       WalkTreeChildren recurse into left child
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $0C,u     load the right child pointer
                     pshs      d         push child
                     lbsr      WalkTreeChildren emit code for this node
-                    leas      $02,s     drop the pushed argument
+                    leas      2,s        drop the pushed argument
                     pshs      u         pass the node pointer
                     bsr       FreeNode  free the node structure
-FreeTreeDone        leas      $02,s     drop the argument
+FreeTreeDone        leas      2,s        drop the argument
 FreeTreeRet         puls      pc,u      restore and return
 
 FreeNode            pshs      u         save u for the free routine
@@ -8123,7 +8161,7 @@ FreeSubBlock        pshs      d         push the block size
                     ldd       $08,u     load the sub-block pointer
                     pshs      d         push the pointer
                     lbsr      InsertFreeBlock free the sub-block
-                    leas      $04,s     clean up the arguments
+                    leas      4,s        clean up the arguments
                     bra       FreeNodeSelf now free the node itself
 
 FreeTypeSwitch      cmpx      #$0034    node type 0x34
@@ -8136,7 +8174,7 @@ FreeNodeSelf        ldd       #$0016    node is 22 bytes
                     pshs      d         push the node size
                     pshs      u         push the node pointer
                     lbsr      InsertFreeBlock free the node
-FreeCleanup         leas      $04,s     clean up arguments
+FreeCleanup         leas      4,s        clean up arguments
 FreeRet             puls      pc,u      restore and return
 
 CopyNode            pshs      u         save u
@@ -8147,7 +8185,7 @@ CopyNode            pshs      u         save u
                     ldd       $08,s     load the source
                     pshs      d         push source
                     bsr       CopyBytes2 copy the node
-CopyNodeDone        leas      $06,s     clean up arguments
+CopyNodeDone        leas      6,s        clean up arguments
                     puls      pc,u      restore and return
 
                     pshs      u         save u
@@ -8194,19 +8232,19 @@ CopyTest            ldd       $08,s     load the remaining count
                     puls      pc,u      restore and return
 
 MsgOutOfMemory      fcc       /out of memory/
-                    fcb       $00
+                    fcb       C$NULL
 MsgCompilerError    fcc       /compiler error - /
-                    fcb       $00
+                    fcb       C$NULL
 FmtNameColon        fcc       /%s: /
-                    fcb       $00
+                    fcb       C$NULL
 FmtLineNum          fcc       /line %d  /
-                    fcb       $00
+                    fcb       C$NULL
 FmtBanner           fcc       /****  %s  ****/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 StrModeR            fcb       $72
-                    fcb       $00
+                    fcb       C$NULL
 MsgTooManyErrors    fcc       /too many errors - ABORT/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 EmitFdb             pshs      u         save u
                     leax      OpFdb,pcr point at the fdb mnemonic
                     pshs      x         push the string
@@ -8221,12 +8259,12 @@ EmitFuncProlog      pshs      u         save u
                     ldd       GlbVar0005 load the output handle
                     pshs      d         push the handle
                     lbsr      fprintf   emit the ttl directive
-                    leas      $06,s     clean up arguments
+                    leas      6,s        clean up arguments
                     ldd       $06,s     load the second argument
                     pshs      d         push it
                     pshs      u         push the name
                     lbsr      EmitLabelDef record the function symbol
-                    leas      $04,s     clean up arguments
+                    leas      4,s        clean up arguments
                     clra                clear the frame globals
                     clrb                clear the frame globals
                     std       GlbVar000D reset argument size
@@ -8235,7 +8273,7 @@ EmitFuncProlog      pshs      u         save u
                     leax      OpPshsU,pcr point at the entry save
                     pshs      x         push the string
                     lbsr      EmitSpaceStrLine emit pshs u
-                    leas      $02,s     clean up argument
+                    leas      2,s        clean up argument
                     ldd       GlbVar0011 check the no-stackcheck flag
                     bne       PrologProfCheck skip stack check if set
                     ldd       $08,s     load the frame size symbol
@@ -8246,24 +8284,24 @@ EmitFuncProlog      pshs      u         save u
                     ldd       GlbVar0005 load the output handle
                     pshs      d         push the handle
                     lbsr      fprintf   emit the stack check call
-                    leas      $06,s     clean up arguments
+                    leas      6,s        clean up arguments
 PrologProfCheck     ldd       GlbVar0013 check the profiling flag
                     lbeq      EmitRet   skip profiling if off
                     leax      OpLeax3,pcr point at the leax mnemonic
                     pshs      x         push the string
                     lbsr      EmitSpaceStr emit the leax
-                    leas      $02,s     clean up argument
+                    leas      2,s        clean up argument
                     ldd       $0a,s     load the profile counter
                     pshs      d         push it
                     lbsr      EmitLocalLabel emit its number
-                    leas      $02,s     clean up argument
+                    leas      2,s        clean up argument
                     leax      FragPcrPshs,pcr point at the pcr fragment
                     pshs      x         push the fragment
                     lbsr      EmitString emit the fragment
-                    leas      $02,s     clean up argument
+                    leas      2,s        clean up argument
                     pshs      u         push the function name
                     lbsr      EmitSymbol2 emit the name
-                    leas      $02,s     clean up argument
+                    leas      2,s        clean up argument
                     leax      FragProfCall,pcr point at the prof call
                     pshs      x         push the fragment
                     lbsr      EmitString emit the profiling call
@@ -8283,7 +8321,7 @@ EmitFrameEqu        pshs      u         save u
                     ldd       GlbVar0005 load the output handle
                     pshs      d         push the handle
                     lbsr      fprintf   emit the frame-size equate
-                    leas      $08,s     clean up arguments
+                    leas      8,s        clean up arguments
 FrameEquRet         puls      pc,u      restore and return
 
 EmitVsect           pshs      u         save u
@@ -8314,30 +8352,30 @@ EmitLiterals        pshs      u,d       save registers
 LitLoop             ldd       ,s        load the current character
                     pshs      d         push it
                     bsr       EmitStrChar emit the character
-LitNext             leas      $02,s     drop the pushed value
+LitNext             leas      2,s        drop the pushed value
                     ldd       GlbVar0003 load the string list head
                     pshs      d         push it
                     lbsr      FetchByte get the next entry
-                    leas      $02,s     clean up argument
+                    leas      2,s        clean up argument
                     std       ,s        save the entry
                     bne       LitLoop   loop while entries remain
                     clra                terminate with a null
                     clrb                terminate with a null
                     pshs      d         push the null
                     bsr       EmitStrChar flush the closing quote
-                    leas      $02,s     clean up argument
-EmitDone            leas      $02,s     drop the saved value
+                    leas      2,s        clean up argument
+EmitDone            leas      2,s        drop the saved value
 EmitRet             puls      pc,u      restore and return
 
 EmitStrChar         pshs      u         save u
-                    ldd       $02E0,y   load the column counter
+                    ldd       ColumnCounter,y   load the column counter
                     bne       StrCharCheck continue current line if open
                     leax      OpFccOpen,pcr point at the fcc open
                     pshs      x         push it
                     ldd       GlbVar0005 load the output handle
                     pshs      d         push the handle
                     lbsr      fprintf   open a new fcc line
-                    leas      $04,s     clean up arguments
+                    leas      4,s        clean up arguments
 StrCharCheck        ldd       $04,s     load the character
                     cmpd      #$0020    below a space
                     blt       StrCharHex emit as hex byte
@@ -8351,7 +8389,7 @@ StrCharHex          ldd       $04,s     load the character
                     ldd       GlbVar0005 load the output handle
                     pshs      d         push the handle
                     lbsr      fprintf   emit close quote and hex byte
-                    leas      $06,s     clean up arguments
+                    leas      6,s        clean up arguments
                     bra       StrCharReset reset the column
 
 StrCharPrint        ldd       GlbVar0005 push it
@@ -8359,10 +8397,10 @@ StrCharPrint        ldd       GlbVar0005 push it
                     ldd       $06,s     push it
                     pshs      d         write the character directly
                     lbsr      GenOperand3 clean up arguments
-                    leas      $04,s     load the column counter
-                    ldd       $02E0,y   advance the column
+                    leas      4,s        load the column counter
+                    ldd       ColumnCounter,y   advance the column
                     addd      #$0001    save the column
-                    std       $02E0,y   test the previous value
+                    std       ColumnCounter,y   test the previous value
                     subd      #$0001    line is under 75 chars
                     cmpd      #$004B    keep filling the line
                     blt       StrCharRet point at the closing quote
@@ -8371,67 +8409,67 @@ StrCharPrint        ldd       GlbVar0005 push it
                     ldd       GlbVar0005 push the handle
                     pshs      d         close the fcc line
                     lbsr      fprintf   clean up arguments
-                    leas      $04,s
+                    leas      4,s
 StrCharReset        clra                reset the column counter
                     clrb                reset the column counter
-                    std       $02E0,y   save the column counter
+                    std       ColumnCounter,y   save the column counter
 StrCharRet          puls      pc,u      restore and return
 
 OpFdb               fcc       /fdb /
-                    fcb       $00
+                    fcb       C$NULL
 FmtTtl              fcc       / ttl %.8s/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 OpPshsU             fcc       /pshs u/
-                    fcb       $00
+                    fcb       C$NULL
 FmtStkCheck         fcc       / ldd #_%d/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / lbsr _stkcheck/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 OpLeax3             fcc       /leax /
-                    fcb       $00
+                    fcb       C$NULL
 FragPcrPshs         fcc       /,pcr/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / pshs x/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / leax /
-                    fcb       $00
+                    fcb       C$NULL
 FragProfCall        fcc       /,pcr/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / pshs x/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / lbsr _prof/
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / leas 4,s/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 FmtFrameEqu         fcc       /_%d equ %d/
-                    fcb       $0D,$0D,$00
+                    fcb       C$CR,C$CR,C$NULL
 OpVsectDp           fcc       /vsect dp/
-                    fcb       $00
+                    fcb       C$NULL
 OpVsect             fcc       /vsect/
-                    fcb       $00
+                    fcb       C$NULL
 OpEndsect           fcc       /endsect/
-                    fcb       $00
+                    fcb       C$NULL
 OpFccOpen           fcc       / fcc "/
-                    fcb       $00
+                    fcb       C$NULL
 FmtFcbHex           fcb       $22
-                    fcb       $0D
+                    fcb       C$CR
                     fcc       / fcb $%x/
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 StrQuoteEol         fcb       $22
-                    fcb       $0D,$00
+                    fcb       C$CR,C$NULL
 AllocSlot           pshs      u         save u
-                    leau      $00C1,y   point at the slot table
+                    leau      Stdin,y   point at the slot table
 SlotScanLoop        ldd       $06,u     load the slot flags
                     clra                isolate the low byte
                     andb      #$03      check the in-use bits
                     lbeq      SlotRet   return this free slot
                     leau      $0d,u     advance to next slot
                     pshs      u         push the slot pointer
-                    leax      $0191,y   point past the table end
+                    leax      PastTableEnd,y   point past the table end
                     cmpx      ,s++      still within the table
                     bhi       SlotScanLoop scan the next slot
                     ldd       #$00C8    flag out of slots
-                    std       $0260,y   set the error code
+                    std       ErrorCode,y   set the error code
                     lbra      SlotNull  return null
 
                     puls      pc,u      restore and return
@@ -8485,7 +8523,7 @@ SlotNull            clra                return null
 
 GenOperand2         pshs      u         save u
                     ldu       $04,s     load the target operand
-                    leas      -$04,s    reserve two locals
+                    leas      -4,s       reserve two locals
                     clra                clear the mode local
                     clrb                clear the mode local
                     std       ,s        store the cleared mode
@@ -8534,7 +8572,7 @@ OperModeSlot        ldd       ,s        load the mode
                     pshs      d         hold the mode
                     pshs      u         push the operand
                     lbsr      OpenPath  look up the register slot
-                    leas      $04,s     clean up arguments
+                    leas      4,s        clean up arguments
                     std       $02,s     save the slot result
                     cmpd      #$FFFF    was it found
                     beq       OperModeAlt fall back if not
@@ -8547,7 +8585,7 @@ OperModeSlot        ldd       ,s        load the mode
                     ldd       $08,s     load the operand
                     pshs      d         push it
                     lbsr      SeekPath  generate the reference
-                    leas      $08,s     clean up arguments
+                    leas      8,s        clean up arguments
                     bra       AddrLoadResult operand done
 
 OperModeAlt         ldd       ,s        load the mode
@@ -8562,13 +8600,13 @@ OperModeDir         ldd       ,s        load the mode
 OperEmit            pshs      d         push the mode
                     pshs      u         push the operand
                     lbsr      OpenPath  call operand emitter for this mode
-AddrSaveResult      leas      $04,s     drop pushed operand arguments
+AddrSaveResult      leas      4,s        drop pushed operand arguments
                     std       $02,s     save returned operand pointer
                     bra       AddrLoadResult go to finish
 
 AddrRestoreStack    leas      -$04,x    restore stack pointer after adjustment
 AddrBadMode         ldd       #$00CB    load unknown-mode error code
-                    std       $0260,y   store error into work area
+                    std       ErrorCode,y   store error into work area
                     clra                zero result high byte
                     clrb                zero result low byte
                     bra       AddrReturn2 return with error
@@ -8584,7 +8622,7 @@ AddrModeDispatch    cmpx      #$0072    operand letter is 'r'
                     bra       AddrBadMode unknown letter is an error
 
 AddrLoadResult      ldd       $02,s     reload saved result
-AddrReturn2         leas      $04,s     drop locals
+AddrReturn2         leas      4,s        drop locals
                     puls      pc,u      return to caller
 
                     pshs      u         save frame pointer
@@ -8603,7 +8641,7 @@ CompareOperands     pshs      u         save frame pointer
                     ldd       $06,s     fetch second operand argument
                     pshs      d         push it
                     lbsr      GenOperand2 evaluate the operand
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     tfr       d,u       move result to u
                     cmpu      #$FFFF    check for failure sentinel
                     bne       CompareFirstOk result valid, continue
@@ -8619,13 +8657,13 @@ CompareFirstOk      clra                zero result high
                     ldd       $08,s     fetch argument
                     pshs      d         push it
                     lbsr      ReleaseBuffer release the buffer
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $06,s     fetch operand argument
                     pshs      d         push it
                     ldd       $06,s     fetch second operand argument
                     pshs      d         push it
                     lbsr      GenOperand2 evaluate the operand
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     tfr       d,u       move result to u
                     stu       -$02,s    save operand result
                     bge       CompareSecond non-negative, continue emit
@@ -8639,12 +8677,12 @@ CompareEmit         pshs      d         push it
                     pshs      d         push it
                     pshs      u         push operand pointer
 CompareCallEmit     lbsr      SetupSlot emit the node
-                    leas      $06,s     drop arguments
+                    leas      6,s        drop arguments
 CompareReturn       puls      pc,u      return to caller
 
 FillBuffer          pshs      u         save frame pointer
                     ldu       $04,s     load destination buffer pointer
-                    leas      -$06,s    reserve local slots
+                    leas      -6,s       reserve local slots
                     clra                zero outer counter high
                     clrb                zero outer counter low
                     bra       FillOuterTest enter outer loop test
@@ -8656,7 +8694,7 @@ FillOuterLoop       ldd       $0C,s     load per-row count
 FillByteLoop        ldd       $10,s     fetch source argument
                     pshs      d         push it
                     lbsr      FetchByte get next value
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     std       ,s        save fetched value
                     cmpd      #$FFFF    end-of-data sentinel
                     beq       FillDone  done filling
@@ -8674,12 +8712,12 @@ FillOuterTest       std       $02,s     save outer counter
                     cmpd      $0e,s     compare against limit
                     blt       FillOuterLoop loop while below
 FillDone            ldd       $02,s     return byte count
-                    leas      $06,s     drop locals
+                    leas      6,s        drop locals
                     puls      pc,u      return to caller
 
 PlaceOperand        pshs      u         save frame pointer
                     ldu       $04,s     load buffer descriptor
-                    leas      -$06,s    reserve local slots
+                    leas      -6,s       reserve local slots
                     cmpu      #$0000    null descriptor?
                     beq       PlaceFail yes, fail
                     ldd       $06,u     load descriptor flags
@@ -8696,7 +8734,7 @@ PlaceCheckHigh      ldd       $06,u     load descriptor flags
                     bne       PlaceCheckLow high bit set path
                     pshs      u         push descriptor
                     lbsr      AllocTemp prepare the buffer
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     lbra      PlaceEmit go emit operand
 
 PlaceCheckLow       ldd       $06,u     load descriptor flags
@@ -8706,7 +8744,7 @@ PlaceCheckLow       ldd       $06,u     load descriptor flags
                     beq       PlaceInRange bit clear path
                     pshs      u         push descriptor
                     lbsr      SpillOperand spill the buffer
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     ldd       $06,u     load flags
                     anda      #$FE      clear bit zero
                     std       $06,u     store flags back
@@ -8733,7 +8771,7 @@ PlaceDefault        leax      $02,s     point at locals
                     pshs      d         push it
                     pshs      u         push descriptor
                     lbsr      DefaultOperand compute default operand
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
                     lbsr      IntSub32  arithmetic helper
                     lbsr      StoreLong push result operand
 PlaceCompare        ldd       $0b,u     load buffer size
@@ -8809,7 +8847,7 @@ PlaceEmit           ldd       $06,u     load flags
                     ldd       $08,u     push buffer handle
                     pshs      d         push it
                     lbsr      SeekPath  emit the instruction
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     ldd       $02,x     push high word
                     pshs      d         push it
                     ldd       ,x        push low word
@@ -8824,7 +8862,7 @@ PlaceConstFF        puls      x         pull constant pointer into x
 
 PlaceOk             clra                zero result high
                     clrb                zero result low
-PlaceReturn         leas      $06,s     drop locals
+PlaceReturn         leas      6,s        drop locals
                     puls      pc,u      return to caller
 
                     pshs      u         save frame pointer
@@ -8838,7 +8876,7 @@ PlaceReturn         leas      $06,s     drop locals
                     ldd       $0a,s     fetch descriptor argument
                     pshs      d         push it
                     lbsr      PlaceOperand place the operand
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     puls      pc,u      return to caller
 
 DefaultOperand      pshs      u         save frame pointer
@@ -8851,7 +8889,7 @@ DefaultOperand      pshs      u         save frame pointer
 DefaultUseFixed     bsr       DefaultFixedBuf fetch inline default pointer
                     fcb       $FF,$FF,$FF,$FF
 DefaultFixedBuf     puls      x         pull pointer into x
-                    leau      $0254,y   point at fixed default buffer
+                    leau      TempBuffer,y   point at fixed default buffer
                     pshs      u         push it
                     lbsr      StoreLong push operand
                     puls      pc,u      return to caller
@@ -8863,7 +8901,7 @@ DefaultTyped        ldd       $06,u     load flags
                     bne       DefaultEmit set, skip prepare
                     pshs      u         push descriptor
                     lbsr      AllocTemp prepare the buffer
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
 DefaultEmit         ldd       #$0001    constant one
                     pshs      d         push it
                     clra                zero argument high
@@ -8873,7 +8911,7 @@ DefaultEmit         ldd       #$0001    constant one
                     ldd       $08,u     push buffer handle
                     pshs      d         push it
                     lbsr      SeekPath  emit the instruction
-                    leas      $08,s     drop arguments
+                    leas      8,s        drop arguments
                     ldd       $02,x     push high word
                     pshs      d         push it
                     ldd       ,x        push low word
@@ -8908,7 +8946,7 @@ GenOperand3         pshs      u         save frame pointer
                     lbne      SpillFail no, other handling
                     pshs      u         push descriptor
                     lbsr      AllocTemp prepare the buffer
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
 GenOpEmit           ldd       $06,u     load flags
                     clra                clear high byte
                     andb      #$04      test bit two
@@ -8930,7 +8968,7 @@ GenOpLoadFunc       leax      WritePath,pcr load default emit function
 GenOpCallFunc       tfr       x,d       copy pointer to d
                     tfr       d,x       copy pointer back to x
                     jsr       ,x        call selected emitter
-                    leas      $06,s     drop arguments
+                    leas      6,s        drop arguments
                     cmpd      #$FFFF    failed?
                     bne       GenOpReturn no, return result
                     ldd       $06,u     load flags
@@ -8945,7 +8983,7 @@ GenOpAppend         ldd       $06,u     load flags
                     bne       GenOpStoreByte set, skip spill
                     pshs      u         push descriptor
                     lbsr      EmitOperandRange spill the buffer
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
 GenOpStoreByte      ldd       ,u        load current position
                     addd      #$0001    advance one byte
                     std       ,u        store new position
@@ -8979,7 +9017,7 @@ GenOpReturn         ldd       $04,s     return the byte
                     lbsr      LsrEntry  fetch field byte
                     pshs      d         push it
                     lbsr      GenOperand3 emit first operand byte
-                    leas      $04,s     drop arguments
+                    leas      4,s        drop arguments
                     ldd       $06,s     fetch second argument
                     pshs      d         push it
                     pshs      u         push descriptor
@@ -8987,7 +9025,7 @@ GenOpReturn         ldd       $04,s     return the byte
                     lbra      RangeExit return to caller
 
 ClearBufTable       pshs      u,d       save frame and index
-                    leau      $00C1,y   point at buffer table base
+                    leau      Stdin,y   point at buffer table base
                     clra                zero index high
                     clrb                zero index low
                     std       ,s        initialise index
@@ -8997,7 +9035,7 @@ ClearBufLoop        tfr       u,d       copy entry pointer to d
                     leau      $0d,u     advance to next entry
                     pshs      d         push entry pointer
                     bsr       ReleaseBuffer release this buffer
-                    leas      $02,s     drop argument
+                    leas      2,s        drop argument
 ClearBufNext        ldd       ,s        load index
                     addd      #$0001    increment it
                     std       ,s        store index
@@ -9008,7 +9046,7 @@ ClearBufNext        ldd       ,s        load index
 
 ReleaseBuffer       pshs      u         save frame pointer
                     ldu       $04,s     load buffer descriptor
-                    leas      -$02,s    reserve local
+                    leas      -2,s       reserve local
                     cmpu      #$0000    null descriptor?
                     beq       ReleaseNone yes, nothing to do
                     ldd       $06,u     load flags
@@ -9022,7 +9060,7 @@ ReleaseCheckFlag    ldd       $06,u     load flags
                     beq       ZeroResult2 clear, skip
                     pshs      u         push descriptor
                     bsr       SpillOperand call to spill the operand
-                    leas      $02,s     drop the pushed argument
+                    leas      2,s        drop the pushed argument
                     bra       StoreResult2 go store the result
 
 ZeroResult2         clra                zero the high byte
@@ -9031,7 +9069,7 @@ StoreResult2        std       ,s        store result on the stack
                     ldd       $08,u     load the id field
                     pshs      d         push it as argument
                     lbsr      ClosePath call the helper routine
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     clra                zero high byte
                     clrb                zero low byte
                     std       $06,u     clear the operand flags
@@ -9056,15 +9094,15 @@ SpillProceed        ldd       $06,u     reload the flags
                     bne       SpillEmitRange already spilled so skip alloc
                     pshs      u         push the operand
                     lbsr      AllocTemp allocate a temp buffer
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 SpillEmitRange      pshs      u         push the operand
                     bsr       EmitOperandRange emit the operand range
-SpillDone           leas      $02,s     drop the argument
+SpillDone           leas      2,s        drop the argument
                     puls      pc,u      restore and return
 
 EmitOperandRange    pshs      u         save u register
                     ldu       $04,s     load the operand pointer
-                    leas      -$04,s    reserve local slots
+                    leas      -4,s       reserve local slots
                     ldd       $06,u     load the flags
                     anda      #$01      isolate bit zero
                     clrb                clear low byte
@@ -9078,7 +9116,7 @@ EmitOperandRange    pshs      u         save u register
                     pshs      d         push the zero argument
                     pshs      u         push the operand
                     lbsr      DefaultOperand call helper returning pointer
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     ldd       $02,x     load a field from result
                     pshs      d         push it
                     ldd       ,x        load the first field
@@ -9086,7 +9124,7 @@ EmitOperandRange    pshs      u         save u register
                     ldd       $08,u     load the id field
                     pshs      d         push it
                     lbsr      SeekPath  emit the call
-                    leas      $08,s     drop the arguments
+                    leas      8,s        drop the arguments
 RangeCheckLen       ldd       ,u        load the base pointer
                     subd      $02,u     subtract the mid pointer
                     std       $02,s     save the range length
@@ -9110,7 +9148,7 @@ RangeEmitLoop       ldd       $02,s     load the length
                     ldd       $08,u     load the id
                     pshs      d         push it
                     lbsr      WriteLine emit a chunk
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     std       ,s        save the emitted count
                     cmpd      #$FFFF    check for failure
                     bne       RangeAdvance ok so continue
@@ -9134,7 +9172,7 @@ RangeEmitAlt        ldd       $02,s     load the length
                     ldd       $08,u     load the id
                     pshs      d         push it
                     lbsr      WritePath emit the alternate form
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     cmpd      $02,s     compare emitted with length
                     beq       RangeFinalize matched so finalize
                     bra       RangeSetError go set error flags
@@ -9157,7 +9195,7 @@ RangeFinalize       ldd       $06,u     load the flags
                     std       $04,u     set the end pointer
                     clra                zero high byte
                     clrb                zero low byte for success
-RangeExit           leas      $04,s     drop the locals
+RangeExit           leas      4,s        drop the locals
                     puls      pc,u      restore and return
 
 FetchByte           pshs      u         save u register
@@ -9211,16 +9249,16 @@ StoreByteBack       ldd       ,u        load the base
 
 FetchWord           pshs      u         save u register
                     ldu       $04,s     load the operand pointer
-                    leas      -$04,s    reserve local slots
+                    leas      -4,s       reserve local slots
                     pshs      u         push the operand
                     lbsr      FetchByte fetch the high byte
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $02,s     save the high byte
                     cmpd      #$FFFF    check for failure
                     beq       FetchWordFail fail so bail out
                     pshs      u         push the operand
                     lbsr      FetchByte fetch the low byte
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       ,s        save the low byte
                     cmpd      #$FFFF    check for failure
                     bne       FetchWordCombine ok so combine
@@ -9232,12 +9270,12 @@ FetchWordCombine    ldd       $02,s     load the high byte
                     ldd       #$0008    shift count of eight
                     lbsr      AslEntry  shift high byte left
                     addd      ,s        add the low byte
-FetchWordExit       leas      $04,s     drop the locals
+FetchWordExit       leas      4,s        drop the locals
                     puls      pc,u      restore and return
 
 EmitLoad2           pshs      u         save u register
                     ldu       $04,s     load the operand pointer
-                    leas      -$02,s    reserve a local slot
+                    leas      -2,s       reserve a local slot
                     ldd       $06,u     load the flags
                     anda      #$80      isolate the sign bit
                     andb      #$31      mask low bits
@@ -9250,8 +9288,8 @@ EmitLoad2           pshs      u         save u register
                     lbne      EmitLoadFail no match so fail
                     pshs      u         push the operand
                     lbsr      AllocTemp allocate a temp buffer
-                    leas      $02,s     drop the argument
-EmitLoadIndex       leax      $00C1,y   load the base table entry
+                    leas      2,s        drop the argument
+EmitLoadIndex       leax      Stdin,y   load the base table entry
                     pshs      x         push the pointer
                     cmpu      ,s++      compare with operand pointer
                     bne       EmitLoadData differ so skip
@@ -9259,10 +9297,10 @@ EmitLoadIndex       leax      $00C1,y   load the base table entry
                     clra                clear high byte
                     andb      #$40      test bit six
                     beq       EmitLoadData clear so skip
-                    leax      $00CE,y   load another table entry
+                    leax      Stdout,y  load another table entry
                     pshs      x         push the pointer
                     lbsr      SpillOperand spill that operand
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
 EmitLoadData        ldd       $06,u     load the flags
                     clra                clear high byte
                     andb      #$08      test bit three
@@ -9294,7 +9332,7 @@ EmitLoadDefault2    ldd       #$0001    count of one
                     ldd       $08,u     load the id
                     pshs      d         push it
                     lbsr      ReadPath  emit the default load
-EmitLoadResult      leas      $06,s     drop the arguments
+EmitLoadResult      leas      6,s        drop the arguments
                     std       ,s        save the emit result
                     ldd       ,s        reload it
                     bgt       EmitLoadOk positive so advance
@@ -9320,7 +9358,7 @@ EmitLoadOk          ldd       $02,u     load the mid pointer
                     std       $04,u     set the end pointer
                     ldb       [$02,u]   load byte via mid pointer
                     clra                zero-extend it
-EmitLoadDrop        leas      $02,s     drop the local
+EmitLoadDrop        leas      2,s        drop the local
 FetchReturn         puls      pc,u      restore and return
 
 AllocTemp           pshs      u         save u register
@@ -9329,7 +9367,7 @@ AllocTemp           pshs      u         save u register
                     clra                clear high byte
                     andb      #$C0      test the allocated bits
                     bne       AllocMark already allocated so skip
-                    leas      -$20,s    reserve a scratch buffer
+                    leas      -32,s      reserve a scratch buffer
                     leax      ,s        point at the buffer
                     pshs      x         push the pointer
                     ldd       $08,u     load the id
@@ -9338,7 +9376,7 @@ AllocTemp           pshs      u         save u register
                     clrb                zero low byte
                     pshs      d         push the zero argument
                     lbsr      GetStat   format into the buffer
-                    leas      $06,s     drop the arguments
+                    leas      6,s        drop the arguments
                     ldd       $06,u     load the flags
                     pshs      d         push them
                     ldb       $02,s     load the result low byte
@@ -9350,7 +9388,7 @@ AllocFlagHigh       ldd       #$0080    select high alloc flag
 AllocFlagStore      ora       ,s+       combine into flag high
                     orb       ,s+       combine into flag low
                     std       $06,u     store the flags
-                    leas      $20,s     release the scratch buffer
+                    leas      32,s       release the scratch buffer
 AllocMark           ldd       $06,u     load the flags
                     ora       #$80      set the allocated marker
                     std       $06,u     store the flags
@@ -9375,7 +9413,7 @@ AllocBuffer         ldd       $02,u     load the mid pointer
                     ldd       $0b,u     load the size
                     pshs      d         push it
                     lbsr      BumpAlloc allocate a memory buffer
-                    leas      $02,s     drop the argument
+                    leas      2,s        drop the argument
                     std       $02,u     store the buffer pointer
                     cmpd      #$FFFF    check for failure
                     beq       AllocBufferInline fail so use inline buffer
@@ -9411,7 +9449,7 @@ EmitOperandStr2     pshs      u         save u register
                     rola                propagate carry
                     aslb                continue shift
                     rola                propagate carry
-                    leax      >$0059,y  point at register-name table
+                    leax      >RegisterNameTable,y  point at register-name table
                     leax      d,x       index into the table
                     lbsr      FpMultiply emit the register operand
                     bra       EmitOperandStrTail go to common tail
@@ -9425,13 +9463,13 @@ EmitOperandStrAlt   leax      $04,s     point at the locals
                     rola                propagate carry
                     aslb                continue shift
                     rola                propagate carry
-                    leax      >$0059,y  point at register-name table
+                    leax      >RegisterNameTable,y  point at register-name table
                     leax      d,x       index into the table
                     lbsr      FpDivide  emit the alternate register operand
                     bra       EmitOperandStrTail go to common tail
 
 EmitOperandStrPlain leax      $04,s     point at the locals
-EmitOperandStrTail  leau      $0254,y   point at the output buffer
+EmitOperandStrTail  leau      TempBuffer,y   point at the output buffer
                     pshs      u         push the buffer
                     lbsr      CopyFloat8 emit the assembled string
                     puls      pc,u      restore and return
@@ -9453,7 +9491,7 @@ EmitDecimal2        pshs      u         save u register
                     leax      $0a,s     point at the arguments
                     lbsr      PushArg8  call the helper
                     lbsr      EmitOperandStr2 recurse on the high digits
-                    leas      $0C,s     drop the arguments
+                    leas      12,s       drop the arguments
                     lbsr      CopyFloat8 emit the assembled part
 EmitDecimalDigit    ldd       $0e,s     load the low argument
                     pshs      d         push it
@@ -9465,7 +9503,7 @@ EmitDecimalDigit    ldd       $0e,s     load the low argument
                     leax      $08,s     point at the arguments
                     lbsr      PushArg8  call the helper
                     lbsr      EmitOperandStr2 emit the single digit
-                    leas      $0C,s     drop the arguments
+                    leas      12,s       drop the arguments
                     puls      pc,u      restore and return
 
 StrLen              pshs      u         save u register
@@ -9479,7 +9517,7 @@ StrLenLoop2         ldb       ,u+       scan the next byte
 
 StrCopy             pshs      u         save u register
                     ldu       $06,s     load the source pointer
-                    leas      -$02,s    reserve a local slot
+                    leas      -2,s       reserve a local slot
                     ldd       $06,s     load the destination pointer
                     std       ,s        save it locally
 StrCopyLoop         ldb       ,u+       load the next source byte
@@ -9492,7 +9530,7 @@ StrCopyLoop         ldb       ,u+       load the next source byte
 
 StrCat              pshs      u         save u
                     ldu       $06,s     load source pointer
-                    leas      -$02,s    make room for a local
+                    leas      -2,s       make room for a local
                     ldd       $06,s     load dest pointer
                     std       ,s        save it
 StrCatEndLoop       ldx       ,s        load dest pointer
@@ -9510,7 +9548,7 @@ StrCatCopyLoop      ldb       ,u+       read a source byte
                     stb       -$01,x    store the byte
                     bne       StrCatCopyLoop loop until null copied
 StrCatDone          ldd       $06,s     load result pointer
-                    leas      $02,s     drop the local
+                    leas      2,s        drop the local
                     puls      pc,u      restore and return
 
                     pshs      u         save u
@@ -9548,7 +9586,7 @@ FpNumCvt            ldx       $02,s     load argument pointer
                     rts                 return
 
 FpNormStore         pshs      u         save u
-                    leas      -$1e,s    allocate a 30-byte fp frame
+                    leas      -30,s      allocate a 30-byte fp frame
                     tfr       s,u       point u at the frame
                     clr       $1d,u     clear the overflow flag
                     clr       $19,u     clear the sign field
@@ -9582,13 +9620,13 @@ FpFetchOperand      lbsr      StoreOutputMant fetch the operand
                     ldd       $02,x     load value word
                     rts                 return
                     ldd       ,x        load value
-                    std       $0254,y   save to the temp buffer
+                    std       TempBuffer,y   save to the temp buffer
                     ldd       $02,x     load next word
-                    leax      $0254,y   point at the temp buffer
+                    leax      TempBuffer,y   point at the temp buffer
                     std       $02,x     store
                     lbra      NormMantissa process it
 
-                    leax      $0254,y   point at the temp buffer
+                    leax      TempBuffer,y   point at the temp buffer
                     std       $02,x     store
                     tfr       a,b       move a into b
                     sex                 sign extend
@@ -9596,23 +9634,23 @@ FpFetchOperand      lbsr      StoreOutputMant fetch the operand
                     std       ,x        store
                     lbra      NormMantissa process it
 
-                    leax      $0254,y   point at the temp buffer
+                    leax      TempBuffer,y   point at the temp buffer
                     std       $02,x     store
                     clr       ,x        clear
                     clr       $01,x     clear
                     lbra      NormMantissa process it
 
 FpMoveTemp          ldd       ,x        load value
-                    std       $0254,y   save to the temp buffer
+                    std       TempBuffer,y   save to the temp buffer
                     lda       $02,x     load a byte
                     ldb       $07,x     load a byte
-                    leax      $0254,y   point at the temp buffer
+                    leax      TempBuffer,y   point at the temp buffer
                     std       $02,x     store
                     rts                 return
                     ldd       ,x        load value
-                    std       $0254,y   save to the temp buffer
+                    std       TempBuffer,y   save to the temp buffer
                     ldd       $02,x     load next word
-                    leax      $0254,y   point at the temp buffer
+                    leax      TempBuffer,y   point at the temp buffer
                     sta       $02,x     store high byte
                     stb       $07,x     store low byte
                     clr       $03,x     clear
@@ -9621,7 +9659,7 @@ FpMoveTemp          ldd       ,x        load value
                     clr       $06,x     clear
                     rts                 return
 
-FpStoreResult       leax      $0254,y   point at the result buffer
+FpStoreResult       leax      TempBuffer,y   point at the result buffer
                     ldd       $22,u     load mantissa bytes
                     std       ,x        store
                     ldd       $24,u     load mantissa bytes
@@ -9634,7 +9672,7 @@ FpStoreResult       leax      $0254,y   point at the result buffer
                     puls      u         restore u
                     puls      d         pull the return pointer
                     std       $06,s     place it on the stack
-                    leas      $06,s     adjust the stack
+                    leas      6,s        adjust the stack
                     rts                 return
                     lda       $02,s     load sign of a
                     eora      ,x        compare with sign of b
@@ -9700,7 +9738,7 @@ CmpReturn           pshs      cc        save flags
                     ldd       $01,s     reload return value
                     std       $09,s     place result
                     puls      cc        restore flags
-                    leas      $08,s     drop the locals
+                    leas      8,s        drop the locals
                     rts                 return
 
 CmpLess             clra                clear result
@@ -10058,7 +10096,7 @@ MantDivDone         ror       ,u        restore the final quotient bit
 
 FpUnpackArgs        puls      d         grab the caller return address
                     pshs      u         save the caller frame pointer
-                    leas      -$1e,s    allocate the unpack work area
+                    leas      -30,s      allocate the unpack work area
                     tfr       s,u       point u at the work area
                     pshs      d         push the return address back
                     clr       $1d,u     clear the result flag
@@ -10105,7 +10143,7 @@ NormMantissa        lda       #$A0      starting exponent value
                     ldd       #$0000    zero for high borrow
                     sbcb      $01,s     subtract with borrow
                     sbca      ,s        subtract with borrow
-                    leas      $02,s     drop the saved word
+                    leas      2,s        drop the saved word
                     bvs       NormMask  handle the overflow edge case
 NormShiftLoop       dec       $07,x     decrement exponent per shift
                     asl       $03,x     shift mantissa left
@@ -10260,13 +10298,13 @@ StoreWorkMantissa   pshs      a         save a
                     puls      pc,a      restore a and return
 
 StoreOutputMant     ldd       ,x        load result high word
-StoreOutputMantD    std       $0254,y   store into the output area
+StoreOutputMantD    std       TempBuffer,y   store into the output area
                     ldd       $02,x     next word
-                    std       $0256,y   store into the output area
+                    std       OutputArea,y   store into the output area
                     ldd       $04,x     next word
-                    std       $0258,y   store into the output area
+                    std       OutputArea2,y   store into the output area
                     ldd       $06,x     next word
-                    leax      $0254,y   repoint x at the output
+                    leax      TempBuffer,y   repoint x at the output
                     std       $06,x     store the last word
                     rts                 return to caller
                     pshs      x         save the operand pointer
@@ -10315,7 +10353,7 @@ FpStoreResult4      ldx       $2a,u     result destination
                     lbsr      FpSubtract perform the operation
                     bra       FpStoreResult4 store and return
 
-PushArg4            leas      -$08,s    allocate the argument buffer
+PushArg4            leas      -8,s       allocate the argument buffer
                     ldd       $08,s     fetch the return address
                     std       ,s        move it below the buffer
                     clra                clear a
@@ -10329,7 +10367,7 @@ PushArg4            leas      -$08,s    allocate the argument buffer
                     stb       $09,s     store low byte
                     rts                 return to caller
 
-PushArg8            leas      -$08,s    allocate the argument buffer
+PushArg8            leas      -8,s       allocate the argument buffer
                     ldd       $08,s     fetch the return address
                     std       ,s        move it below the buffer
                     ldd       ,x        copy eight-byte value
@@ -10369,20 +10407,20 @@ CopyFloatDone       puls      u         restore u
 
 IntAdd32            ldd       $04,s     low word of first operand
                     addd      $02,x     add second operand low
-                    std       $0256,y   store the sum low
+                    std       OutputArea,y   store the sum low
                     ldd       $02,s     high word
                     adcb      $01,x     add with carry
                     adca      ,x        add with carry
-                    std       $0254,y   store the sum high
+                    std       TempBuffer,y   store the sum high
                     lbra      ReturnTempPtr finish the operation
 
 IntSub32            ldd       $04,s     low word of first operand
                     subd      $02,x     subtract second operand low
-                    std       $0256,y   store the difference low
+                    std       OutputArea,y   store the difference low
                     ldd       $02,s     high word
                     sbcb      $01,x     subtract with borrow
                     sbca      ,x        subtract with borrow
-                    std       $0254,y   store the difference high
+                    std       TempBuffer,y   store the difference high
                     lbra      ReturnTempPtr finish the operation
 
 IntCmp32            ldd       $02,s     high word of first operand
@@ -10402,7 +10440,7 @@ CmpPushCC           pshs      cc        capture the comparison flags
                     ldd       $01,s     fetch saved value
                     std       $05,s     store into result slot
                     puls      cc        restore condition codes
-                    leas      $04,s     drop the local frame
+                    leas      4,s        drop the local frame
                     rts                 return to caller
 
 NegLong             lbsr      CopyOperandToTemp copy operand into temp buffer
@@ -10417,22 +10455,22 @@ NegLong             lbsr      CopyOperandToTemp copy operand into temp buffer
                     ldd       ,x        load high word
                     coma                ones-complement high byte
                     comb                ones-complement next byte
-                    std       $0254,y   save into temp buffer
+                    std       TempBuffer,y   save into temp buffer
                     ldd       $02,x     load low word
                     coma                ones-complement low byte
                     comb                ones-complement next byte
-                    leax      $0254,y   point at the temp buffer
+                    leax      TempBuffer,y   point at the temp buffer
                     std       $02,x     store complemented low word
                     rts                 return the complemented long
 
-SignExtendLong      leax      $0254,y   point at temp long buffer
+SignExtendLong      leax      TempBuffer,y   point at temp long buffer
                     std       $02,x     store value as low word
                     tfr       a,b       move high byte for sign extend
                     sex                 sign-extend into d
                     tfr       a,b       propagate sign byte
                     std       ,x        store sign-extended high word
                     rts                 return the widened long
-                    leax      $0254,y   point at temp long buffer
+                    leax      TempBuffer,y   point at temp long buffer
                     std       $02,x     store value as low word
                     clr       ,x        zero the high byte
                     clr       $01,x     zero the next high byte
@@ -10443,7 +10481,7 @@ StoreLong           pshs      y         save y register
                     ldd       ,x        load high word from source
                     std       ,y        store high word to destination
                     ldd       $02,x     load low word from source
-                    std       $02,y     store low word to destination
+                    std       LowWordDestination,y     store low word to destination
                     puls      x         restore pointer register
                     exg       y,x       swap the pointers back
                     puls      d         pop the passed word
@@ -10484,30 +10522,30 @@ AsrLongDone         puls      d         pop the passed word
 ReturnTempPtr       tfr       cc,a      save condition codes
                     puls      x         pop return word off stack
                     stx       $02,s     stash it below
-                    leas      $02,s     drop the slot
-                    leax      $0254,y   point at temp buffer for return
+                    leas      2,s        drop the slot
+                    leax      TempBuffer,y   point at temp buffer for return
                     tfr       a,cc      restore condition codes
                     rts                 return the temp pointer
 
 CopyOperandToTemp   ldd       ,x        load high word
-                    std       $0254,y   save into temp buffer
+                    std       TempBuffer,y   save into temp buffer
                     ldd       $02,x     load low word
-                    leax      $0254,y   point x at the temp buffer
+                    leax      TempBuffer,y   point x at the temp buffer
                     std       $02,x     store low word into temp
                     rts                 return with x on temp
 
                     use       lib/imul.asm
-                    clr       $02E2,y   clear the result sign flag
+                    clr       ResultSignFlag,y   clear the result sign flag
                     leax      >DivUnsigned,pcr point at unsigned divide helper
-                    stx       $02E3,y   store helper vector
+                    stx       HelperVector,y   store helper vector
                     bra       DivCheckZero join the common divide path
 
 DivSignedSetup      leax      >DivSigned,pcr point at signed divide helper
-                    stx       $02E3,y   store helper vector
-                    clr       $02E2,y   clear the result sign flag
+                    stx       HelperVector,y   store helper vector
+                    clr       ResultSignFlag,y   clear the result sign flag
                     tst       $02,s     test the dividend sign
                     bpl       DivCheckZero positive, keep sign flag clear
-                    inc       $02E2,y   mark result negative
+                    inc       ResultSignFlag,y   mark result negative
 DivCheckZero        subd      #$0000    test divisor for zero
                     bne       DivCallHelper nonzero, proceed
                     puls      x         discard helper pointer
@@ -10516,11 +10554,11 @@ DivCheckZero        subd      #$0000    test divisor for zero
 
 DivCallHelper       ldx       $02,s     placeholder
                     pshs      x         pass it to helper
-                    jsr       [$02E3,y] call the divide helper
+                    jsr       [HelperVector,y] call the divide helper
                     ldd       ,s        grab remainder
                     std       $02,s     stash remainder
                     tfr       x,d       move quotient to d
-                    tst       $02E2,y   is result meant negative
+                    tst       ResultSignFlag,y   is result meant negative
                     beq       DivStoreResult no, skip negate
                     nega                negate quotient
                     negb                negate quotient
@@ -10531,7 +10569,7 @@ DivStoreResult      std       ,s++      store the result
 DivUnsigned         subd      #$0000    test divisor for zero
                     beq       DivByZero zero divisor, raise signal
                     pshs      d         save divisor
-                    leas      -$02,s    make room for quotient
+                    leas      -2,s       make room for quotient
                     clr       ,s        clear quotient high
                     clr       $01,s     clear quotient low
                     bra       DivNormalize enter division
@@ -10544,7 +10582,7 @@ DivByZero           puls      d         restore the word
 DivSigned           subd      #$0000    test divisor for zero
                     beq       DivByZero zero divisor, raise signal
                     pshs      d         save divisor
-                    leas      -$02,s    make room for sign flag
+                    leas      -2,s       make room for sign flag
                     clr       ,s        clear sign flag
                     clr       $01,s     clear sign flag byte
                     tsta                is divisor negative
@@ -10597,12 +10635,12 @@ DivSwapResults      ldx       $04,s     grab caller pointer
                     stx       $06,s     restore caller pointer
                     ldx       $02,s     remainder into x
                     ldd       $04,s     quotient into d
-                    leas      $06,s     drop the work frame
+                    leas      6,s        drop the work frame
                     rts                 return quotient and remainder
 
                     use       lib/shift.asm
 
-SendSignal          std       $0260,y   save the signal code
+SendSignal          std       ErrorCode,y   save the signal code
                     pshs      y,b       preserve y and code
                     os9       F$ID      get own process id
                     puls      y,b       restore y and code
@@ -10788,9 +10826,9 @@ CheckWhence         cmpd      #$0001    whence value one
                     beq       SeekFromEnd handle seek relative to end
                     ldb       #$F7      set error code for bad whence
 SeekErr             clra                clear high byte of errno
-                    std       $0260,y   store os-9 error code in work block
+                    std       ErrorCode,y   store os-9 error code in work block
                     ldd       #$FFFF    prepare minus one result
-                    leax      $0254,y   point at result position buffer
+                    leax      TempBuffer,y   point at result position buffer
                     std       ,x        store -1 high word
                     std       $02,x     store -1 low word
                     puls      pc,u      return failure
@@ -10807,26 +10845,26 @@ SeekFromCur         lda       $05,s     load file path number
                     bcs       SeekErr   bail out on error
 SeekCompute         tfr       u,d       low word of base position
                     addd      $08,s     add low word of offset
-                    std       $0256,y   save new position low word
+                    std       OutputArea,y   save new position low word
                     tfr       d,u       keep low word in u
                     tfr       x,d       high word of base position
                     adcb      $07,s     add offset high with carry
                     adca      $06,s     add offset top byte
                     bmi       SeekErr   reject negative position
                     tfr       d,x       high word into x
-                    std       $0254,y   save new position high word
+                    std       TempBuffer,y   save new position high word
                     lda       $05,s     reload file path number
                     os9       I$Seek    seek to computed position
                     bcs       SeekErr   bail out on error
-                    leax      $0254,y   point at new position buffer
+                    leax      TempBuffer,y   point at new position buffer
                     puls      pc,u      return success
 
-GrowHeap            ldd       $0252,y   load current heap top
+GrowHeap            ldd       HeapTop,y   load current heap top
                     pshs      d         save heap top
                     ldd       $04,s     load requested size
-                    cmpd      $02E5,y   compare against free space
+                    cmpd      FreeSpace,y   compare against free space
                     bcs       GrowHeapTail enough room so skip allocation
-                    addd      $0252,y   new top after request
+                    addd      HeapTop,y   new top after request
                     pshs      y         save work block pointer
                     subd      ,s        bytes needed from process base
                     os9       F$Mem     request more memory
@@ -10834,51 +10872,51 @@ GrowHeap            ldd       $0252,y   load current heap top
                     puls      y         restore work block pointer
                     bcc       GrowHeapOk allocation succeeded
                     ldd       #$FFFF    prepare failure return
-                    leas      $02,s     drop saved heap top
+                    leas      2,s        drop saved heap top
                     rts                 return error
 
-GrowHeapOk          std       $0252,y   save new heap top
-                    addd      $02E5,y   add old free count
+GrowHeapOk          std       HeapTop,y   save new heap top
+                    addd      FreeSpace,y   add old free count
                     subd      ,s        minus old top gives grown free
-                    std       $02E5,y   update free space count
-GrowHeapTail        leas      $02,s     drop saved heap top
-                    ldd       $02E5,y   load free space
+                    std       FreeSpace,y   update free space count
+GrowHeapTail        leas      2,s        drop saved heap top
+                    ldd       FreeSpace,y   load free space
                     pshs      d         save free space
                     subd      $04,s     subtract requested size
-                    std       $02E5,y   reduce free space count
-                    ldd       $0252,y   load heap top
+                    std       FreeSpace,y   reduce free space count
+                    ldd       HeapTop,y   load heap top
                     subd      ,s++      subtract free to get block start
                     pshs      d         save block start pointer
                     clra                zero fill byte
                     ldx       ,s        load fill pointer
 ZeroFillLoop2       sta       ,x+       zero one byte
-                    cmpx      $0252,y   reached heap top yet
+                    cmpx      HeapTop,y   reached heap top yet
                     bcs       ZeroFillLoop2 keep zeroing
                     puls      pc,d      return block pointer
 
 BumpAlloc           ldd       $02,s     load requested size
-                    addd      $025C,y   add to current bump pointer
+                    addd      BumpPointer,y   add to current bump pointer
                     bcs       BumpAllocErr overflow so fail
-                    cmpd      $025e,y   compare against limit
+                    cmpd      Limit,y   compare against limit
                     bcc       BumpAllocErr beyond limit so fail
                     pshs      d         save new bump pointer
-                    ldx       $025C,y   load old bump pointer
+                    ldx       BumpPointer,y   load old bump pointer
                     clra                zero fill byte
 BumpFillLoop        cmpx      ,s        reached new pointer yet
                     bcc       BumpAllocOk done filling
                     sta       ,x+       zero one byte
                     bra       BumpFillLoop continue filling
 
-BumpAllocOk         ldd       $025C,y   old pointer as result
+BumpAllocOk         ldd       BumpPointer,y   old pointer as result
                     puls      x         load new bump pointer
-                    stx       $025C,y   store advanced pointer
+                    stx       BumpPointer,y   store advanced pointer
                     rts                 return old pointer
 
 BumpAllocErr        ldd       #$FFFF    prepare failure return
                     rts                 return error
 
 FailClearErrno      clra                clear high byte
-                    std       $0260,y   clear errno in work block
+                    std       ErrorCode,y   clear errno in work block
                     ldd       #$FFFF    prepare minus one
                     rts                 return failure
 
@@ -10897,9 +10935,20 @@ CleanupStub         rts                 empty cleanup stub
 * WorkBlockImage - cc1-style init image for the work block (see _start):
 * rts stub + count/block table + relocation dirs + module-name string.
 * ------------------------------------------------------------------
-WorkBlockImage      fcb       $00,$03,$00,$00 init table / work-block image
+                    * ============ WorkBlockImage: cstart init/relocation tables ============
+
+                    * ---- count1: DP-data length (bytes copied to the DP base)
+WorkBlockImage      fdb       $0003
+
+                    * ---- block1: DP data image  ->  data base
+                    fcb       $00,$00
                     fcb       $4B
-                    fcb       $01,$EB,$00,$02,$00,$04,$00,$08
+
+                    * ---- count2: non-DP-data length (bytes copied to base+HDRADV)
+                    fdb       $01EB
+
+                    * ---- block2: non-DP data image  ->  data base + HDRADV
+WBIblock2           fcb       $00,$02,$00,$04,$00,$08
                     fcb       $00,$10,$00
                     fcb       $20
                     fcb       $00
@@ -10910,10 +10959,8 @@ WorkBlockImage      fcb       $00,$03,$00,$00 init table / work-block image
                     fcb       $00
                     fcb       $40
                     fcb       $00
-                    fcb       $27
-                    fcb       $10,$03,$E8,$00
-                    fcb       $64
-                    fcb       $00,$0A,$00,$00
+Pow10Img            fdb       10000,1000,100,10 powers of ten
+FreeRootImg         fcb       $00,$00
                     fcb       $44
                     fcb       $C9
                     fcb       $44
@@ -10954,10 +11001,13 @@ WorkBlockImage      fcb       $00,$03,$00,$00 init table / work-block image
                     fcb       $49
                     fcb       $F2,$C9,$CD,$04
                     fcb       $67,$4F
-                    fcb       $E4,$00,$00,$00,$00,$00,$00,$00
-                    fcb       $01,$00,$00,$00,$00,$00,$00,$00
+                    fcb       $E4
+StdinImg            fcb       $00,$00,$00,$00,$00,$00,$00
+                    fcb       $01,$00,$00,$00,$00,$00
+StdoutImg           fcb       $00,$00
                     fcb       $00,$00,$00,$00,$00,$02,$00,$01
-                    fcb       $00,$00,$00,$00,$00,$00,$00,$00
+                    fcb       $00,$00,$00
+StderrImg           fcb       $00,$00,$00,$00,$00
                     fcb       $00,$00
                     fcb       $42
                     fcb       $00,$02,$00,$00,$00,$00,$00,$00
@@ -10981,7 +11031,8 @@ WorkBlockImage      fcb       $00,$03,$00,$00 init table / work-block image
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
-                    fcb       $00,$00,$00,$00,$00,$00,$00,$01
+                    fcb       $00,$00,$00,$00,$00,$00,$00
+CtypeTabImg         fcb       $01
                     fcb       $01,$01,$01,$01,$01,$01,$01,$01
                     fcb       $11,$11,$01,$11,$11,$01,$01,$01
                     fcb       $01,$01,$01,$01,$01,$01,$01,$01
@@ -10995,21 +11046,23 @@ WorkBlockImage      fcb       $00,$03,$00,$00 init table / work-block image
                     fcb       $04,$04,$04,$04,$04,$04,$04,$04
                     fcb       $04,$04,$04,$04
                     fcc       /    /
-                    fcb       $01,$00,$06,$00
-                    fcb       $57
-                    fcb       $00
-                    fcb       $55
-                    fcb       $00
-                    fcb       $53
-                    fcb       $00
-                    fcb       $51
-                    fcb       $00
-                    fcb       $4F
-                    fcb       $00
-                    fcb       $4D
-                    fcb       $00,$01,$00,$01
+                    fcb       $01
+
+                    * ---- nreloc1: text-relocation count  (each offset patched by +module base)
+                    fdb       $0006
+
+                    * ---- reloc1: text relocation offsets
+                    fdb       $0057,$0055,$0053,$0051,$004F,$004D
+
+                    * ---- nreloc2: data-relocation count  (each offset patched by +work base)
+                    fdb       $0001
+
+                    * ---- reloc2: data relocation offsets
+                    fdb       $0001
+
+                    * ---- name: trailing module-name string
                     fcc       /c.pass2/
-                    fcb       $00
+                    fcb       C$NULL
                     emod
 eom                 equ       *
                     end

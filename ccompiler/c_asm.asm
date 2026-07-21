@@ -960,50 +960,50 @@ FatalError          pshs      U         save the frame pointer
                     puls      PC,U,X    return unreached
 
 ModeWrite           fcb       $77
-                    fcb       $00
+                    fcb       C$NULL
 ModeRead            fcb       $72
-                    fcb       $00
+                    fcb       C$NULL
 MsgFileCloseErr     fcc       "file close error"
-                    fcb       $00
+                    fcb       C$NULL
 MsgBadLabel         fcc       "bad label"
-                    fcb       $00
+                    fcb       C$NULL
 MsgBadMnemonic      fcc       "bad mnemonic"
-                    fcb       $00
+                    fcb       C$NULL
 FmtDecimal5         fcc       "%05d"
-                    fcb       $00
+                    fcb       C$NULL
 FmtHex4             fcc       " %04x"
-                    fcb       $00
+                    fcb       C$NULL
 FmtSpaces5          fcc       "     "
-                    fcb       $00
+                    fcb       C$NULL
 FmtHex2             fcc       "%02x"
-                    fcb       $00
+                    fcb       C$NULL
 FmtSpaces2          fcc       "  "
-                    fcb       $00
+                    fcb       C$NULL
 FmtSpaces10         fcc       "          "
-                    fcb       $00
-NullStrA            fcb       $00
-NullStrB            fcb       $00
-NullStrC            fcb       $00
+                    fcb       C$NULL
+NullStrA            fcb       C$NULL
+NullStrB            fcb       C$NULL
+NullStrC            fcb       C$NULL
 FmtListLine         fcc       "%c%-8s %-5s "
-                    fcb       $00
+                    fcb       C$NULL
 FmtStr              fcc       "%s"
-                    fcb       $00
+                    fcb       C$NULL
 FmtStr10            fcc       "%-10s"
-                    fcb       $00
+                    fcb       C$NULL
 FmtSpaceStr         fcc       " %s"
-                    fcb       $00
+                    fcb       C$NULL
 MsgBadRegList       fcc       "bad register list"
-                    fcb       $00
+                    fcb       C$NULL
 MsgBadRegName       fcc       "bad register name"
-                    fcb       $00
+                    fcb       C$NULL
 MsgNestedMacro      fcc       "nested MACRO definitions"
-                    fcb       $00
+                    fcb       C$NULL
 FmtErrorLine        fcc       "*** error - %s ***"
-                    fcb       $0D
-                    fcb       $00
+                    fcb       C$CR
+                    fcb       C$NULL
 FmtAsmError         fcc       "asm: %s"
-                    fcb       $0D
-                    fcb       $00
+                    fcb       C$CR
+                    fcb       C$NULL
 FindKeyword         pshs      U,D       save registers and frame
                     leau      >Y06B7,Y  point at the output buffer
                     bra       CopyLoopTest enter the copy loop test
@@ -1070,277 +1070,277 @@ ScanLoopTest        std       ,S        save the index
                     puls      PC,U,X    return to caller
 
                     fcc       "psect"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "csect"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "vsect"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "end"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "lbra"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "lbsr"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "orcc"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "andcc"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "cwai"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "addd"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "subd"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ldd"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ldx"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ldu"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "cmpx"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "jsr"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "std"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "stx"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "stu"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "cmpu"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "cmps"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "cmpd"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "cmpy"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ldy"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "lds"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "sty"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "sts"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "add"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "cmp"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "sub"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "sbc"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "and"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bit"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ld"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "st"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "eor"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "adc"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "org"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "or"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "neg"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "com"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "lsr"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ror"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "asr"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "lsl"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "asl"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "rol"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "dec"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "inc"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "tst"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "jmp"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "clr"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "rts"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "mul"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "nop"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "sync"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "daa"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "sex"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "abx"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "rti"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "swi2"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "swi3"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "swi"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "leax"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "leay"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "leas"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "leau"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "tfr"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "exg"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "pshs"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "puls"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "pshu"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "pulu"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "lb"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "fcc"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "fdb"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "fcs"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "fcb"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "rzb"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "vsect"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "csect"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ends"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "setdp"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "os9"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "rmb"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ends"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "rmb"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "fcc"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "fdb"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "fcs"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "fcb"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "rzb"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ends"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "rmb"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ends"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "nam"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "opt"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ttl"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "pag"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "spc"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "use"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "fail"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "rept"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "endr"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ifeq"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ifne"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "iflt"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ifle"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ifge"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ifgt"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ifp1"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "endc"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "else"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "equ"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "set"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "macro"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "endm"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bsr"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bra"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "brn"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bhi"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bls"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bhs"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bcc"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "blo"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bcs"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bne"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "beq"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bvc"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bvs"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bpl"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bmi"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bge"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "blt"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "bgt"
-                    fcb       $00
+                    fcb       C$NULL
                     fcc       "ble"
-                    fcb       $00
+                    fcb       C$NULL
 
                     pshs      U         save the frame pointer
                     ldd       #3        three bytes for this directive
@@ -1880,19 +1880,19 @@ SetEndFlag          ldd       #1        set the end flag value
                     puls      PC,U,X    return to caller
 
 MsgRegSizeMismatch  fcc       "register size mismatch"
-                    fcb       $00
+                    fcb       C$NULL
 MsgBadMnemonic2     fcc       "bad mnemonic"
-                    fcb       $00
+                    fcb       C$NULL
 MsgBranchRange      fcc       "branch out of range"
-                    fcb       $00
+                    fcb       C$NULL
 MsgIllegalExtRef    fcc       "illegal external reference"
-                    fcb       $00
+                    fcb       C$NULL
 MsgCondNesting      fcc       "conditional nesting error"
-                    fcb       $00
+                    fcb       C$NULL
 MsgLabelMissing     fcc       "label missing"
-                    fcb       $00
+                    fcb       C$NULL
 MsgEndmNoMacro      fcc       "ENDM without MACRO"
-                    fcb       $00
+                    fcb       C$NULL
 ParseHashOperand    pshs      U         set up the stack frame
                     lbsr      SkipSpaces read the next token
                     cmpd      #35       compare to a hash
@@ -2743,11 +2743,11 @@ StoreIndexPostbyte  stb       <PostByte store the postbyte
                     puls      PC,U      restore and return
 
 MsgIllegalMode      fcc       "illegal addressing mode"
-                    fcb       $00
+                    fcb       C$NULL
 MsgIllegalIndexReg  fcc       "illegal index register"
-                    fcb       $00
+                    fcb       C$NULL
 MsgBracketMissing   fcc       "bracket missing"
-                    fcb       $00
+                    fcb       C$NULL
                     pshs      U         save u
                     lbsr      GetOperandToken get the operand token
                     std       -2,S      save the result
@@ -3550,25 +3550,25 @@ ReturnOne           ldd       #1        return value one
                     puls      PC,U      restore frame and return
 
 MsgLabelMissing2    fcc       "label missing"
-                    fcb       $00
+                    fcb       C$NULL
 MsgConstantDef      fcc       "constant definition"
-                    fcb       $00
+                    fcb       C$NULL
 MsgCommaExpected    fcc       "comma expected"
-                    fcb       $00
+                    fcb       C$NULL
 MsgBadNumber        fcc       "bad number"
-                    fcb       $00
+                    fcb       C$NULL
 MsgBadOption        fcc       "bad option"
-                    fcb       $00
+                    fcb       C$NULL
 StrOptionR          fcb       $72
-                    fcb       $00
+                    fcb       C$NULL
 MsgDpSection        fcc       "DP section ???"
-                    fcb       $00
+                    fcb       C$NULL
 MsgFail             fcc       "fail"
-                    fcb       $00
+                    fcb       C$NULL
 MsgNestedRept       fcc       "nested REPT"
-                    fcb       $00
+                    fcb       C$NULL
 MsgEndrNoRept       fcc       "ENDR without REPT"
-                    fcb       $00
+                    fcb       C$NULL
 ScanName            pshs      U,D       save frame and reserve a local
                     ldb       [>SrcPtr,Y] load the current input character
                     sex                 sign-extend to d
@@ -4227,15 +4227,15 @@ OverflowErr         leax      >MsgSymTabOvf,PC point to overflow message
 AllocDone           puls      PC,U,X    return
 
 MsgSymbolLost       fcc       "symbol lost!?"
-                    fcb       $00
+                    fcb       C$NULL
 MsgRedefined        fcc       "redefined name"
-                    fcb       $00
+                    fcb       C$NULL
 MsgNewSymPass2      fcc       "new symbol in pass two"
-                    fcb       $00
+                    fcb       C$NULL
 MsgPhasingErr       fcc       "phasing error"
-                    fcb       $00
+                    fcb       C$NULL
 MsgSymTabOvf        fcc       "symbol table overflow"
-                    fcb       $00
+                    fcb       C$NULL
 ParseValue          pshs      U         save frame pointer
                     ldd       #-68      request stack space for locals
                     lbsr      stkcheck  check stack space
@@ -4799,17 +4799,17 @@ ParseNumberDone     leas      6,S       discard locals
                     puls      PC,U      return
 
 MsgValueOutOfRange  fcc       "value out of range"
-                    fcb       $00
+                    fcb       C$NULL
 MsgBadOperator      fcc       "bad operator"
-                    fcb       $00
+                    fcb       C$NULL
 MsgZeroDivision     fcc       "zero division"
-                    fcb       $00
+                    fcb       C$NULL
 MsgParenMissing     fcc       "parenthesis missing"
-                    fcb       $00
+                    fcb       C$NULL
 MsgUndefinedOrg     fcc       "undefined org"
-                    fcb       $00
+                    fcb       C$NULL
 MsgBadOperand       fcc       "bad operand"
-                    fcb       $00
+                    fcb       C$NULL
 ParseOrgDirective   pshs      U         save frame pointer
                     leas      -1,S      allocate local
                     clra                clear high byte
@@ -5722,50 +5722,50 @@ NameListLoop        ldd       <OutFileHand load the output flag
                     puls      PC,U      restore and return
 
 MsgTooManyObjFiles  fcc       "too many object files"
-                    fcb       $00
+                    fcb       C$NULL
 MsgTooManyInputFiles fcc       "too many input files"
-                    fcb       $00
+                    fcb       C$NULL
 MsgNoInputFile      fcc       "no input file"
-                    fcb       $00
+                    fcb       C$NULL
 NameDefaultOutput   fcc       "output.r"
-                    fcb       $00
+                    fcb       C$NULL
 MsgQuotedName       fcc       /"%s" - /
-                    fcb       $00
+                    fcb       C$NULL
 MsgCantOpenFile     fcc       "can't open file"
-                    fcb       $00
+                    fcb       C$NULL
 MsgBanner           fcc       "Microware OS-9 %s  %d/%02d/%02d  %02d:%02d"
-                    fcb       $00
+                    fcb       C$NULL
 MsgRmaVersion       fcc       "RMA - V1.0"
-                    fcb       $00
+                    fcb       C$NULL
 MsgPageHeader       fcc       "   %-20s Page %5d"
-                    fcb       $0D
-                    fcb       $00
+                    fcb       C$CR
+                    fcb       C$NULL
 MsgTitleLine        fcc       "%s - %s"
-                    fcb       $0D
-                    fcb       $0D
-                    fcb       $00
+                    fcb       C$CR
+                    fcb       C$CR
+                    fcb       C$NULL
 MsgAsmPrefix        fcc       "Asm:"
-                    fcb       $00
+                    fcb       C$NULL
 MsgFileCloseErr2    fcc       "file close error"
-                    fcb       $00
-MsgSymbolTable      fcb       $0D
+                    fcb       C$NULL
+MsgSymbolTable      fcb       C$CR
                     fcc       "Symbol Table"
-                    fcb       $0D
-                    fcb       $00
-MsgNewLineA         fcb       $0D
-                    fcb       $00
-MsgNewLineB         fcb       $0D
-                    fcb       $00
+                    fcb       C$CR
+                    fcb       C$NULL
+MsgNewLineA         fcb       C$CR
+                    fcb       C$NULL
+MsgNewLineB         fcb       C$CR
+                    fcb       C$NULL
 MsgBarSep           fcc       "  |"
-                    fcb       $00
+                    fcb       C$NULL
 MsgSymTableRow      fcc       "  %-9s %02x %02x %04x"
-                    fcb       $00
-MsgNewLineC         fcb       $0D
-                    fcb       $00
+                    fcb       C$NULL
+MsgNewLineC         fcb       C$CR
+                    fcb       C$NULL
 MsgProgram          fcc       "program"
-                    fcb       $00
+                    fcb       C$NULL
 MsgNoExternal       fcc       "no external allowed"
-                    fcb       $00
+                    fcb       C$NULL
 OpenObjectFile      pshs      U,D       save the frame and reserve a local
                     ldb       <PassFlag load the pass flag
                     beq       DoOpenFile branch on the first pass
@@ -6410,27 +6410,27 @@ MacroFileError      pshs      U         save the frame pointer
                     puls      PC,U,X    restore and return
 
 StrModeWPlus        fcc       "w+"
-                    fcb       $00
+                    fcb       C$NULL
 MsgCantOpenMacro    fcc       "can't open macro work file"
-                    fcb       $00
+                    fcb       C$NULL
 MsgMacroNestDeep    fcc       "macro nesting too deep"
-                    fcb       $00
+                    fcb       C$NULL
 MsgAsmMacroNest     fcc       "asm err: macro nest"
-                    fcb       $00
+                    fcb       C$NULL
 FmtPad3             fcc       "%03d"
-                    fcb       $00
+                    fcb       C$NULL
 FmtPad2             fcc       "%02d"
-                    fcb       $00
+                    fcb       C$NULL
 MsgUnmatchedQuotes  fcc       "unmatched quotes"
-                    fcb       $00
+                    fcb       C$NULL
 MsgArgTooLong       fcc       "macro arg too long"
-                    fcb       $00
+                    fcb       C$NULL
 MsgTooManyArgs      fcc       "too many args"
-                    fcb       $00
+                    fcb       C$NULL
 MsgNoParamForArg    fcc       "no param for arg"
-                    fcb       $00
+                    fcb       C$NULL
 MsgMacroFileError   fcc       "macro file error"
-                    fcb       $00
+                    fcb       C$NULL
 
 * fopen
 
@@ -7339,7 +7339,7 @@ StoreToStrBuf       pshs      U         save the frame pointer
                     puls      PC,U      restore and return
 
 MsgMinInt           fcc       "-32768"
-                    fcb       $00
+                    fcb       C$NULL
 Fseek               pshs      U         save the frame pointer
                     ldu       4,S       load the file pointer
                     leas      -6,S      allocate the local frame
@@ -8675,8 +8675,12 @@ _exit               ldd       2,S       load the exit status code
 
 _dumprof            rts                 profiling stub does nothing
 
-WorkBlockImage      fcb       $00
-                    fcb       $15
+                    * ============ WorkBlockImage: cstart init/relocation tables ============
+
+                    * ---- count1: DP-data length (bytes copied to the DP base)
+WorkBlockImage      fdb       $0015
+
+                    * ---- block1: DP data image  ->  data base
                     fcb       $00
                     fcb       $01
                     fcb       $01
@@ -8698,32 +8702,35 @@ WorkBlockImage      fcb       $00
                     fcb       $DA
                     fcb       $03
                     fcb       $26
-                    fcb       $04
-                    fcb       $71
+
+                    * ---- count2: non-DP-data length (bytes copied to base+HDRADV)
+                    fdb       $0471
+
+                    * ---- block2: non-DP data image  ->  data base + HDRADV
                     fcc       "rma.tmp"
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
-                    fcb       $00
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
+                    fcb       C$NULL
                     fcb       $08
                     fcb       $EE
                     fcb       $00
@@ -9316,42 +9323,42 @@ WorkBlockImage      fcb       $00
                     fcb       $78
                     fcb       $0E
                     fcb       $96
-                    fcb       $0D
+                    fcb       C$CR
                     fcb       $67
                     fcb       $0F
                     fcb       $2A
-                    fcb       $0D
+                    fcb       C$CR
                     fcb       $67
                     fcb       $0E
                     fcb       $5C
-                    fcb       $0D
+                    fcb       C$CR
                     fcb       $67
                     fcb       $1C
                     fcb       $72
                     fcc       "A"
-                    fcb       $00
+                    fcb       C$NULL
                     fcb       $02
                     fcc       "B"
-                    fcb       $00
+                    fcb       C$NULL
                     fcb       $04
                     fcc       "CC"
                     fcb       $01
                     fcc       "DP"
                     fcb       $08
                     fcc       "D"
-                    fcb       $00
+                    fcb       C$NULL
                     fcb       $06
                     fcc       "X"
-                    fcb       $00
+                    fcb       C$NULL
                     fcb       $10
                     fcc       "Y"
-                    fcb       $00
+                    fcb       C$NULL
                     fcb       $20
                     fcc       "U"
-                    fcb       $00
+                    fcb       C$NULL
                     fcb       $40
                     fcc       "S"
-                    fcb       $00
+                    fcb       C$NULL
                     fcb       $40
                     fcc       "PC"
                     fcb       $80
@@ -9607,14 +9614,7 @@ WorkBlockImage      fcb       $00
                     fcb       $00
                     fcb       $00
                     fcb       $00
-                    fcb       $27
-                    fcb       $10
-                    fcb       $03
-                    fcb       $E8
-                    fcb       $00
-                    fcb       $64
-                    fcb       $00
-                    fcb       $0A
+                    fdb       10000,1000,100,10 powers of ten
                     fcb       $04
                     fcb       $84
                     fcb       $6C
@@ -9828,441 +9828,48 @@ WorkBlockImage      fcb       $00
                     fcb       $00
                     fcb       $00
                     fcb       $00
-                    fcb       $00
-                    fcb       $C4
-                    fcb       $03
-                    fcb       $A4
-                    fcb       $03
-                    fcb       $A2
-                    fcb       $03
-                    fcb       $A0
-                    fcb       $03
-                    fcb       $9E
-                    fcb       $03
-                    fcb       $9C
-                    fcb       $03
-                    fcb       $9A
-                    fcb       $03
-                    fcb       $98
-                    fcb       $03
-                    fcb       $B2
-                    fcb       $03
-                    fcb       $B0
-                    fcb       $03
-                    fcb       $AE
-                    fcb       $03
-                    fcb       $AC
-                    fcb       $03
-                    fcb       $AA
-                    fcb       $03
-                    fcb       $A8
-                    fcb       $03
-                    fcb       $A6
-                    fcb       $03
-                    fcb       $C0
-                    fcb       $03
-                    fcb       $BE
-                    fcb       $03
-                    fcb       $BC
-                    fcb       $03
-                    fcb       $BA
-                    fcb       $03
-                    fcb       $B8
-                    fcb       $03
-                    fcb       $B6
-                    fcb       $03
-                    fcb       $B4
-                    fcb       $03
-                    fcb       $CE
-                    fcb       $03
-                    fcb       $CC
-                    fcb       $03
-                    fcb       $CA
-                    fcb       $03
-                    fcb       $C8
-                    fcb       $03
-                    fcb       $C6
-                    fcb       $03
-                    fcb       $C4
-                    fcb       $03
-                    fcb       $C2
-                    fcb       $03
-                    fcb       $2E
-                    fcb       $03
-                    fcb       $2C
-                    fcb       $03
-                    fcb       $2A
-                    fcb       $03
-                    fcb       $28
-                    fcb       $03
-                    fcb       $26
-                    fcb       $03
-                    fcb       $D2
-                    fcb       $03
-                    fcb       $D0
-                    fcb       $03
-                    fcb       $3C
-                    fcb       $03
-                    fcb       $3A
-                    fcb       $03
-                    fcb       $38
-                    fcb       $03
-                    fcb       $36
-                    fcb       $03
-                    fcb       $34
-                    fcb       $03
-                    fcb       $32
-                    fcb       $03
-                    fcb       $30
-                    fcb       $03
-                    fcb       $4A
-                    fcb       $03
-                    fcb       $48
-                    fcb       $03
-                    fcb       $46
-                    fcb       $03
-                    fcb       $44
-                    fcb       $03
-                    fcb       $42
-                    fcb       $03
-                    fcb       $40
-                    fcb       $03
-                    fcb       $3E
-                    fcb       $03
-                    fcb       $58
-                    fcb       $03
-                    fcb       $56
-                    fcb       $03
-                    fcb       $54
-                    fcb       $03
-                    fcb       $52
-                    fcb       $03
-                    fcb       $50
-                    fcb       $03
-                    fcb       $4E
-                    fcb       $03
-                    fcb       $4C
-                    fcb       $01
-                    fcb       $0E
-                    fcb       $01
-                    fcb       $0A
-                    fcb       $01
-                    fcb       $06
-                    fcb       $03
-                    fcb       $60
-                    fcb       $03
-                    fcb       $5E
-                    fcb       $03
-                    fcb       $5C
-                    fcb       $03
-                    fcb       $5A
-                    fcb       $01
-                    fcb       $2A
-                    fcb       $01
-                    fcb       $26
-                    fcb       $01
-                    fcb       $22
-                    fcb       $01
-                    fcb       $1E
-                    fcb       $01
-                    fcb       $1A
-                    fcb       $01
-                    fcb       $16
-                    fcb       $01
-                    fcb       $12
-                    fcb       $01
-                    fcb       $46
-                    fcb       $01
-                    fcb       $42
-                    fcb       $01
-                    fcb       $3E
-                    fcb       $01
-                    fcb       $3A
-                    fcb       $01
-                    fcb       $36
-                    fcb       $01
-                    fcb       $32
-                    fcb       $01
-                    fcb       $2E
-                    fcb       $01
-                    fcb       $62
-                    fcb       $01
-                    fcb       $5E
-                    fcb       $01
-                    fcb       $5A
-                    fcb       $01
-                    fcb       $56
-                    fcb       $01
-                    fcb       $52
-                    fcb       $01
-                    fcb       $4E
-                    fcb       $01
-                    fcb       $4A
-                    fcb       $01
-                    fcb       $7E
-                    fcb       $01
-                    fcb       $7A
-                    fcb       $01
-                    fcb       $76
-                    fcb       $01
-                    fcb       $72
-                    fcb       $01
-                    fcb       $6E
-                    fcb       $01
-                    fcb       $6A
-                    fcb       $01
-                    fcb       $66
-                    fcb       $01
-                    fcb       $9A
-                    fcb       $01
-                    fcb       $96
-                    fcb       $01
-                    fcb       $92
-                    fcb       $01
-                    fcb       $8E
-                    fcb       $01
-                    fcb       $8A
-                    fcb       $01
-                    fcb       $86
-                    fcb       $01
-                    fcb       $82
-                    fcb       $01
-                    fcb       $B6
-                    fcb       $01
-                    fcb       $B2
-                    fcb       $01
-                    fcb       $AE
-                    fcb       $01
-                    fcb       $AA
-                    fcb       $01
-                    fcb       $A6
-                    fcb       $01
-                    fcb       $A2
-                    fcb       $01
-                    fcb       $9E
-                    fcb       $01
-                    fcb       $D2
-                    fcb       $01
-                    fcb       $CE
-                    fcb       $01
-                    fcb       $CA
-                    fcb       $01
-                    fcb       $C6
-                    fcb       $01
-                    fcb       $C2
-                    fcb       $01
-                    fcb       $BE
-                    fcb       $01
-                    fcb       $BA
-                    fcb       $01
-                    fcb       $EE
-                    fcb       $01
-                    fcb       $EA
-                    fcb       $01
-                    fcb       $E6
-                    fcb       $01
-                    fcb       $E2
-                    fcb       $01
-                    fcb       $DE
-                    fcb       $01
-                    fcb       $DA
-                    fcb       $01
-                    fcb       $D6
-                    fcb       $02
-                    fcb       $0A
-                    fcb       $02
-                    fcb       $06
-                    fcb       $02
-                    fcb       $02
-                    fcb       $01
-                    fcb       $FE
-                    fcb       $01
-                    fcb       $FA
-                    fcb       $01
-                    fcb       $F6
-                    fcb       $01
-                    fcb       $F2
-                    fcb       $02
-                    fcb       $26
-                    fcb       $02
-                    fcb       $22
-                    fcb       $02
-                    fcb       $1E
-                    fcb       $02
-                    fcb       $1A
-                    fcb       $02
-                    fcb       $16
-                    fcb       $02
-                    fcb       $12
-                    fcb       $02
-                    fcb       $0E
-                    fcb       $02
-                    fcb       $42
-                    fcb       $02
-                    fcb       $3E
-                    fcb       $02
-                    fcb       $3A
-                    fcb       $02
-                    fcb       $36
-                    fcb       $02
-                    fcb       $32
-                    fcb       $02
-                    fcb       $2E
-                    fcb       $02
-                    fcb       $2A
-                    fcb       $02
-                    fcb       $5E
-                    fcb       $02
-                    fcb       $5A
-                    fcb       $02
-                    fcb       $56
-                    fcb       $02
-                    fcb       $52
-                    fcb       $02
-                    fcb       $4E
-                    fcb       $02
-                    fcb       $4A
-                    fcb       $02
-                    fcb       $46
-                    fcb       $02
-                    fcb       $7A
-                    fcb       $02
-                    fcb       $76
-                    fcb       $02
-                    fcb       $72
-                    fcb       $02
-                    fcb       $6E
-                    fcb       $02
-                    fcb       $6A
-                    fcb       $02
-                    fcb       $66
-                    fcb       $02
-                    fcb       $62
-                    fcb       $02
-                    fcb       $96
-                    fcb       $02
-                    fcb       $92
-                    fcb       $02
-                    fcb       $8E
-                    fcb       $02
-                    fcb       $8A
-                    fcb       $02
-                    fcb       $86
-                    fcb       $02
-                    fcb       $82
-                    fcb       $02
-                    fcb       $7E
-                    fcb       $02
-                    fcb       $B2
-                    fcb       $02
-                    fcb       $AE
-                    fcb       $02
-                    fcb       $AA
-                    fcb       $02
-                    fcb       $A6
-                    fcb       $02
-                    fcb       $A2
-                    fcb       $02
-                    fcb       $9E
-                    fcb       $02
-                    fcb       $9A
-                    fcb       $02
-                    fcb       $CE
-                    fcb       $02
-                    fcb       $CA
-                    fcb       $02
-                    fcb       $C6
-                    fcb       $02
-                    fcb       $C2
-                    fcb       $02
-                    fcb       $BE
-                    fcb       $02
-                    fcb       $BA
-                    fcb       $02
-                    fcb       $B6
-                    fcb       $02
-                    fcb       $EA
-                    fcb       $02
-                    fcb       $E6
-                    fcb       $02
-                    fcb       $E2
-                    fcb       $02
-                    fcb       $DE
-                    fcb       $02
-                    fcb       $DA
-                    fcb       $02
-                    fcb       $D6
-                    fcb       $02
-                    fcb       $D2
-                    fcb       $03
-                    fcb       $06
-                    fcb       $03
-                    fcb       $02
-                    fcb       $02
-                    fcb       $FE
-                    fcb       $02
-                    fcb       $FA
-                    fcb       $02
-                    fcb       $F6
-                    fcb       $02
-                    fcb       $F2
-                    fcb       $02
-                    fcb       $EE
-                    fcb       $03
-                    fcb       $22
-                    fcb       $03
-                    fcb       $1E
-                    fcb       $03
-                    fcb       $1A
-                    fcb       $03
-                    fcb       $16
-                    fcb       $03
-                    fcb       $12
-                    fcb       $03
-                    fcb       $0E
-                    fcb       $03
-                    fcb       $0A
-                    fcb       $00
-                    fcb       $12
-                    fcb       $03
-                    fcb       $81
-                    fcb       $03
-                    fcb       $F6
-                    fcb       $03
-                    fcb       $F4
-                    fcb       $04
-                    fcb       $84
-                    fcb       $03
-                    fcb       $84
-                    fcb       $03
-                    fcb       $93
-                    fcb       $03
-                    fcb       $96
-                    fcb       $03
-                    fcb       $87
-                    fcb       $03
-                    fcb       $90
-                    fcb       $03
-                    fcb       $8A
-                    fcb       $03
-                    fcb       $8D
-                    fcb       $00
-                    fcb       $13
-                    fcb       $00
-                    fcb       $11
-                    fcb       $00
-                    fcb       $0F
-                    fcb       $00
-                    fcb       $0D
-                    fcb       $00
-                    fcb       $0B
-                    fcb       $00
-                    fcb       $09
-                    fcb       $00
-                    fcb       $07
-                    fcc       "c.asm"
-                    fcb       $00
 
+                    * ---- nreloc1: text-relocation count  (each offset patched by +module base)
+                    fdb       $00C4
+
+                    * ---- reloc1: text relocation offsets
+                    fdb       $03A4,$03A2,$03A0,$039E,$039C,$039A,$0398,$03B2
+                    fdb       $03B0,$03AE,$03AC,$03AA,$03A8,$03A6,$03C0,$03BE
+                    fdb       $03BC,$03BA,$03B8,$03B6,$03B4,$03CE,$03CC,$03CA
+                    fdb       $03C8,$03C6,$03C4,$03C2,$032E,$032C,$032A,$0328
+                    fdb       $0326,$03D2,$03D0,$033C,$033A,$0338,$0336,$0334
+                    fdb       $0332,$0330,$034A,$0348,$0346,$0344,$0342,$0340
+                    fdb       $033E,$0358,$0356,$0354,$0352,$0350,$034E,$034C
+                    fdb       $010E,$010A,$0106,$0360,$035E,$035C,$035A,$012A
+                    fdb       $0126,$0122,$011E,$011A,$0116,$0112,$0146,$0142
+                    fdb       $013E,$013A,$0136,$0132,$012E,$0162,$015E,$015A
+                    fdb       $0156,$0152,$014E,$014A,$017E,$017A,$0176,$0172
+                    fdb       $016E,$016A,$0166,$019A,$0196,$0192,$018E,$018A
+                    fdb       $0186,$0182,$01B6,$01B2,$01AE,$01AA,$01A6,$01A2
+                    fdb       $019E,$01D2,$01CE,$01CA,$01C6,$01C2,$01BE,$01BA
+                    fdb       $01EE,$01EA,$01E6,$01E2,$01DE,$01DA,$01D6,$020A
+                    fdb       $0206,$0202,$01FE,$01FA,$01F6,$01F2,$0226,$0222
+                    fdb       $021E,$021A,$0216,$0212,$020E,$0242,$023E,$023A
+                    fdb       $0236,$0232,$022E,$022A,$025E,$025A,$0256,$0252
+                    fdb       $024E,$024A,$0246,$027A,$0276,$0272,$026E,$026A
+                    fdb       $0266,$0262,$0296,$0292,$028E,$028A,$0286,$0282
+                    fdb       $027E,$02B2,$02AE,$02AA,$02A6,$02A2,$029E,$029A
+                    fdb       $02CE,$02CA,$02C6,$02C2,$02BE,$02BA,$02B6,$02EA
+                    fdb       $02E6,$02E2,$02DE,$02DA,$02D6,$02D2,$0306,$0302
+                    fdb       $02FE,$02FA,$02F6,$02F2,$02EE,$0322,$031E,$031A
+                    fdb       $0316,$0312,$030E,$030A
+
+                    * ---- nreloc2: data-relocation count  (each offset patched by +work base)
+                    fdb       $0012
+
+                    * ---- reloc2: data relocation offsets
+                    fdb       $0381,$03F6,$03F4,$0484,$0384,$0393,$0396,$0387
+                    fdb       $0390,$038A,$038D,$0013,$0011,$000F,$000D,$000B
+                    fdb       $0009,$0007
+
+                    * ---- name: trailing module-name string
+                    fcc       /c.asm/
+                    fcb       C$NULL
                     emod
 eom                 equ       *
                     end
