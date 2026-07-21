@@ -83,7 +83,11 @@ FreeCount           rmb       $2
 size                equ       .
 
 name                equ       *
-                    fcs       /cc1/
+                    ifne       CC2
+                    fcs        /cc2/
+                    else
+                    fcs        /cc1/
+                    endc
                     fcb       edition
 
 * --- shared C runtime startup (see cstart.i) ---
@@ -600,6 +604,88 @@ DefsLoopTest        ldd       $04,s     load define index
                     pshs      x         push destination
                     lbsr      StrCopy   copy prep output to pass1 input
                     leas      4,s        clean up arguments
+                    ifne       CC2
+                    * ------------------------------------------------------------------
+                    * cc2: compile in a single pass with c.comp, which reads the
+                    * preprocessor output and emits the .a assembler source directly
+                    * (the combined job of c.pass1 then c.pass2).  c.comp accepts only
+                    * -s, -p and -o=, so no -e is passed.
+                    * ------------------------------------------------------------------
+                    leax       EchoComp,pcr point at c.comp echo header
+                    pshs       x         push string
+                    lbsr       PrintTrace append c.comp echo line
+                    leas       2,s       clean up argument
+                    leax       PhaseComp,pcr point at "C.COMP "
+                    pshs       x         push command
+                    lbsr       PrintTrace append c.comp command
+                    leas       2,s       clean up argument
+                    leax       Pass1InBuf,y point at prep output name
+                    pshs       x         push name
+                    lbsr       PrintTrace append c.comp input file
+                    leas       2,s       clean up argument
+                    ldd        GlbVar0007 load strip flag
+                    beq        CompCheckProf skip if not set
+                    leax       OptPass1S,pcr point at " -s " option
+                    pshs       x         push option
+                    lbsr       PrintTrace append strip option
+                    leas       2,s       clean up argument
+CompCheckProf       ldd        GlbOptP   load profile flag
+                    beq        CompSelectOut skip if not set
+                    leax       OptPass1P,pcr point at " -p " option
+                    pshs       x         push option
+                    lbsr       PrintTrace append profile option
+                    leas       2,s       clean up argument
+CompSelectOut       ldd        GlbVar000D load assemble-only flag
+                    beq        CompAppendA use default output base
+                    ldd        GlbVar0003 load output-name-given flag
+                    beq        CompUseInput use input name if none given
+                    leax       FValBuf,y point at output name
+                    pshs       x         push source
+                    leax       PrepOutBuf,y point at scratch buffer
+                    pshs       x         push destination
+                    lbsr       StrCopy   copy output name to scratch
+                    bra        CompEmitOut continue with output
+CompUseInput        ldd        $08,s     load file index
+                    aslb                 scale index high
+                    rola                 scale to word offset
+                    leax       FilePtrArray,y point at filename array
+                    leax       d,x       index entry
+                    ldd        ,x        load source filename pointer
+                    pshs       d         push source
+                    leax       PrepOutBuf,y point at scratch buffer
+                    pshs       x         push destination
+                    lbsr       StrCopy   copy input name to scratch
+                    leas       4,s       clean up arguments
+CompAppendA         ldd        #$0061    character 'a'
+                    pshs       d         push suffix char
+                    leax       PrepOutBuf,y point at scratch buffer
+                    pshs       x         push buffer
+                    lbsr       SetFileSuffix append 'a' suffix
+CompEmitOut         leas       4,s       clean up arguments
+                    leax       OptPass2Out,pcr point at " -o=" option
+                    pshs       x         push option
+                    lbsr       PrintTrace append output option
+                    leas       2,s       clean up argument
+                    leax       PrepOutBuf,y point at output name
+                    pshs       x         push name
+                    lbsr       PrintTrace append output file
+                    leas       2,s       clean up argument
+                    ldd        GlbFlag13 load keep-intermediate flag
+                    bne        CompFinish keep the prep output
+                    leax       CmdDelPass1,pcr point at "del " command
+                    pshs       x         push command
+                    lbsr       PrintTrace append delete of prep output
+                    leas       2,s       clean up argument
+                    leax       Pass1InBuf,y point at prep output name
+                    pshs       x         push name
+                    lbsr       PrintTrace append name to delete
+                    leas       2,s       clean up argument
+CompFinish          leax       CrNulPass2,pcr point at newline terminator
+                    pshs       x         push terminator
+                    lbsr       PrintTrace finish the compile chain line
+                    leas       2,s       clean up argument
+                    bra        EmitAsmStep continue to assembler step
+                    else
                     leax      EchoPass1,pcr point at pass1 echo header
                     pshs      x         push string
                     lbsr      PrintTrace append pass1 echo line
@@ -771,6 +857,7 @@ FinishCChain        leax      CrNulPass2,pcr point at newline terminator
                     lbsr      PrintTrace finish the compile chain line
                     leas      2,s        clean up argument
                     bra       EmitAsmStep continue to assembler step
+                    endc
 
 NotCFile            clra                clear is-C flag high
                     clrb                clear is-C flag low
@@ -1394,6 +1481,15 @@ CmdDelPass2         fcb       C$CR
 StrDelSpc           fcc       / /
                     fcb       C$NULL
 CrNulPass2          fcb       C$CR,C$NULL
+                    ifne       CC2
+EchoComp            fcb        C$CR
+                    fcc        /x/
+                    fcb        C$CR
+                    fcc        /echo c.comp:/
+                    fcb        C$CR,C$NULL
+PhaseComp           fcc        /C.COMP /
+                    fcb        C$NULL
+                    endc
 EchoOpt             fcc       /echo c.opt:/
                     fcb       C$CR,C$NULL
 PhaseOpt            fcc       /C.OPT /

@@ -1,7 +1,7 @@
 include $(NITROS9DIR)/rules.mak
 
 DSK		= CCompiler.dsk
-CMDS		= cc1 c.prep c.pass1 c.pass2 c.comp c.opt c.asm c_asm c.link make
+CMDS		= cc1 cc2 c.prep c.pass1 c.pass2 c.comp c.opt c.asm c_asm c.link make
 HEADERS		= $(wildcard defs/*.h)
 LIBRARIES	= $(wildcard lib/*.l lib/*.r)
 C_SOURCES	= $(wildcard sources/*.c)
@@ -12,14 +12,14 @@ SYS_SOURCES	= $(wildcard sources/*.sys)
 # is pulled into each with "use lib/cstart.asm" (make keeps its own variant
 # via cstart_rev.asm; c.asm is a copy of c_asm).  Validate the lib first, and
 # rebuild the sharing modules when cstart.asm changes.
-CSTARTMODS	= cc1 c.prep c.pass1 c.pass2 c.comp c.opt c_asm c.link
+CSTARTMODS	= cc1 cc2 c.prep c.pass1 c.pass2 c.comp c.opt c_asm c.link
 
 # Modules that share the full-width runtime multiply from lib/imul.asm
 # (all of them carry the same MulFull the C runtime falls into).
-IMULMODS	= cc1 c.prep c.pass1 c.pass2 c.comp c.opt c_asm c.link make
+IMULMODS	= cc1 cc2 c.prep c.pass1 c.pass2 c.comp c.opt c_asm c.link make
 
 # Modules that share the word shift runtime from lib/shift.asm.
-SHIFTMODS	= cc1 c.prep c.pass1 c.pass2 c.comp c.opt c_asm c.link make
+SHIFTMODS	= cc1 cc2 c.prep c.pass1 c.pass2 c.comp c.opt c_asm c.link make
 
 .PHONY: all banner clean lib
 
@@ -48,6 +48,11 @@ clean:
 
 c.asm: c_asm
 	$(CP) $< $@
+
+# cc2 is cc1 built for the single-pass c.comp front end (it invokes c.comp
+# instead of c.pass1 + c.pass2); selected in cc1.asm with -DCC2=1.
+cc2: cc1.asm
+	$(AS) $(AFLAGS) -DCC2=1 $< $(ASOUT)$@
 
 $(DSK): Makefile $(CMDS) $(HEADERS) $(LIBRARIES) $(C_SOURCES) \
 	$(ASM_SOURCES) $(SYS_SOURCES)
