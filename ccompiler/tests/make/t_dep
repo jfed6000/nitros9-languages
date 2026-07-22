@@ -1,0 +1,8 @@
+* Test C: dependency chain + multiple commands
+prog: one two
+	echo linking prog
+	echo done
+one:
+	echo make one
+two:
+	echo make two

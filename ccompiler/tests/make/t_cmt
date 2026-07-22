@@ -1,0 +1,5 @@
+# hash comment
+* star comment
+
+all:
+	echo after comments
