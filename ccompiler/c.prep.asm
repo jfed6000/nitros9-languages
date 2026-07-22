@@ -93,7 +93,7 @@ LeftJustified       rmb       $2
 PadCharacter        rmb       $2
 FitsFreePool        rmb       $2
 HandlerPointer      rmb       $2
-                    rmb       $1180     remaining data, bss and heap
+HeapStart           rmb       $1180     remaining data, bss and heap
 size                equ       .
 
 name                equ       *
@@ -101,9 +101,9 @@ name                equ       *
                     fcb       edition
 
 * --- shared C runtime startup (see lib/cstart.asm) ---
-RTBASE              equ       $017E     runtime-globals block base in the data area
-DATAEND             equ       $058A     end of static data / heap start / stack limit
-HDRADV              equ       $001C     advance to where the non-DP data starts
+RTBASE              equ       SavedArgv runtime-globals block base in the data area
+DATAEND             equ       HeapStart end of static data / heap start / stack limit
+HDRADV              equ       OptEqPtr  advance to where the non-DP data starts
                     use       lib/cstart.asm
 
 ErrorCleanup        pshs      u         save U
@@ -131,11 +131,11 @@ ProcessArg          ldx       $0A,s     X = argv cursor
                     leax      $02,x     advance to next argv entry
                     stx       $0A,s     save updated cursor
                     ldb       [,x]      B = first char of the argument
-                    cmpb      #$2B      leading '+'?
+                    cmpb      #'+       leading '+'?
                     beq       OptionLetter yes -> option
                     ldx       $0A,s     reload argv cursor
                     ldb       [,x]      B = first char again
-                    cmpb      #$2D      leading '-'?
+                    cmpb      #'-       leading '-'?
                     lbne      ProcessFileArg no -> treat as a filename
 OptionLetter        ldu       [<$0A,s]  U -> the option argument
                     leau      PoolPtr,u skip the +/- sign
@@ -150,7 +150,7 @@ SetLineFlag         ldd       #$0001    D = 1
 
 SetErrPath          leau      PoolPtr,u skip the 'E'/'e' letter
                     ldb       ,u        B = next char
-                    cmpb      #$3D      is it '='?
+                    cmpb      #'=       is it '='?
                     lbne      NextArgLoop no -> back to arg loop
                     leax      PoolPtr,u X -> value after '='
                     stx       >OptEqPtr,y  save the error-output path
@@ -166,7 +166,7 @@ ParseDefine         leau      PoolPtr,u skip the 'D' letter
                     andb      #$06      is it a letter?
                     bne       DefNameStart yes -> valid name _start
                     ldb       ,u        B = char again
-                    cmpb      #$5F      underscore?
+                    cmpb      #'_       underscore?
                     lbne      BadDefineErr no -> bad define name
 DefNameStart        stu       $02,s     save name _start pointer
                     bra       DefNameTest begin scanning the name
@@ -183,7 +183,7 @@ DefNameTest         ldb       [<$02,s]  B = char at scan point
                     andb      #$0E      identifier char?
                     bne       DefNameLoop yes -> keep scanning
                     ldb       [<$02,s]  B = char at scan point
-                    cmpb      #$5F      underscore?
+                    cmpb      #'_       underscore?
                     lbeq      DefNameLoop yes -> keep scanning
                     ldb       [<$02,s]  B = terminating char
                     sex                 sign-extend
@@ -546,7 +546,7 @@ ProcessLine         clra                clear A
                     lbsr      NextChar  advance to first char
                     leas      2,s        drop flag
                     ldb       <CurChar  B = current char
-                    cmpb      #$23      '#' directive?
+                    cmpb      #'#       '#' directive?
                     lbeq      HandleDirective handle the directive
                     ldd       >OutputEnabled,y  output enabled?
                     beq       SkipLine  disabled -> skip line
@@ -632,7 +632,7 @@ ChkIdentChar        ldb       <CurChar  B = current char
                     andb      #$06      letter?
                     bne       MacroExpand identifier -> macro lookup
                     ldb       <CurChar  B = current char
-                    cmpb      #$5F      underscore?
+                    cmpb      #'_       underscore?
                     lbne      CopyNumber not a name -> number/other
 MacroExpand         leax      <$18,s    X -> identifier scratch
                     pshs      x         push scratch
@@ -658,7 +658,7 @@ SetSpaceFlag        std       ,s        record space-before-paren flag
                     ldu       $02,x     U = macro replacement text
                     lbsr      SkipSpaces skip spaces after the name
                     ldb       <CurChar  B = current input char
-                    cmpb      #$28      is it an open paren
+                    cmpb      #'(       is it an open paren
                     lbne      ExpandAndEmit2 no paren means emit body plain
                     ldx       >$010C,s  X = macro table entry
                     ldd       $04,x     function-like flag
@@ -719,7 +719,7 @@ ArgQuote            ldb       <CurChar  quote char
                     sex                 sign extend to word
                     std       ,s        remember the opening quote
 ArgStrLoop          ldb       <CurChar  current char
-                    cmpb      #$5C      is it a backslash escape
+                    cmpb      #'\       is it a backslash escape
                     bne       ArgStrNext not escaped
                     clra                clear get-char flag
                     clrb                clear get-char flag
@@ -781,7 +781,7 @@ StoreArgLen         ldd       >$0126,s  argument index
 ArgListLoop         ldb       <CurChar  current char
                     beq       SetGetNext end means do substitution
                     ldb       <CurChar  current char
-                    cmpb      #$29      is it the close paren
+                    cmpb      #')       is it the close paren
                     lbne      CollectArg no so collect another arg
 SetGetNext          ldd       #$0001    one for get-next-char flag
                     pshs      b,a       push the flag
@@ -918,7 +918,7 @@ CopyIdentLoop       ldb       ,u        peek next identifier char
                     lbra      NextToken back to the token loop
 
 CopyNumber          ldb       <CurChar  current char
-                    cmpb      #$30      leading zero of a constant
+                    cmpb      #'0       leading zero of a constant
                     bne       CopyOneChar not zero copy one char
                     ldb       <CurChar  the zero digit
                     ldx       <ExpandPtr output pointer
@@ -1029,7 +1029,7 @@ HandleDefUndef      pshs      u         save caller u
                     andb      #$06      is it a letter?
                     bne       GotDefName yes, read the name
                     ldb       <CurChar  b = current char
-                    cmpb      #$5F      underscore?
+                    cmpb      #'_       underscore?
                     bne       BadDefName no, not an identifier - error
 GotDefName          leax      ,s        x -> name buffer
                     pshs      x         push buffer pointer
@@ -1126,7 +1126,7 @@ ParseMacroDef       clra                clear param count high
                     clrb                clear param count low
                     std       ,s        param count = 0
                     ldb       <CurChar  b = current char
-                    cmpb      #$28      '(' function-like macro?
+                    cmpb      #'(       '(' function-like macro?
                     lbne      BodyStart no, object-like body
                     ldd       #$0001    flag value
                     ldx       >$0125,s  x = entry
@@ -1142,7 +1142,7 @@ ParamLoop           lbsr      SkipSpaces skip spaces
                     ldb       <CurChar  b = current char
                     lbeq      ParamsDone end of input - done
                     ldb       <CurChar  b = current char
-                    cmpb      #$29      ')' end of params?
+                    cmpb      #')       ')' end of params?
                     lbeq      ParamsDone yes, done
                     ldd       ,s        d = param count
                     lslb                word offset = count*2
@@ -1159,7 +1159,7 @@ ParamLoop           lbsr      SkipSpaces skip spaces
                     andb      #$06      is it a letter?
                     bne       ReadParam yes, read the param name
                     ldb       <CurChar  b = current char
-                    cmpb      #$5F      underscore?
+                    cmpb      #'_       underscore?
                     bne       BadParamErr no, bad parameter
 ReadParam           leax      <$16,s    x -> token buffer
                     pshs      x         push buffer
@@ -1178,7 +1178,7 @@ CopyParamLoop       ldx       >$011F,s  x = read pointer
                     std       ,s        store new count
                     lbsr      SkipSpaces skip spaces
                     ldb       <CurChar  b = current char
-                    cmpb      #$2C      comma between params?
+                    cmpb      #',       comma between params?
                     bne       NextParam no, jump to loop
                     ldd       #$0001    request a char read
                     pshs      b,a       push arg
@@ -1219,7 +1219,7 @@ BodyIdent           ldb       <CurChar  b = current char
                     andb      #$06      is it a letter?
                     bne       ReadBodyWord yes, read the word
                     ldb       <CurChar  b = current char
-                    cmpb      #$5F      underscore?
+                    cmpb      #'_       underscore?
                     lbne      BodyNumber no, check for a number
 ReadBodyWord        leax      <$16,s    x -> word buffer
                     pshs      x         push buffer
@@ -1277,7 +1277,7 @@ EmitWordLoop        ldx       >$011F,s  x = read pointer
                     lbra      BodyNext  next body char
 
 BodyNumber          ldb       <CurChar  b = current char
-                    cmpb      #$30      leading '0' of a number?
+                    cmpb      #'0       leading '0' of a number?
                     bne       BodyLiteral no, literal char
                     ldb       <CurChar  b = current char
                     sex                 sign extend
@@ -1289,10 +1289,10 @@ BodyNumber          ldb       <CurChar  b = current char
                     lbsr      NextChar  get next char
                     leas      2,s        drop arg
                     ldb       <CurChar  b = current char
-                    cmpb      #$78      'x' hex prefix?
+                    cmpb      #'x       'x' hex prefix?
                     beq       CopyHexLoop2 yes, copy hex digits
                     ldb       <CurChar  b = current char
-                    cmpb      #$58      'X' hex prefix?
+                    cmpb      #'X       'X' hex prefix?
                     bne       BodyNext  no, resume body
 CopyHexLoop2        ldb       <CurChar  b = current char
                     sex                 sign extend
@@ -1642,7 +1642,7 @@ IfChkIdent          lbsr      SkipWsComment advance to next line
                     andb      #$06      is it a letter?
                     bne       IfEvalName yes, valid macro name
                     ldb       <CurChar  current char
-                    cmpb      #$5F      underscore?
+                    cmpb      #'_       underscore?
                     beq       IfEvalName yes, valid macro name
                     leax      >IllegalIfMacroMsg,pcr "missing name" error
 IfErr               pshs      x         push message pointer
@@ -1759,7 +1759,7 @@ CopyStringLit2      pshs      u         save U for literal copy
 CopyStrLoop         ldb       <CurChar  copy the current char
                     stb       ,u+       into the buffer
                     ldb       <CurChar  reload current char
-                    cmpb      #$5C      backslash escape?
+                    cmpb      #'\       backslash escape?
                     bne       CopyStrNext no -> normal handling
                     clra                yes, take next char verbatim
                     clrb                D = 0
@@ -1815,7 +1815,7 @@ IdentCheck          std       ,s        save the length
                     andb      #$0E      alphanumeric?
                     bne       IdentLoop yes -> keep collecting
                     ldb       <CurChar  current char
-                    cmpb      #$5F      underscore?
+                    cmpb      #'_       underscore?
                     lbeq      IdentLoop also an identifier char
 IdentTerminate      clra                terminate identifier
                     clrb                D = 0
@@ -1835,7 +1835,7 @@ IdentSkipCheck      ldb       <CurChar  classify current char
                     andb      #$0E      alphanumeric?
                     bne       IdentSkipLoop keep skipping
                     ldb       <CurChar  current char
-                    cmpb      #$5F      underscore?
+                    cmpb      #'_       underscore?
                     lbeq      IdentSkipLoop skip it too
                     puls      pc,u,x    return
 
@@ -1987,11 +1987,11 @@ CommentAdvance      ldd       <InPtr    advance past comment char
 CommentStorePtr     std       <InPtr    store input pointer
 CommentReadChar     ldb       [>InPtr,y] read next comment char
                     stb       $02,s     save it
-                    cmpb      #$2A      possible comment end '*'?
+                    cmpb      #'*       possible comment end '*'?
                     bne       CommentScan no -> keep scanning
                     ldx       <InPtr    peek char after '*'
                     ldb       $01,x     next char
-                    cmpb      #$2F      closing '/'?
+                    cmpb      #'/       closing '/'?
                     lbne      CommentScan no -> keep scanning
                     ldd       <InPtr    skip past the '*/'
                     addd      #$0002    two chars
@@ -2542,11 +2542,11 @@ StreamGotSlot       stu       -$02,s    remember slot
                     std       InPtr,u   store fd in stream
                     ldx       $06,s     X = mode string
                     ldb       $01,x     second char
-                    cmpb      #$2B      '+' update mode?
+                    cmpb      #'+       '+' update mode?
                     beq       SetRdWrMode set read and write
                     ldx       $06,s     X = mode string
                     ldb       $02,x     third char
-                    cmpb      #$2B      '+' update mode?
+                    cmpb      #'+       '+' update mode?
                     bne       ChkModeFirst no plus so pick one mode
 SetRdWrMode         ldd       ExpandPtr,u load flags
                     orb       #$03      set read and write flags
@@ -2555,10 +2555,10 @@ SetRdWrMode         ldd       ExpandPtr,u load flags
 ChkModeFirst        ldd       ExpandPtr,u load flags
                     pshs      b,a       save flags
                     ldb       [<$08,s]  first mode char
-                    cmpb      #$72      'r' read?
+                    cmpb      #'r       'r' read?
                     beq       SetReadMode select read
                     ldb       [<$08,s]  first mode char
-                    cmpb      #$64      'd' device?
+                    cmpb      #'d       'd' device?
                     bne       SetWriteMode not read so select write
 SetReadMode         ldd       #$0001    read flag
                     bra       MergeModeFlags merge it in
@@ -2592,7 +2592,7 @@ OpenFileByMode      pshs      u         save caller U
 
 ChkThirdPlus        ldx       $0A,s     X = mode string
                     ldb       $02,x     third char
-                    cmpb      #$2B      '+' update?
+                    cmpb      #'+       '+' update?
                     bne       SetAccessWrite no plus after x
                     ldd       #$0007    access mode 7
                     bra       StoreAccessMode store it
@@ -2789,7 +2789,7 @@ EmitLiteral         ldb       $08,s     B = current literal char
                     leas      2,s        drop the char argument
 FormatLoop          ldb       ,u+       fetch the next format character
                     stb       $08,s     save the current char
-                    cmpb      #$25      '%' conversion introducer?
+                    cmpb      #'%       '%' conversion introducer?
                     bne       EmitLiteral no, emit it literally
                     ldb       ,u+       fetch the char after '%'
                     stb       $08,s     save it
@@ -2798,7 +2798,7 @@ FormatLoop          ldb       ,u+       fetch the next format character
                     std       $02,s     clear the precision
                     std       $06,s     clear the width
                     ldb       $08,s     B = char after '%'
-                    cmpb      #$2D      '-' left-justify flag?
+                    cmpb      #'-       '-' left-justify flag?
                     bne       NoLeftFlag no, skip the flag
                     ldd       #$0001    flag value = 1
                     std       >LeftJustified,y  set the left-justify flag
@@ -2810,7 +2810,7 @@ NoLeftFlag          clra                A = 0
                     clrb                D = 0
                     std       >LeftJustified,y  clear the left-justify flag
 ChkZeroFlag         ldb       $08,s     B = current char
-                    cmpb      #$30      '0' zero-pad flag?
+                    cmpb      #'0       '0' zero-pad flag?
                     bne       FillSpace no, use space fill
                     ldd       #$0030    fill character = '0'
                     bra       SetFill   store the pad character
@@ -2840,7 +2840,7 @@ WidthLoop           ldb       $08,s     B = current char
                     andb      #$08      is-digit bit set?
                     bne       WidthDigit yes, keep accumulating width
                     ldb       $08,s     B = current char
-                    cmpb      #$2E      '.' precision separator?
+                    cmpb      #'.       '.' precision separator?
                     bne       NoPrec    no, precision stays unset
                     ldd       #$0001    mark precision present
                     std       $04,s     set the precision flag
@@ -3983,7 +3983,7 @@ SkipBlanks          ldb       ,u+       fetch a character
                     cmpb      #$09      a tab?
                     lbeq      SkipBlanks skip it
                     ldb       ,s        reload the char
-                    cmpb      #$2D      leading minus?
+                    cmpb      #'-       leading minus?
                     bne       SignPositive no
                     ldd       #$0001    remember negative
                     bra       StoreSign store the sign flag
@@ -3992,10 +3992,10 @@ SignPositive        clra                positive
                     clrb
 StoreSign           std       $03,s     save the sign flag
                     ldb       ,s        reload the char
-                    cmpb      #$2D      leading minus?
+                    cmpb      #'-       leading minus?
                     beq       NextParseChar consume it
                     ldb       ,s        reload the char
-                    cmpb      #$2B      leading plus?
+                    cmpb      #'+       leading plus?
                     bne       DigitTest no, _start scanning digits
                     bra       NextParseChar consume the plus
 
@@ -4045,7 +4045,7 @@ GetDevStat          lda       $05,s     A = path number
                     beq       GetStatXU GetStt returning X and U
                     cmpb      #$05      code 5?
                     beq       GetStatXU GetStt returning X and U
-                    ldb       #$D0      unknown code error
+                    ldb       #E$UnkSvc unknown code error
                     lbra      ReturnErr report the error
 
 GetStatXU           pshs      u         save caller U
@@ -4071,7 +4071,7 @@ DoGetStt            os9       I$GetStt
                     beq       DoSetStt  code 0 -> plain setstt
                     cmpb      #$02      code 2?
                     beq       SetSttWithU code 2 -> setstt with U param
-                    ldb       #$D0      bad code -> error $D0
+                    ldb       #E$UnkSvc bad code -> error $D0
                     lbra      ReturnErr return error
 
 DoSetStt            ldx       $06,s     X = status parameter
@@ -4116,7 +4116,7 @@ CreateFile          ldx       $02,s     create: X = pathname
 ReturnPathNum       tfr       a,b       B = path number
                     clra                D = path number
                     rts                 return path number
-CreateExisting      cmpb      #$DA      already exists (E$CEF)?
+CreateExisting      cmpb      #E$CEF    already exists (E$CEF)?
                     lbne      ReturnErr other error -> errno
                     lda       $05,s     A = access mode
                     bita      #$80      exclusive create requested?
@@ -4154,7 +4154,7 @@ ReadFile            pshs      y         save Y
                     pshs      y         save count for result
                     os9       I$Read
 ReadResult          bcc       ReadDone  read ok -> return bytes read
-                    cmpb      #$D3      end of file (E$EOF)?
+                    cmpb      #E$EOF    end of file (E$EOF)?
                     bne       ReadErr   real error -> fail
                     clra                end of file -> D = 0
                     clrb                clear low byte
@@ -4206,7 +4206,7 @@ ChkWhence           cmpd      #$0001    SEEK_CUR?
                     beq       SeekCur   go fetch current position
                     cmpd      #$0002    SEEK_END?
                     beq       SeekEnd   go fetch file size
-                    ldb       #$F7      invalid whence -> error $F7
+                    ldb       #E$Seek   invalid whence -> error $F7
 SeekErr             clra                seek error: A=0 so D=errno
                     std       >Errno,y  save errno
                     ldd       #$FFFF    result = -1
@@ -4361,22 +4361,20 @@ ReturnStub          rts                 return (stub)
                     * ============ WorkBlockImage: cstart init/relocation tables ============
 
                     * ---- count1: DP-data length (bytes copied to the DP base)
-WorkBlockImage      fdb       $0001
+WorkBlockImage      fdb       WBIcount2-WBIblock1
 
                     * ---- block1: DP data image  ->  data base
-                    fcb       $00
+WBIblock1           fcb       $00
 
                     * ---- count2: non-DP-data length (bytes copied to base+HDRADV)
-                    fdb       $0162
+WBIcount2           fdb       WBIblk2End-WBIblock2
 
                     * ---- block2: non-DP data image  ->  data base + HDRADV
-                    fcb       $03
-                    fcb       $77       w
+WBIblock2           fdb       StrZero   reloc1 data-to-text pointer to the zero string
                     fcb       $00
                     fcb       $01
                     fdb       10000,1000,100,10 powers of ten
-                    fcb       $00
-                    fcb       $28       (
+WBIptr2             fdb       HDRADV+WBIptr2-WBIblock2 reloc2 data-to-data self pointer
                     fcb       $6C       l
                     fcb       $78       x
                     fcb       $00
@@ -4719,16 +4717,18 @@ CharClassBackslash  fcb       $20
                     fcb       $01
 
                     * ---- nreloc1: text-relocation count  (each offset patched by +module base)
-                    fdb       $0001
+WBIblk2End          fdb       (reloc1End-reloc1Start)/2
 
                     * ---- reloc1: text relocation offsets
-                    fdb       $001C
+reloc1Start         fdb       HDRADV    work offset of the block2-start text pointer
+reloc1End           equ       *
 
                     * ---- nreloc2: data-relocation count  (each offset patched by +work base)
-                    fdb       $0001
+                    fdb       (reloc2End-reloc2Start)/2
 
                     * ---- reloc2: data relocation offsets
-                    fdb       $0028
+reloc2Start         fdb       HDRADV+WBIptr2-WBIblock2 work offset of the data pointer
+reloc2End           equ       *
 
                     * ---- name: trailing module-name string
                     fcc       /c.prep/

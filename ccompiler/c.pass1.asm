@@ -114,7 +114,7 @@ ResultSignFlag      rmb       $1
 DivideRoutinePointer rmb       $2
 UpdateFreeSpace     rmb       $2
 SignalHandler       rmb       $2
-                    rmb       $780     remaining data, bss and heap
+HeapStart           rmb       $780     remaining data, bss and heap
 size                equ       .
 
 name                equ       *
@@ -122,9 +122,9 @@ name                equ       *
                     fcb       edition
 
 * --- shared C runtime startup (see lib/cstart.asm) ---
-RTBASE              equ       $0284     runtime-globals block base in the data area
-DATAEND             equ       $0813     end of static data / heap start / stack limit
-HDRADV              equ       $0076     advance to where the non-DP data starts
+RTBASE              equ       TableLimit runtime-globals block base in the data area
+DATAEND             equ       HeapStart end of static data / heap start / stack limit
+HDRADV              equ       MsgBuf    advance to where the non-DP data starts
                     use       lib/cstart.asm
 
 AllocNode           pshs      u         save the frame
@@ -4426,7 +4426,7 @@ StmtEofRet          puls      pc,u      restore frame and return
 
 IdentOrLabel        lbsr      SkipWhitespace parse the identifier expression
                     ldb       GlbVar0065 load the following character
-                    cmpb      #$3a      is it a colon
+                    cmpb      #':       is it a colon
                     bne       NotLabelStmt no, treat as an expression
                     lbsr      ParseLabelStmt define the statement label
 LabelDone           leax      ,s        point at the stack
@@ -8755,7 +8755,7 @@ FloatConstAddr      puls      x         recover the constant address
 UseFloatTemp        leax      $06,s     point at the temp buffer
                     tfr       x,d       use the buffer address
 EmitFloatData       pshs      d         push the data pointer
-                    lbsr      $6EB7     emit the float bytes
+                    lbsr      EmitFloatBytes emit the float bytes
                     leas      8,s        drop the arguments
                     bra       EmitCleanup clean up and return
 
@@ -8783,7 +8783,7 @@ DoubleConstAddr     puls      x         recover the constant address
 UseDoubleTemp       leax      $06,s     point at the temp buffer
                     tfr       x,d       use the buffer address
 EmitDoubleData      pshs      d         push the data pointer
-                    lbsr      $6EB7     emit the double bytes
+                    lbsr      EmitFloatBytes emit the double bytes
                     leas      8,s        drop the arguments
                     leas      8,s        release the temp buffer
                     lbra      EmitReturn clean up and return
@@ -8878,7 +8878,7 @@ EmitFloatField      pshs      u         save the caller frame
                     ldd       #$0008    element size eight bytes
                     pshs      d         push element size
                     pshs      u         push the node pointer
-                    lbsr      $6EB7     emit the double value bytes
+                    lbsr      EmitFloatBytes emit the double value bytes
                     leas      8,s        drop the arguments
                     puls      pc,u      restore and return
 
@@ -8957,7 +8957,7 @@ PutLiteralChar      ldb       $08,s     load the current char
                     leas      2,s        drop the argument
 FmtScanLoop         ldb       ,u+       read next format char
                     stb       $08,s     save the current char
-                    cmpb      #$25      is it '%'
+                    cmpb      #'%       is it '%'
                     bne       PutLiteralChar no, output literally
                     ldb       ,u+       read the conversion char
                     stb       $08,s     save it
@@ -8966,7 +8966,7 @@ FmtScanLoop         ldb       ,u+       read next format char
                     std       $02,s     clear the precision
                     std       $06,s     clear the width
                     ldb       $08,s     load the conversion char
-                    cmpb      #$2d      is it the '-' flag
+                    cmpb      #'-       is it the '-' flag
                     bne       NoLeftFlag no left-justify flag
                     ldd       #$0001    flag value one
                     std       GlbVar0011 set left-justify flag
@@ -8978,7 +8978,7 @@ NoLeftFlag          clra                high byte zero
                     clrb                form zero
                     std       GlbVar0011 clear left-justify flag
 CheckZeroFlag       ldb       $08,s     load the char
-                    cmpb      #$30      is it the '0' flag
+                    cmpb      #'0       is it the '0' flag
                     bne       PadSpace  no, use space padding
                     ldd       #$0030    pad character '0'
                     bra       StorePadChar store the pad char
@@ -9007,7 +9007,7 @@ CheckWidthDigit     ldb       $08,s     load the char
                     cmpb      #$6b      is it a digit class
                     beq       WidthDigit yes, accumulate width digit
                     ldb       $08,s     load the char
-                    cmpb      #$2e      is it the '.' precision marker
+                    cmpb      #'.       is it the '.' precision marker
                     bne       NoPrecision no precision given
                     ldd       #$0001    precision-present flag
                     std       $04,s     set the precision flag
@@ -9390,7 +9390,7 @@ PutCharDone         puls      pc,u      return
 
 MsgMinInt           fcc       /-32768/
                     fcb       C$NULL
-                    ldx       $02,s     load pointer to bignum accumulator
+CvtFloatDigits      ldx       $02,s     load pointer to bignum accumulator
                     leas      -8,s       reserve a local copy
                     ldd       $05,x     load the low word
                     aslb                shift left one bit
@@ -9655,7 +9655,7 @@ ChkAndNext          cmpx      #$0026    following ampersand
                     lbra      ClassifyOpExit plain and, done
 
 OpXorAssign         ldb       GlbVar0065 lookahead character
-                    cmpb      #$3d      is it equals
+                    cmpb      #'=       is it equals
                     lbne      ClassifyOpExit no, done
                     ldd       #$005A    opcode for xor-assign
                     std       GlbVar005F set operator opcode
@@ -9687,7 +9687,7 @@ ChkOrNext           cmpx      #$007C    following pipe
                     lbra      ClassifyOpExit plain or, done
 
 OpEqEq              ldb       GlbVar0065 lookahead character
-                    cmpb      #$3d      is it equals
+                    cmpb      #'=       is it equals
                     lbne      ClassifyOpExit no, done
                     ldd       #$005B    opcode for equality
                     std       GlbVar005F set operator opcode
@@ -9696,13 +9696,13 @@ OpEqEq              ldb       GlbVar0065 lookahead character
                     bra       StorePrecExit set precedence and exit
 
 OpNotEq             ldb       GlbVar0065 lookahead character
-                    cmpb      #$3d      is it equals
+                    cmpb      #'=       is it equals
                     lbne      ClassifyOpExit no, done
                     ldd       #$00A2    opcode for not-equal
                     bra       StoreOpAdvance store and set precedence
 
 OpMulDivModAssign   ldb       GlbVar0065 lookahead character
-                    cmpb      #$3d      is it equals
+                    cmpb      #'=       is it equals
                     lbne      ClassifyOpExit no, done
                     ldd       GlbVar005F current operator opcode
                     addd      #$0050    bias to compound-assign form
@@ -9719,7 +9719,7 @@ OpShiftLeft         ldd       #$0056    opcode for shift left
                     std       GlbVar0061 set operator precedence
                     lbsr      NextChar  consume second character
                     ldb       GlbVar0065 new lookahead character
-                    cmpb      #$3d      is it equals
+                    cmpb      #'=       is it equals
                     lbne      ClassifyOpExit plain shift, done
                     ldd       #$00A6    opcode for shift-left-assign
                     std       GlbVar005F set operator opcode
@@ -9748,7 +9748,7 @@ OpShiftRight        ldd       #$0055    opcode for shift right
                     std       GlbVar0061 set operator precedence
                     lbsr      NextChar  consume second character
                     ldb       GlbVar0065 new lookahead character
-                    cmpb      #$3d      is it equals
+                    cmpb      #'=       is it equals
                     lbne      ClassifyOpExit plain shift, done
                     ldd       #$00A5    opcode for shift-right-assign
                     std       GlbVar005F set operator opcode
@@ -10295,12 +10295,12 @@ ScanNumBody         puls      x         recover accumulator data pointer
                     lbra      FloatEntry return existing number
 
 CheckLeadingZero    ldb       GlbVar0065 load current character
-                    cmpb      #$30      is it a leading zero
+                    cmpb      #'0       is it a leading zero
                     lbne      ClassifyNumChar no, parse decimal digits
                     leas      -6,s       reserve extra locals
                     lbsr      NextChar  advance past the zero
                     ldb       GlbVar0065 load next character
-                    cmpb      #$2e      is it a decimal point
+                    cmpb      #'.       is it a decimal point
                     bne       PrepRadix not a dotted number
                     lbsr      NextChar  advance past the point
                     leax      $16,s     point to float result
@@ -10313,10 +10313,10 @@ PrepRadix           leax      $02,s     point to radix buffer
 GotRadixBuf         puls      x         recover radix buffer pointer
                     lbsr      StoreLong reset big-number accumulator
                     ldb       GlbVar0065 load next character
-                    cmpb      #$78      lowercase x means hex
+                    cmpb      #'x       lowercase x means hex
                     beq       ParseHexLiteral yes, parse hex
                     ldb       GlbVar0065 load character
-                    cmpb      #$58      uppercase X means hex
+                    cmpb      #'X       uppercase X means hex
                     lbne      DecNextDigit not hex so parse octal
 ParseHexLiteral     leas      -2,s       reserve local
                     bra       HexNextDigit enter hex scan
@@ -10381,10 +10381,10 @@ DecNextDigit        ldb       GlbVar0065 load current character
 CheckLongSuffix     leax      $02,s     point to result slot
                     stx       ,s        store result pointer
                     ldb       GlbVar0065 load current character
-                    cmpb      #$4C      uppercase L suffix
+                    cmpb      #'L       uppercase L suffix
                     beq       GotLongSuffix yes, long constant
                     ldb       GlbVar0065 load character
-                    cmpb      #$6C      lowercase l suffix
+                    cmpb      #'l       lowercase l suffix
                     bne       StoreIntValue no suffix
 GotLongSuffix       lbsr      NextChar  advance past suffix
                     leax      $16,s     point to long result slot
@@ -10415,7 +10415,7 @@ FloatFracDigit      ldb       GlbVar0065 load current character
                     pshs      d         pass character
                     leax      $0a,s     point to conversion buffer
                     pshs      x         pass it
-                    lbsr      $549C     convert accumulated float digits
+                    lbsr      CvtFloatDigits convert accumulated float digits
                     leas      4,s        drop arguments
                     std       -$02,s    store result
                     bne       ContinueFloat nonzero, continue float
@@ -10428,16 +10428,16 @@ ClassifyNumChar     ldb       GlbVar0065 load current character
                     cmpb      #$6b      class 0x6b is a digit
                     beq       FloatFracDigit yes, accumulate fraction digit
                     ldb       GlbVar0065 load character
-                    cmpb      #$2e      is it a decimal point
+                    cmpb      #'.       is it a decimal point
                     beq       IsFloatLiteral yes, it is a float
                     ldb       GlbVar0065 load character
-                    cmpb      #$65      exponent letter e
+                    cmpb      #'e       exponent letter e
                     beq       IsFloatLiteral yes, it is a float
                     ldb       GlbVar0065 load character
-                    cmpb      #$45      exponent letter E
+                    cmpb      #'E       exponent letter E
                     lbne      TestZeroValue not a float, handle elsewhere
 IsFloatLiteral      ldb       GlbVar0065 load current character
-                    cmpb      #$2e      is it a decimal point
+                    cmpb      #'.       is it a decimal point
                     bne       CheckExponent no decimal point
                     lbsr      NextChar  advance past the point
                     bra       FracDigitTest go accumulate fraction
@@ -10450,7 +10450,7 @@ FloatFracDigit2     ldb       GlbVar0065 load current character
                     pshs      d         pass character
                     leax      $0a,s     point to conversion buffer
                     pshs      x         pass it
-                    lbsr      $549C     convert accumulated float digits
+                    lbsr      CvtFloatDigits convert accumulated float digits
                     leas      4,s        drop arguments
                     std       -$02,s    store result
                     beq       FracDigitCount zero so stop
@@ -10469,22 +10469,22 @@ FracDigitTest       ldb       GlbVar0065 load the current character
                     cmpb      #$6b      is it a digit
                     beq       FloatFracDigit2 loop for the next fraction digit
 CheckExponent       ldb       GlbVar0065 load the current character
-                    cmpb      #$45      is it exponent 'E'
+                    cmpb      #'E       is it exponent 'E'
                     beq       ParseExponent handle the exponent
                     ldb       GlbVar0065 load the current character
-                    cmpb      #$65      is it exponent 'e'
+                    cmpb      #'e       is it exponent 'e'
                     lbne      FinalizeExponent no exponent, finalize the value
 ParseExponent       ldd       #$0001    default exponent sign positive
                     std       $04,s     store the exponent sign
                     lbsr      NextChar  advance past the 'e'
                     ldb       GlbVar0065 load the current character
-                    cmpb      #$2b      is it a plus sign
+                    cmpb      #'+       is it a plus sign
                     bne       CheckExpMinus otherwise check for minus
                     lbsr      NextChar  consume the plus sign
                     bra       ExpDigitInit go read exponent digits
 
 CheckExpMinus       ldb       GlbVar0065 load the current character
-                    cmpb      #$2d      is it a minus sign
+                    cmpb      #'-       is it a minus sign
                     bne       ExpDigitInit no sign present
                     lbsr      NextChar  consume the minus sign
                     clra                clear D
@@ -10559,10 +10559,10 @@ ValueZero           clra                clear D
                     lbra      NumReturn return zero value
 
 CheckLongSuffix2    ldb       GlbVar0065 load the current character
-                    cmpb      #$6C      is it 'l' suffix
+                    cmpb      #'l       is it 'l' suffix
                     beq       LongSuffix handle the long suffix
                     ldb       GlbVar0065 load the current character
-                    cmpb      #$4C      is it 'L' suffix
+                    cmpb      #'L       is it 'L' suffix
                     bne       CheckIntRange no suffix, check int range
 LongSuffix          leas      -2,s       reserve two bytes
                     lbsr      NextChar  consume the suffix
@@ -10604,7 +10604,7 @@ NumReturn           leas      16,s       unwind the stack frame
 ParseCharConst      pshs      u         save frame pointer
                     lbsr      NextChar  advance past the opening quote
                     ldb       GlbVar0065 load the current character
-                    cmpb      #$5C      is it a backslash escape
+                    cmpb      #'\       is it a backslash escape
                     bne       CharConstPlain plain character
                     lbsr      ParseEscape parse the escape sequence
                     std       GlbVar0061 store the character value
@@ -10696,7 +10696,7 @@ StringCharLoop      leax      LineBuffer,y   point at the source buffer end
                     bra       StringTerminate terminate the string
 
 StringEscape        ldb       GlbVar0065 load the current character
-                    cmpb      #$5C      is it a backslash escape
+                    cmpb      #'\       is it a backslash escape
                     bne       StringPlainChar plain character
                     lbsr      ParseEscape parse the escape sequence
                     pshs      d         pass the value as argument
@@ -10929,10 +10929,10 @@ OctalEscapeExit     leas      2,s        drop the local
 
 IsOctalDigit        pshs      u         save frame pointer
                     ldb       $05,s     load the character argument
-                    cmpb      #$37      compare to '7'
+                    cmpb      #'7       compare to '7'
                     bgt       NotDigit  above octal range, not a digit
                     ldb       $05,s     reload the character
-                    cmpb      #$30      compare to '0'
+                    cmpb      #'0       compare to '0'
                     blt       NotDigit  below octal range, not a digit
                     ldd       #$0001    result is true
                     bra       DigitTestRet return
@@ -10952,7 +10952,7 @@ IsHexDigit          pshs      u         save frame pointer
                     cmpd      #$0041    compare to 'A'
                     blt       NotDigit  below hex letters, reject
                     ldb       $05,s     reload the character
-                    cmpb      #$46      compare to 'F'
+                    cmpb      #'F       compare to 'F'
                     bgt       NotDigit  above hex letters, reject
 HexDigitOk          ldb       $05,s     load the character value
                     sex                 extend to word
@@ -11097,7 +11097,7 @@ ReadLineLoop        lbsr      GetSourceLine read the next source line
                     std       GlbVar006A save the line pointer
                     lbeq      LineEof   end of file
                     ldb       [>GlbVar006A,y] load the first character
-                    cmpb      #$23      is it a '#' directive
+                    cmpb      #'#       is it a '#' directive
                     lbne      BumpLineNum not a directive, count line
                     ldx       GlbVar006A reload line pointer
                     ldb       $01,x     load the directive code
@@ -11872,7 +11872,7 @@ ArgLoop             ldx       $06,s     argv pointer
                     stx       $06,s     store advanced argv
                     ldu       ,x        load argument string pointer
                     ldb       ,u        first character
-                    cmpb      #$2d      is it a dash flag
+                    cmpb      #'-       is it a dash flag
                     lbne      InputFileArg no, treat as input file
                     lbra      NextFlag  yes, process flag characters
 
@@ -11896,7 +11896,7 @@ FlagN               ldd       GlbVar0039 load the n counter
 
 FlagO               leau      $01,u     skip past the o letter
                     ldb       ,u        next character
-                    cmpb      #$3d      expect an equals sign
+                    cmpb      #'=       expect an equals sign
                     bne       FlagODone none, flag is complete
                     leax      ModeWStr,pcr write mode string
                     pshs      x         push it
@@ -12070,11 +12070,11 @@ HaveSlot            stu       -$02,s    remember the slot
                     std       $08,u     store it in the slot
                     ldx       $06,s     mode string
                     ldb       $01,x     second character
-                    cmpb      #$2b      is it plus
+                    cmpb      #'+       is it plus
                     beq       ModeReadWrite yes, read-write
                     ldx       $06,s     reload mode string
                     ldb       $02,x     third character
-                    cmpb      #$2b      is it plus
+                    cmpb      #'+       is it plus
                     bne       ModeSingle no, single mode
 ModeReadWrite       ldd       $06,u     current flags
                     orb       #$03      set read-write bits
@@ -12083,10 +12083,10 @@ ModeReadWrite       ldd       $06,u     current flags
 ModeSingle          ldd       $06,u     current flags
                     pshs      d         push them
                     ldb       [$08,s]   mode first character
-                    cmpb      #$72      is it r
+                    cmpb      #'r       is it r
                     beq       ModeReadBit read bit
                     ldb       [$08,s]   reload mode character
-                    cmpb      #$64      is it d
+                    cmpb      #'d       is it d
                     bne       ModeWriteBit no, write bit
 ModeReadBit         ldd       #$0001    read bit
                     bra       ModeCombine combine the flags
@@ -12120,7 +12120,7 @@ OpenFileMode        pshs      u         save the frame
 
 ModeX               ldx       $0a,s     mode string
                     ldb       $02,x     third character
-                    cmpb      #$2b      plus modifier
+                    cmpb      #'+       plus modifier
                     bne       ModeXPlain no, read only
                     ldd       #$0007    read-write-execute perms
                     bra       SetPerm   store the permission
@@ -12325,7 +12325,7 @@ FormatXDone         ldd       $06,s     return the original pointer
 
 FmtDecimal          fcc       /%d/
                     fcb       C$NULL
-                    pshs      u         save u
+EmitFloatBytes      pshs      u         save u
                     ldu       $04,s     load the array pointer argument
                     leas      -4,s       reserve two locals
                     clra                clear high byte of row index
@@ -13301,7 +13301,7 @@ GetStat             lda       $05,s     load the path number
                     beq       GetStatPtr handle with a pointer return
                     cmpb      #$05      selector five
                     beq       GetStatPtr handle with a pointer return
-                    ldb       #$D0      unknown function error
+                    ldb       #E$UnkSvc unknown function error
                     lbra      SysCallErr report the error
 
 GetStatPtr          pshs      u         save u
@@ -13327,7 +13327,7 @@ GetStatCall         os9       I$GetStt  get file status
                     beq       SetStatX  branch on selector value
                     cmpb      #$02      selector two
                     beq       SetStatPtr handle with a pointer parameter
-                    ldb       #$D0      unknown function error
+                    ldb       #E$UnkSvc unknown function error
                     lbra      SysCallErr report the error
 
 SetStatX            ldx       $06,s     load the parameter register
@@ -13376,7 +13376,7 @@ CreateDone          tfr       a,b       return the path number
                     clra                clear the high byte
                     rts                 return
 
-CreateExists        cmpb      #$DA      was it the already-exists error
+CreateExists        cmpb      #E$CEF    was it the already-exists error
                     lbne      SysCallErr report any other error
                     lda       $05,s     reload the mode bits
                     bita      #$80      test the exclusive flag
@@ -13467,7 +13467,7 @@ SeekWhence          cmpd      #$0001    seek from current position
                     beq       SeekFromCur handle seek from current
                     cmpd      #$0002    seek from end
                     beq       SeekFromEnd handle seek from end
-                    ldb       #$F7      bad argument error
+                    ldb       #E$Seek   bad argument error
 SeekErr             clra                clear the high byte
                     std       Errno,y   store the error number
                     ldd       #$FFFF    return failure
@@ -13580,7 +13580,7 @@ GetUserIdOk         tfr       y,d       return the user id
                     bsr       GetUserId get the current user id
                     std       -$02,s    save it
                     beq       SetUserCall allow if super user
-                    ldb       #$D6      permission error
+                    ldb       #E$FNA    permission error
                     bra       GetUserIdErr report the error
 
 SetUserCall         ldy       $04,s     load the new user id
@@ -13634,13 +13634,14 @@ RtsStub             rts                 return to caller
                     * ============ WorkBlockImage: cstart init/relocation tables ============
 
                     * ---- count1: DP-data length (bytes copied to the DP base)
-WorkBlockImage      fdb       $0003
+WorkBlockImage      fdb       WBIcount2-WBIblock1 count1 = length of block1 (DP data)
 
                     * ---- block1: DP data image  ->  data base
-                    fcb       $00,$00,$89
+WBIblock1           fcb       $00
+WBIblk1ptr          fdb       CtypeTab  reloc2 data-to-data pointer to the ctype table
 
                     * ---- count2: non-DP-data length (bytes copied to base+HDRADV)
-                    fdb       $020E
+WBIcount2           fdb       WBIblk2End-WBIblock2 count2 = length of block2 (non-DP data)
 
                     * ---- block2: non-DP data image  ->  data base + HDRADV
 WBIblock2           fcb       $78,$20,$65,$78,$70,$65,$63,$74,$65,$64
@@ -13674,11 +13675,13 @@ CtypeTabImg         fcb       $00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$06,$00,$0E
-                    fcb       $00,$07,$0B,$00,$01,$00,$02,$00
+                    fcb       $00
+WBIptr2             fdb       LineBuffer+$FF reloc2 data-to-data ptr into the line buffer
+                    fcb       $00,$01,$00,$02,$00
                     fcb       $00,$00,$00,$00,$0C,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
-                    fcb       $00,$00,$00,$00,$00,$00,$00,$01
-                    fcb       $9F
+                    fcb       $00,$00,$00,$00,$00,$00,$00
+WBIptr3             fdb       DummyErrorSymbol+$14 reloc2 data-to-data ptr into dummy symbol
 NameBufImg          fcb       $63,$73,$74,$72,$2E,$58,$58,$58,$58,$58
                     fcb       $00
 FileTabImg          fcb       $00,$00,$00,$00,$00,$00,$00
@@ -13711,15 +13714,18 @@ FileTabImg          fcb       $00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00
 
                     * ---- nreloc1: text-relocation count  (each offset patched by +module base)
-                    fdb       $0000
+WBIblk2End          fdb       (reloc1End-reloc1Start)/2 nreloc1 = text-reloc count; marks block2 end
 
                     * ---- reloc1: text relocation offsets
+reloc1Start         equ       *
+reloc1End           equ       *
 
                     * ---- nreloc2: data-relocation count  (each offset patched by +work base)
-                    fdb       $0003
+                    fdb       (reloc2End-reloc2Start)/2 nreloc2 = data-reloc count
 
                     * ---- reloc2: data relocation offsets
-                    fdb       $0001,$0189,$01A7
+reloc2Start         fdb       WBIblk1ptr-WBIblock1,HDRADV+WBIptr2-WBIblock2,HDRADV+WBIptr3-WBIblock2
+reloc2End           equ       *
 
                     * ---- name: trailing module-name string
                     fcc       /c.pass1/

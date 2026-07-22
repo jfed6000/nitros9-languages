@@ -136,7 +136,7 @@ NextArgLoop         ldx       $15,s     load the current argv pointer
                     std       $0C,s     save the current argument
                     tfr       d,x       point x at the argument
                     ldb       ,x        get the first character
-                    cmpb      #$2d      is it an option dash?
+                    cmpb      #'-       is it an option dash?
                     lbne      ProcessFile treat as file if not a dash
                     lbra      NextOptChar process option characters
 
@@ -233,7 +233,7 @@ OptF                ldx       $0C,s     point at the F option argument
                     leax      $01,x     advance past the F
                     stx       $0C,s     save the pointer
                     ldb       ,x        get the next char
-                    cmpb      #$3d      is it an equals sign?
+                    cmpb      #'=       is it an equals sign?
                     lbne      OptHandled done if no value follows
                     ldd       $0C,s     load the argument pointer
                     addd      #$0001    skip past the equals
@@ -252,16 +252,16 @@ OptF                ldx       $0C,s     point at the F option argument
                     lbsr      GetFileSuffix get the value type character
                     leas      2,s        clean up the argument
                     stb       $0e,s     save the type character
-                    cmpb      #$63      is it lowercase c?
+                    cmpb      #'c       is it lowercase c?
                     beq       OptFTypeOk accept the c type
                     ldb       $0e,s     reload the type char
-                    cmpb      #$72      is it lowercase r?
+                    cmpb      #'r       is it lowercase r?
                     beq       OptFTypeOk accept the r type
                     ldb       $0e,s     reload the type char
-                    cmpb      #$43      is it uppercase C?
+                    cmpb      #'C       is it uppercase C?
                     beq       OptFTypeOk accept the C type
                     ldb       $0e,s     reload the type char
-                    cmpb      #$52      is it uppercase R?
+                    cmpb      #'R       is it uppercase R?
                     bne       OptHandled reject an unknown type
 OptFTypeOk          ldb       $0e,s     reload the accepted type
                     sex                 sign extend to a word
@@ -274,7 +274,7 @@ OptFTypeOk          ldb       $0e,s     reload the accepted type
 
 OptLibrary          ldx       $0C,s     point at the L option argument
                     ldb       $01,x     get char after the L
-                    cmpb      #$3d      is it an equals sign?
+                    cmpb      #'=       is it an equals sign?
                     bne       OptHandled done if no value follows
                     ldd       GlbLibCount load the library count
                     cmpd      #$0004    reached maximum libraries?
@@ -511,13 +511,13 @@ EmitFileCmds        leax      StrEchoQuote,pcr point at "echo '" prefix
                     leax      FileTypeArray,y   point at file-type array
                     leax      d,x       index the entry
                     ldb       ,x        load this file's type char
-                    cmpb      #$43      is it uppercase C
+                    cmpb      #'C       is it uppercase C
                     beq       EmitCPrepCmd compile as C source
                     ldd       $08,s     reload file index
                     leax      FileTypeArray,y   file-type array
                     leax      d,x       index entry
                     ldb       ,x        load type char
-                    cmpb      #$63      is it lowercase c
+                    cmpb      #'c       is it lowercase c
                     lbne      NotCFile  not C, handle other file type
 EmitCPrepCmd        ldd       #$0001    mark this as a C file
                     std       ,s        store is-C flag
@@ -868,25 +868,25 @@ EmitAsmStep         ldd       GlbVar000D load assemble-only flag
                     leax      FileTypeArray,y   point at file-type array
                     leax      d,x       index entry
                     ldb       ,x        load type char
-                    cmpb      #$52      is it uppercase R
+                    cmpb      #'R       is it uppercase R
                     lbeq      AfterOutEcho relocatable, skip assembly
                     ldd       $08,s     reload file index
                     leax      FileTypeArray,y   file-type array
                     leax      d,x       index entry
                     ldb       ,x        load type char
-                    cmpb      #$72      is it lowercase r
+                    cmpb      #'r       is it lowercase r
                     lbeq      AfterOutEcho relocatable, skip assembly
                     ldd       $08,s     reload file index
                     leax      FileTypeArray,y   file-type array
                     leax      d,x       index entry
                     ldb       ,x        load type char
-                    cmpb      #$41      is it uppercase A
+                    cmpb      #'A       is it uppercase A
                     beq       AsmUseInput assembly source, use input
                     ldd       $08,s     reload file index
                     leax      FileTypeArray,y   file-type array
                     leax      d,x       index entry
                     ldb       ,x        load type char
-                    cmpb      #$61      is it lowercase a
+                    cmpb      #'a       is it lowercase a
                     bne       AsmUseTemp otherwise use temp name
 AsmUseInput         ldd       $08,s     load file index
                     aslb                scale index high
@@ -1322,7 +1322,7 @@ SetFileSuffix       pshs      u         save caller frame pointer
 SuffixScanLoop      ldb       ,u+       read next character
                     bne       SuffixScanLoop loop to end of string
                     ldb       -$03,u    load third-from-last char
-                    cmpb      #$2e      is it a dot
+                    cmpb      #'.       is it a dot
                     beq       SuffixDotFound branch if suffix present
                     puls      pc,u      return with no change
 
@@ -1347,7 +1347,7 @@ ResetNameLen        clra                zero high byte
                     bra       CountNameStore reset the length counter
 
 CountNameLoop       ldb       ,s        load current character
-                    cmpb      #$2f      is it a slash
+                    cmpb      #'/       is it a slash
                     beq       ResetNameLen reset counter on slash
                     ldd       $01,s     load length counter
                     addd      #$0001    increment the counter
@@ -1362,7 +1362,7 @@ CountNameStore      std       $01,s     store the length counter
                     cmpd      #$0002    compare against minimum
                     ble       NoValidSuffix reject if too short
                     ldb       -$03,u    load third-from-last char
-                    cmpb      #$2e      is it a dot
+                    cmpb      #'.       is it a dot
                     bne       NoValidSuffix reject if no dot
                     ldb       -$02,u    load the suffix character
                     sex                 sign extend to word
@@ -1627,11 +1627,11 @@ AddFileHaveSlot     stu       -$02,s    save the entry pointer
                     std       $08,u     store type into entry
                     ldx       $06,s     get name pointer
                     ldb       $01,x     read second name character
-                    cmpb      #$2b      is it a '+'
+                    cmpb      #'+       is it a '+'
                     beq       AddFileSetBoth handle the '+' flag
                     ldx       $06,s     reload name pointer
                     ldb       $02,x     read third name character
-                    cmpb      #$2b      is it a '+'
+                    cmpb      #'+       is it a '+'
                     bne       AddFileParseMode no plus, parse mode character
 AddFileSetBoth      ldd       $06,u     load entry flags
                     orb       #$03      set both in-use bits
@@ -1640,10 +1640,10 @@ AddFileSetBoth      ldd       $06,u     load entry flags
 AddFileParseMode    ldd       $06,u     load entry flags
                     pshs      d         save flags on stack
                     ldb       [$08,s]   read first name character indirectly
-                    cmpb      #$72      is it 'r'
+                    cmpb      #'r       is it 'r'
                     beq       AddFileFlag1 read/delete flag value
                     ldb       [$08,s]   read the character again
-                    cmpb      #$64      is it 'd'
+                    cmpb      #'d       is it 'd'
                     bne       AddFileFlag2 default flag value
 AddFileFlag1        ldd       #$0001    set flag bit 0
                     bra       AddFileMergeFlags merge with saved flags
@@ -1677,7 +1677,7 @@ OpenFileByMode      pshs      u         save u, enter OpenFileByMode
 
 OpenModeExecPlus    ldx       $0a,s     reload mode string
                     ldb       $02,x     read third mode character
-                    cmpb      #$2b      is it a '+'
+                    cmpb      #'+       is it a '+'
                     bne       OpenModeExec no plus, plain exec flags
                     ldd       #$0007    update and create flags
                     bra       OpenModeSaveFlags save the open flags
@@ -1901,7 +1901,7 @@ PutLiteral          ldb       $08,s     reload current format char
                     leas      2,s        drop the char argument
 FormatLoop          ldb       ,u+       fetch next format char
                     stb       $08,s     save the current char
-                    cmpb      #$25      is it a percent sign
+                    cmpb      #'%       is it a percent sign
                     bne       PutLiteral no, output it literally
                     ldb       ,u+       fetch the char after percent
                     stb       $08,s     save the conversion char
@@ -1910,7 +1910,7 @@ FormatLoop          ldb       ,u+       fetch next format char
                     std       $02,s     clear the precision field
                     std       $06,s     clear the width field
                     ldb       $08,s     reload the conversion char
-                    cmpb      #$2d      is it the dash flag
+                    cmpb      #'-       is it the dash flag
                     bne       NoLeftJustify no, default justification
                     ldd       #$0001    left-justify flag value
                     std       LeftJustFlag,y   set the left-justify flag
@@ -1922,7 +1922,7 @@ NoLeftJustify       clra                clear the left-justify flag
                     clrb                clear the left-justify flag
                     std       LeftJustFlag,y   store cleared left-justify flag
 CheckZeroPad        ldb       $08,s     load the current char
-                    cmpb      #$30      is it the zero pad flag
+                    cmpb      #'0       is it the zero pad flag
                     bne       PadSpace  no, use space padding
                     ldd       #$0030    pad character is zero
                     bra       SetPadChar store the pad character
@@ -1952,7 +1952,7 @@ WidthTestDigit      ldb       $08,s     load the current char
                     andb      #$08      test the digit class bit
                     bne       WidthDigitLoop is a digit, accumulate width
                     ldb       $08,s     load the current char
-                    cmpb      #$2e      is it the dot precision
+                    cmpb      #'.       is it the dot precision
                     bne       NoPrecision no precision given
                     ldd       #$0001    precision-present flag
                     std       $04,s     mark precision present
@@ -2924,7 +2924,7 @@ GetStat             lda       $05,s     load the path number
                     beq       GetStatXU use the x/u variant
                     cmpb      #$05      is it code five
                     beq       GetStatXU use the x/u variant
-                    ldb       #$D0      unknown service error
+                    ldb       #E$UnkSvc unknown service error
                     lbra      SetErrno  report the error
 
 GetStatXU           pshs      u         save frame register
@@ -2950,7 +2950,7 @@ GetStatCall         os9       I$GetStt  get file status
                     beq       SetStatCall code zero uses the default
                     cmpb      #$02      is it code two
                     beq       SetStatXU use the x/u variant
-                    ldb       #$D0      unknown service error
+                    ldb       #E$UnkSvc unknown service error
                     lbra      SetErrno  report the error
 
 SetStatCall         ldx       $06,s     load x from the argument
@@ -2997,7 +2997,7 @@ CreateOk            tfr       a,b       path number to b
                     clra                clear high byte
                     rts                 return the path number
 
-CreateExists        cmpb      #$DA      already exists error
+CreateExists        cmpb      #E$CEF    already exists error
                     lbne      SetErrno  other error, report it
                     lda       $05,s     reload the mode
                     bita      #$80      is the directory bit set
@@ -3035,7 +3035,7 @@ CreateExists        cmpb      #$DA      already exists error
                     pshs      y         save the count
                     os9       I$Read    read from the file
 ReadCheck           bcc       ReadOk    check the read result
-                    cmpb      #$D3      end-of-file error
+                    cmpb      #E$EOF    end-of-file error
                     bne       ReadFail  other error
                     clra                return zero at end of file
                     clrb                clear low byte
@@ -3087,7 +3087,7 @@ SeekWhence          cmpd      #$0001    is it SEEK_CUR
                     beq       SeekCur   get the current position
                     cmpd      #$0002    is it SEEK_END
                     beq       SeekEnd   get the file size
-                    ldb       #$F7      bad whence error
+                    ldb       #E$Seek   bad whence error
 SeekFail            clra                clear high byte
                     std       ErrCode,y   store the error number
                     ldd       #$FFFF    return -1
@@ -3278,13 +3278,13 @@ GetIdsRet           tfr       y,d       return the user id in d
                     bsr       SysGetIds fetch the current user id
                     std       -$02,s    save the current user id
                     beq       DoSetUser allowed if super user
-                    ldb       #$D6      prepare permission error
+                    ldb       #E$FNA    prepare permission error
                     bra       IdErr     jump to the error exit
 
 DoSetUser           ldy       $04,s     load the new user id argument
                     os9       F$SUser   change the user id
                     bcc       SetUserOk branch on success
-                    cmpb      #$D0      check for unknown-service error
+                    cmpb      #E$UnkSvc check for unknown-service error
                     bne       IdErr     fail on any other error
                     tfr       y,d       move the requested id into d
                     ldy       >$004B    point y at the global work block (data-area address, overlaps cstart)

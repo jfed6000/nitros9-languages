@@ -85,7 +85,7 @@ ColumnCounter       rmb       $2
 ResultSignFlag      rmb       $1
 HelperVector        rmb       $2
 FreeSpace           rmb       $2
-                    rmb       $A80     remaining data, bss and heap
+HeapStart           rmb       $A80     remaining data, bss and heap
 size                equ       .
 
 name                equ       *
@@ -93,9 +93,9 @@ name                equ       *
                     fcb       edition
 
 * --- shared C runtime startup (see lib/cstart.asm) ---
-RTBASE              equ       $0212     runtime-globals block base in the data area
-DATAEND             equ       $02E7     end of static data / heap start / stack limit
-HDRADV              equ       $0027     advance to where the non-DP data starts
+RTBASE              equ       CtypeTab+$80 runtime-globals block base in the data area
+DATAEND             equ       HeapStart end of static data / heap start / stack limit
+HDRADV              equ       LookupTable advance to where the non-DP data starts
                     use       lib/cstart.asm
 
 main                pshs      u         save caller frame
@@ -109,7 +109,7 @@ ArgProcess          ldx       $2a,s     load the argv pointer
                     stx       $2a,s     save updated argv pointer
                     ldu       ,x        load the current argument string
                     ldb       ,u        fetch the first character
-                    cmpb      #$2d      is it an option dash
+                    cmpb      #'-      is it an option dash
                     lbne      HandleFileArg no, treat as a filename
                     lbra      NextOptChar parse the option characters
 
@@ -132,7 +132,7 @@ OptSetN             ldd       #$0001    flag value one
 
 OptSetO             leau      $01,u     advance past the o
                     ldb       ,u        fetch the following char
-                    cmpb      #$3d      is it an equals sign
+                    cmpb      #'=      is it an equals sign
                     bne       OptBadO   no, malformed option
                     leau      $01,u     skip the equals
                     pshs      u         push the value string
@@ -768,7 +768,7 @@ BuildExprNode       pshs      u         save frame pointer
                     std       $06,s     save the token
                     ldd       #$0016    node size 22 bytes
                     pshs      d         push it
-                    lbsr      $310F     allocate the node
+                    lbsr      AllocMem  allocate the node
                     leas      2,s        drop the argument
                     tfr       d,u       node pointer in u
                     stu       -$02,s    save the pointer
@@ -815,7 +815,7 @@ FillNodeFields      ldd       GlbVar0003 input file pointer
 
 BuildChildNode      ldd       #$000D    child node size 13 bytes
                     pshs      d         push it
-                    lbsr      $310F     allocate the child node
+                    lbsr      AllocMem  allocate the child node
                     leas      2,s        drop the argument
                     std       $08,s     save the pointer
                     std       $08,u     link into parent node
@@ -873,7 +873,7 @@ NameTypeCheck       cmpx      #$000E    check for subtype 0e
 
 ReadConst4          ldd       #$0004    allocation size four bytes
                     pshs      d         pass allocation size
-                    lbsr      $310F     allocate memory
+                    lbsr      AllocMem  allocate memory
                     leas      2,s        drop the argument
                     std       $02,s     save allocated pointer
                     bne       ReadConst4Fill allocation succeeded
@@ -893,7 +893,7 @@ ReadConst4Fill      ldd       GlbVar0003 load input file pointer
 
 ReadConst8          ldd       #$0008    allocation size eight bytes
                     pshs      d         pass allocation size
-                    lbsr      $310F     allocate memory
+                    lbsr      AllocMem  allocate memory
                     leas      2,s        drop the argument
                     std       ,s        save allocated pointer
                     bne       ReadConst8Fill allocation succeeded
@@ -5006,7 +5006,7 @@ PrntLiteral         ldb       $08,s     get current format char
                     leas      2,s        drop pushed char
 FmtLoop             ldb       ,u+       fetch next format char
                     stb       $08,s     save current char
-                    cmpb      #$25      is it a percent
+                    cmpb      #'%      is it a percent
                     bne       PrntLiteral no then emit literally
                     ldb       ,u+       fetch char after percent
                     stb       $08,s     save it
@@ -5015,7 +5015,7 @@ FmtLoop             ldb       ,u+       fetch next format char
                     std       $02,s     clear precision
                     std       $06,s     clear field width
                     ldb       $08,s     get flag character
-                    cmpb      #$2d      is it minus
+                    cmpb      #'-      is it minus
                     bne       NoLeftFlag no then clear left flag
                     ldd       #$0001    flag value one
                     std       GlbVar001D mark left-justify
@@ -5027,7 +5027,7 @@ NoLeftFlag          clra                zero high byte
                     clrb                zero low byte
                     std       GlbVar001D clear left-justify flag
 CheckZeroPad        ldb       $08,s     get current char
-                    cmpb      #$30      is it a zero
+                    cmpb      #'0      is it a zero
                     bne       UseSpacePad no then use space pad
                     ldd       #$0030    zero pad character
                     bra       SetPadChar store pad character
@@ -5057,7 +5057,7 @@ WidthScanLoop       ldb       $08,s     get current char
                     andb      #$08      test digit bit
                     bne       WidthDigit a digit then accumulate width
                     ldb       $08,s     get current char
-                    cmpb      #$2e      is it a dot
+                    cmpb      #'.      is it a dot
                     bne       NoPrecision no then no precision
                     ldd       #$0001    precision present
                     std       $04,s     set precision flag
@@ -5441,7 +5441,7 @@ EmitByteRet         puls      pc,u      return to caller
 
 StrMinInt           fcc       /-32768/
                     fcb       C$NULL
-                    pshs      u,x,d     save registers and make room
+AllocMem            pshs      u,x,d     save registers and make room
                     ldd       $08,s     fetch the requested size
                     pshs      d         pass size
                     lbsr      SizeToQuads round size up to quad units
@@ -7615,17 +7615,17 @@ EmitLeaPcr          pshs      u         save the frame pointer
                     leas      8,s        drop the args
                     puls      pc,u      return
 
-                    fcb       $2C,$79
+OpCommaY            fcb       $2C,$79
                     fcb       C$NULL
-                    fcb       $2C,$73
+OpCommaS            fcb       $2C,$73
                     fcb       C$NULL
 OpLbsr              fcc       /lbsr /
                     fcb       C$NULL
-                    fcc       /lbra /
+OpLbra              fcc       /lbra /
                     fcb       C$NULL
-                    fcc       /clra/
+OpClra              fcc       /clra/
                     fcb       C$NULL
-                    fcc       /unknown operator : /
+MsgUnknownOp        fcc       /unknown operator : /
                     fcb       C$NULL
 FmtPshs             fcc       / pshs %c/
                     fcb       C$CR,C$NULL
@@ -8485,11 +8485,11 @@ SlotInit            stu       -$02,s    test the slot pointer
                     std       $08,u     store it in the slot
                     ldx       $06,s     load the operand string
                     ldb       $01,x     read the second character
-                    cmpb      #$2b      is it a plus
+                    cmpb      #'+      is it a plus
                     beq       SlotFlagAuto mark as auto-increment
                     ldx       $06,s     reload the string
                     ldb       $02,x     read the third character
-                    cmpb      #$2b      is it a plus
+                    cmpb      #'+      is it a plus
                     bne       SlotFlagReg otherwise classify by register
 SlotFlagAuto        ldd       $06,u     load the slot flags
                     orb       #$03      set auto-increment bits
@@ -8498,10 +8498,10 @@ SlotFlagAuto        ldd       $06,u     load the slot flags
 SlotFlagReg         ldd       $06,u     load the slot flags
                     pshs      d         hold the flags
                     ldb       [$08,s]   read the register letter
-                    cmpb      #$72      is it r
+                    cmpb      #'r      is it r
                     beq       SlotTypeOne register type one
                     ldb       [$08,s]   reload the letter
-                    cmpb      #$64      is it d
+                    cmpb      #'d      is it d
                     bne       SlotTypeTwo otherwise type two
 SlotTypeOne         ldd       #$0001    register type one
                     bra       SlotFlagMerge merge the flags
@@ -8535,7 +8535,7 @@ GenOperand2         pshs      u         save u
 
 OperIndexX          ldx       $0a,s     reload the operand string
                     ldb       $02,x     read the third character
-                    cmpb      #$2b      is it a plus
+                    cmpb      #'+      is it a plus
                     bne       OperIndexed otherwise indexed
                     ldd       #$0007    auto-increment mode
                     bra       OperSetMode store the mode
@@ -8605,7 +8605,7 @@ AddrSaveResult      leas      4,s        drop pushed operand arguments
                     bra       AddrLoadResult go to finish
 
 AddrRestoreStack    leas      -$04,x    restore stack pointer after adjustment
-AddrBadMode         ldd       #$00CB    load unknown-mode error code
+AddrBadMode         ldd       #E$BMode    load unknown-mode error code
                     std       ErrorCode,y   store error into work area
                     clra                zero result high byte
                     clrb                zero result low byte
@@ -10658,7 +10658,7 @@ GetStat             lda       $05,s     path number
                     beq       GetStatDevInfo return device info
                     cmpb      #$05      function five
                     beq       GetStatDevInfo return device info
-                    ldb       #$D0      bad function error
+                    ldb       #E$UnkSvc      bad function error
                     lbra      FailClearErrno return the error
 
 GetStatDevInfo      pshs      u         save u
@@ -10684,7 +10684,7 @@ GetStatCall         os9       I$GetStt  issue getstat
                     beq       SetStatSimple zero means simple setstat
                     cmpb      #$02      function two
                     beq       SetStatWithU setstat with extra value
-                    ldb       #$D0      bad function error
+                    ldb       #E$UnkSvc      bad function error
                     lbra      FailClearErrno return the error
 
 SetStatSimple       ldx       $06,s     load status block
@@ -10733,7 +10733,7 @@ CreateOk            tfr       a,b       path number into b
                     clra                clear high result
                     rts                 return the path number
 
-CreateExists        cmpb      #$DA      is it file-exists error
+CreateExists        cmpb      #E$CEF      is it file-exists error
                     lbne      FailClearErrno no, propagate the error
                     lda       $05,s     reload the mode
                     bita      #$80      exclusive create requested
@@ -10824,7 +10824,7 @@ CheckWhence         cmpd      #$0001    whence value one
                     beq       SeekFromCur seek from current
                     cmpd      #$0002    whence value two
                     beq       SeekFromEnd handle seek relative to end
-                    ldb       #$F7      set error code for bad whence
+                    ldb       #E$Seek      set error code for bad whence
 SeekErr             clra                clear high byte of errno
                     std       ErrorCode,y   store os-9 error code in work block
                     ldd       #$FFFF    prepare minus one result
@@ -10938,14 +10938,14 @@ CleanupStub         rts                 empty cleanup stub
                     * ============ WorkBlockImage: cstart init/relocation tables ============
 
                     * ---- count1: DP-data length (bytes copied to the DP base)
-WorkBlockImage      fdb       $0003
+WorkBlockImage      fdb       WBIcount2-WBIblock1
 
                     * ---- block1: DP data image  ->  data base
-                    fcb       $00,$00
-                    fcb       $4B
+WBIblock1           fcb       $00
+WBIp0001            fdb       FreeRoot
 
                     * ---- count2: non-DP-data length (bytes copied to base+HDRADV)
-                    fdb       $01EB
+WBIcount2           fdb       WBIblk2End-WBIblock2
 
                     * ---- block2: non-DP data image  ->  data base + HDRADV
 WBIblock2           fcb       $00,$02,$00,$04,$00,$08
@@ -10961,18 +10961,13 @@ WBIblock2           fcb       $00,$02,$00,$04,$00,$08
                     fcb       $00
 Pow10Img            fdb       10000,1000,100,10 powers of ten
 FreeRootImg         fcb       $00,$00
-                    fcb       $44
-                    fcb       $C9
-                    fcb       $44
-                    fcb       $CC
-                    fcb       $44
-                    fcb       $CF
-                    fcb       $44
-                    fcb       $D5
-                    fcb       $44
-                    fcb       $DB
-                    fcb       $44
-                    fcb       $E0,$00,$00,$00,$00,$00,$00,$00
+WBIpCommaY          fdb       OpCommaY
+WBIpCommaS          fdb       OpCommaS
+WBIpLbsr            fdb       OpLbsr
+WBIpLbra            fdb       OpLbra
+WBIpClra            fdb       OpClra
+WBIpUnknown         fdb       MsgUnknownOp
+                    fcb       $00,$00,$00,$00,$00,$00,$00
                     fcb       $80
                     fcb       $20
                     fcb       $00,$00,$00,$00,$00,$00,$84
@@ -11049,16 +11044,18 @@ CtypeTabImg         fcb       $01
                     fcb       $01
 
                     * ---- nreloc1: text-relocation count  (each offset patched by +module base)
-                    fdb       $0006
+WBIblk2End          fdb       (reloc1End-reloc1Start)/2
 
                     * ---- reloc1: text relocation offsets
-                    fdb       $0057,$0055,$0053,$0051,$004F,$004D
+reloc1Start         fdb       HDRADV+WBIpUnknown-WBIblock2,HDRADV+WBIpClra-WBIblock2,HDRADV+WBIpLbra-WBIblock2,HDRADV+WBIpLbsr-WBIblock2,HDRADV+WBIpCommaS-WBIblock2,HDRADV+WBIpCommaY-WBIblock2
+reloc1End           equ       *
 
                     * ---- nreloc2: data-relocation count  (each offset patched by +work base)
-                    fdb       $0001
+                    fdb       (reloc2End-reloc2Start)/2
 
                     * ---- reloc2: data relocation offsets
-                    fdb       $0001
+reloc2Start         fdb       WBIp0001-WBIblock1
+reloc2End           equ       *
 
                     * ---- name: trailing module-name string
                     fcc       /c.pass2/

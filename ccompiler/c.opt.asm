@@ -74,7 +74,7 @@ ScratchBuffer       rmb       $A
 LeftJustifyFlag     rmb       $2
 PadCharacter        rmb       $2
 UpdateFreeCount     rmb       $2
-                    rmb       $B80     remaining data, bss and heap
+HeapStart           rmb       $B80     remaining data, bss and heap
 size                equ       .
 
 name                equ       *
@@ -82,10 +82,14 @@ name                equ       *
                     fcb       edition
 
 * --- shared C runtime startup (see lib/cstart.asm) ---
-RTBASE              equ       $0515     runtime-globals block base in the data area
-DATAEND             equ       $0887     end of static data / heap start / stack limit
-HDRADV              equ       $0023     advance to where the non-DP data starts
+RTBASE              equ       PastTableEnd  runtime-globals block base in the data area
+DATAEND             equ       HeapStart  end of static data / heap start / stack limit
+HDRADV              equ       LabelCtr  advance to where the non-DP data starts
                     use       lib/cstart.asm
+
+* --- record/node struct field offsets (U-relative) ---
+Flags               equ       $06       flags/attributes word in the record header
+BufferSize          equ       $0B       byte count held in a stream/buffer record
 
 main                pshs      u         save frame pointer
                     leas      -8,s       reserve locals
@@ -103,7 +107,7 @@ ProcessArg          ldd       [$0e,s]   load current argv pointer
                     std       $04,s     save arg pointer local
                     tfr       d,x       arg pointer into X
                     ldb       ,x        get first character
-                    cmpb      #$2d      leading dash
+                    cmpb      #'-      leading dash
                     lbne      HandleFileArg not an option
                     ldx       $04,s     reload arg pointer
                     leax      $01,x     skip the dash
@@ -124,7 +128,7 @@ HandleOptI          clra                zero high byte
                     leax      $01,x     skip option letter
                     stx       $04,s     save pointer
                     ldb       ,x        get next character
-                    cmpb      #$3d      equals sign
+                    cmpb      #'=      equals sign
                     beq       NextOptChar parse number after equals
                     ldd       $04,s     reload pointer
                     addd      #$FFFF    back up one character
@@ -375,7 +379,7 @@ EolScanLoop         ldb       ,u        read line character
                     ldb       [$06,s]   read first character
                     lbeq      ReadLineLoop skip empty line
                     ldb       [$06,s]   reload first character
-                    cmpb      #$2a      test for comment star
+                    cmpb      #'*      test for comment star
                     lbeq      ReadLineLoop skip comment line
                     leax      ,s        point at output field buffer
                     pshs      x         push destination arg
@@ -485,11 +489,11 @@ MatchVsect          leax      OpVsect,pcr point at vsect keyword
                     std       -$02,s    save compare result
                     lbne      DefaultLine not vsect, handle as instruction
                     ldb       [$06,s]   read next character
-                    cmpb      #$64      test for letter d
+                    cmpb      #'d      test for letter d
                     bne       SectNumOne default section number
                     ldx       $06,s     load line pointer
                     ldb       $01,x     read following character
-                    cmpb      #$70      test for letter p
+                    cmpb      #'p      test for letter p
                     bne       SectNumOne default section number
                     ldd       #$0002    section number two for dp
                     bra       StoreSectNum store the section number
@@ -750,7 +754,7 @@ CopyCheckWs         ldb       [$0a,s]   read character
                     andb      #$0f      extract the class low nibble
                     bne       CopySkipWs keep scanning identifier characters
                     ldb       [$0a,s]   read the current source char
-                    cmpb      #$3a      test for a colon
+                    cmpb      #':      test for a colon
                     bne       NoColon   no colon so clear the flag
                     ldd       #$0001    set the colon-seen flag
                     bra       StoreColonFlag go store the flag
@@ -983,7 +987,7 @@ AllocNode           pshs      u         save u
                     clrb                clear low byte
                     std       $0a,u     clear a node field
                     std       $08,u     clear a node field
-                    std       $06,u     clear a node field
+                    std       Flags,u     clear a node field
                     std       $04,u     clear a node field
                     bra       AllocReturn return the node
 
@@ -999,7 +1003,7 @@ FreeNode            pshs      u         save u
                     ldu       $04,s     load the node pointer
                     ldd       $04,u     check reference field four
                     bne       FreeDone  still referenced so keep it
-                    ldd       $06,u     check reference field six
+                    ldd       Flags,u     check reference field six
                     bne       FreeDone  still referenced so keep it
                     ldd       ,u        unlink the node
                     std       [$02,u]   relink the neighbor
@@ -1024,9 +1028,9 @@ GenLabel            pshs      u         save u
                     leas      6,s        clean up the arguments
                     puls      pc,u      restore and return
 
-MsgLabelFmt         clrb                label format string data
-                    bcc       $0A7B     label format string data
-                    lsr       0,x       label format string data
+MsgLabelFmt         fcb       $5F       label format string data
+                    fcb       $24,$25   label format string data
+                    fcb       $64,$00   label format string data
 SearchStrings       pshs      u         save u
                     ldu       $06,s     load the array start
                     bra       SearchTest enter the search loop
@@ -1128,7 +1132,7 @@ CheckBranchOp       ldx       $06,s     load the text pointer
                     leax      $01,x     advance the pointer
                     stx       $06,s     save the pointer
                     ldb       ,x        read the next char
-                    cmpb      #$62      test for letter b
+                    cmpb      #'b      test for letter b
                     lbne      EmitInsnTail not a branch so handle elsewhere
 MatchBranchOp       leax      >StringArgument2,y  point to a string argument
                     pshs      x         push it
@@ -1141,7 +1145,7 @@ MatchBranchOp       leax      >StringArgument2,y  point to a string argument
                     leas      6,s        clean up the arguments
                     std       $02,s     save the result
                     lbeq      EmitInsnTail not found
-                    ldd       $06,u     load a node field
+                    ldd       Flags,u     load a node field
                     pshs      d         push it
                     leax      >StringArgument,y  point to a string argument
                     pshs      x         push it
@@ -1153,7 +1157,7 @@ MatchBranchOp       leax      >StringArgument2,y  point to a string argument
                     orb       #$60      set operand-mode bits in low byte
                     ora       ,s+       merge high flag byte from stack
                     orb       ,s+       merge low flag byte from stack
-                    std       $06,u     store combined flags into node
+                    std       Flags,u     store combined flags into node
                     ldd       [$02,s]   load field indirectly through arg
                     pshs      d         push the value
                     pshs      u         push node pointer
@@ -1212,9 +1216,9 @@ ChkNodeRef          ldd       $04,u     load node reference field
                     clrb                clear result low
                     lbra      OptExit   return null via exit
 
-SetKeepFlag         ldd       $06,u     load node flags
+SetKeepFlag         ldd       Flags,u     load node flags
                     ora       #$01      set keep bit zero
-                    std       $06,u     store flags
+                    std       Flags,u     store flags
 BumpReplaceCount    ldd       GlbWord0019 load replace counter
                     addd      #$0001    add one
                     std       GlbWord0019 bump the replace counter
@@ -1225,9 +1229,9 @@ BumpReplaceCount    ldd       GlbWord0019 load replace counter
                     lbsr      HashInsert create a new node
                     leas      2,s        drop argument
                     std       $08,s     save the new node
-SetEmitFlag         ldd       $06,u     load node flags
+SetEmitFlag         ldd       Flags,u     load node flags
                     ora       #$02      set emitted bit one
-                    std       $06,u     store flags
+                    std       Flags,u     store flags
                     ldd       $08,s     load result node
                     std       $13,u     store operand pointer in node
                     pshs      d         push node value
@@ -1259,9 +1263,9 @@ CmpMnemonic         pshs      d         push it
                     leas      4,s        drop the arguments
                     std       -$02,s    save comparison result
                     bne       EmitInsnTail no match, go to tail
-                    ldd       $06,u     load node flags
+                    ldd       Flags,u     load node flags
                     ora       #$01      set keep bit zero
-                    std       $06,u     store flags
+                    std       Flags,u     store flags
                     bra       EmitInsnTail branch to emit tail
 
 DispatchOperand     cmpx      #$006C    is operand type l
@@ -1272,7 +1276,7 @@ DispatchOperand     cmpx      #$006C    is operand type l
                     beq       MatchPuls handle the puls case
                     cmpx      #$0072    is operand type r
                     beq       MatchRts  handle the rts case
-EmitInsnTail        ldd       $06,u     load node flags
+EmitInsnTail        ldd       Flags,u     load node flags
                     clra                clear high byte
                     andb      #$20      test emitted bit five
                     bne       ReturnNode skip emit if already set
@@ -1317,7 +1321,7 @@ ReuseFreeNode       ldd       ,u        load next free pointer
                     clra                clear high
                     clrb                clear low
                     std       $13,u     clear operand field
-                    std       $06,u     clear the flags
+                    std       Flags,u     clear the flags
 AllocDone           tfr       u,d       return the node pointer
                     puls      pc,u      restore and return
 
@@ -1369,7 +1373,7 @@ PrintInsn           pshs      u,d       save registers and locals
                     pshs      x         push message pointer
                     lbsr      FatalError report the error
                     leas      2,s        drop argument
-ChkRefChain         ldd       $06,u     load node flags
+ChkRefChain         ldd       Flags,u     load node flags
                     clra                clear high byte
                     andb      #$60      isolate bits five and six
                     cmpd      #$0060    both bits set
@@ -1406,7 +1410,7 @@ PrintRefLoop        ldd       ,s        load current reference node
                     pshs      d         push it
                     ldd       #$003A    colon character
                     pshs      d         push it
-                    lbsr      $1FB2     output the colon
+                    lbsr      Putc      output the colon
                     leas      4,s        drop the arguments
 NextRefLabel        ldx       ,s        reload iterator
                     ldd       $08,x     load next reference
@@ -1416,7 +1420,7 @@ NextRefLabel        ldx       ,s        reload iterator
                     pshs      d         push it
                     ldd       #$000D    separator character
                     pshs      d         push it
-                    lbsr      $1FB2     output the separator
+                    lbsr      Putc      output the separator
 DropScanArgs        leas      4,s        drop scan arguments
 RefLoopCond         ldd       ,s        load iterator
                     bne       PrintRefLoop loop while references remain
@@ -1424,13 +1428,13 @@ RefLoopCond         ldd       ,s        load iterator
                     pshs      d         push it
                     ldd       #$0020    space character
                     pshs      d         push it
-                    lbsr      $1FB2     output the space
+                    lbsr      Putc      output the space
                     leas      4,s        drop the arguments
-                    ldd       $06,u     load node flags
+                    ldd       Flags,u     load node flags
                     clra                clear high byte
                     andb      #$20      test bit five
                     beq       EmitMnemonic branch if clear
-                    ldd       $06,u     load node flags
+                    ldd       Flags,u     load node flags
                     anda      #$02      test bit one
                     clrb                clear low byte
                     std       -$02,s    save the test flag
@@ -1445,7 +1449,7 @@ EmitBranch          pshs      d         push it
                     ldd       #$0008    offset eight
                     addd      ,s++      compute node plus eight
                     pshs      d         push mnemonic address
-                    ldd       $06,u     load node flags
+                    ldd       Flags,u     load node flags
                     clra                clear high byte
                     andb      #$40      test bit six
                     beq       NoSuffix  branch if clear
@@ -1487,7 +1491,7 @@ EmitNewline         ldd       OutputFilePointer,y   load output file pointer
                     pshs      d         push it
                     ldd       #$000D    carriage return character
                     pshs      d         push it
-                    lbsr      $1FB2     output the newline
+                    lbsr      Putc      output the newline
                     leas      4,s        drop the arguments
                     pshs      u         push node
                     lbsr      FreeOperand release the instruction node
@@ -1499,7 +1503,7 @@ AdjustRefs          pshs      u,y,x,d   save registers and locals
                     ldd       $0C,s     load type argument
                     cmpd      #$0004    is type four
                     lbne      ScanOtherType handle other types
-                    ldd       $06,u     load node flags
+                    ldd       Flags,u     load node flags
                     anda      #$02      test bit one
                     clrb                clear low byte
                     std       -$02,s    save the test flag
@@ -1522,9 +1526,9 @@ HaveTarget          std       $02,s     save resolved node
 
 ScanFwdLoop         cmpu      $04,s     current equals target
                     bne       DecCounter no, decrement and continue
-                    ldd       $06,u     load node flags
+                    ldd       Flags,u     load node flags
                     orb       #$80      set found bit seven
-                    std       $06,u     store flags
+                    std       Flags,u     store flags
                     ldx       $0a,s     load node argument
                     ldd       $06,x     load its flags
                     andb      #$BF      clear bit six
@@ -1546,12 +1550,12 @@ ScanFwdCond         std       ,s        store the counter
 ScanOtherType       ldd       #$0024    loop limit thirty-six
                     bra       ChainCountStore enter second scan loop
 
-ScanRefLoop2        ldd       $06,u     load node flags
+ScanRefLoop2        ldd       Flags,u     load node flags
                     clra                clear high byte
                     andb      #$60      isolate bits five and six
                     cmpd      #$0060    both bits set
                     bne       NextChainNode skip if not both set
-                    ldd       $06,u     load node flags
+                    ldd       Flags,u     load node flags
                     anda      #$02      test bit one
                     clrb                zero the low byte to build result
                     std       -$02,s    store result to local temp
@@ -1569,9 +1573,9 @@ OperandReady        std       $02,s     save the mapped operand value
                     ldx       $02,s     load the mapped result pointer
                     cmpd      $04,x     compare against its target field
                     bne       NextChainNode branch if the targets differ
-                    ldd       $06,u     load the instruction flags
+                    ldd       Flags,u     load the instruction flags
                     andb      #$BF      clear the $40 flag bit
-                    std       $06,u     store the updated flags
+                    std       Flags,u     store the updated flags
 BumpMatchCount      ldd       GlbWord001B load the global match counter
                     addd      #$0001    increment the counter
                     std       GlbWord001B store the counter back
@@ -1593,7 +1597,7 @@ ScanDone            leas      6,s        release the locals
 FreeOperand         pshs      u         save the register
                     ldu       $04,s     load the node argument
                     leas      -2,s       reserve a local word
-                    ldd       $06,u     load the node flags
+                    ldd       Flags,u     load the node flags
                     clra                keep only the low byte
                     andb      #$20      test the $20 flag bit
                     beq       FreeOperandStr branch when the flag is clear
@@ -1747,41 +1751,41 @@ FreeLargeBuf        ldd       GlbVar0005 load the large free-list head
                     std       GlbVar0005 push onto the large free list
 FreeBufDone         puls      pc,u      restore register and return
 
-                    fcb       $72,$61
+Otxt_1052           fcb       $72,$61
                     fcb       C$NULL
-                    fcb       $73,$72
+Otxt_1055           fcb       $73,$72
                     fcb       C$NULL
-                    fcb       $65,$71
+Otxt_1058           fcb       $65,$71
                     fcb       C$NULL
-                    fcb       $6E,$65
+Otxt_105B           fcb       $6E,$65
                     fcb       C$NULL
-                    fcb       $6C,$74
+Otxt_105E           fcb       $6C,$74
                     fcb       C$NULL
-                    fcb       $67,$65
+Otxt_1061           fcb       $67,$65
                     fcb       C$NULL
-                    fcb       $6C,$65
+Otxt_1064           fcb       $6C,$65
                     fcb       C$NULL
-                    fcb       $67,$74
+Otxt_1067           fcb       $67,$74
                     fcb       C$NULL
-                    fcb       $6C,$6F
+Otxt_106A           fcb       $6C,$6F
                     fcb       C$NULL
-                    fcb       $68,$73
+Otxt_106D           fcb       $68,$73
                     fcb       C$NULL
-                    fcb       $6C,$73
+Otxt_1070           fcb       $6C,$73
                     fcb       C$NULL
 BraCondHi           fcb       $68,$69
                     fcb       C$NULL
-                    fcb       $70,$6C
+Otxt_1076           fcb       $70,$6C
                     fcb       C$NULL
 BraCondMi           fcb       $6D,$69
                     fcb       C$NULL
-                    fcb       $63,$63
+Otxt_107C           fcb       $63,$63
                     fcb       C$NULL
 BraCondCs           fcb       $63,$73
                     fcb       C$NULL
-                    fcb       $76,$63
+Otxt_1082           fcb       $76,$63
                     fcb       C$NULL
-                    fcb       $76,$73
+Otxt_1085           fcb       $76,$73
                     fcb       C$NULL
 StrPuls             fcc       /puls/
                     fcb       C$NULL
@@ -1846,11 +1850,11 @@ OptLoopTest         leax      >GlbPtr0015,y  address the list-head sentinel
                     ldx       $0a,s     load the next instruction
                     ldd       $04,x     load its target field
                     lbeq      OptTableLookup branch when the field is zero
-                    ldd       $06,u     load the current flags
+                    ldd       Flags,u     load the current flags
                     clra                keep only the low byte
                     andb      #$20      test the $20 flag bit
                     lbeq      WalkExit  skip when the flag is clear
-                    ldd       $06,u     reload the flags
+                    ldd       Flags,u     reload the flags
                     clra                keep only the low byte
                     andb      #$3f      mask the opcode bits
                     cmpd      #$0021    compare with opcode $21
@@ -1875,7 +1879,7 @@ OptLoopTest         leax      >GlbPtr0015,y  address the list-head sentinel
                     leax      $0C,s     point at the frame base
                     lbra      OptLoopReset loop for the next instruction
 
-OptCheckPredecessor ldd       $06,u     load the flags
+OptCheckPredecessor ldd       Flags,u     load the flags
                     anda      #$01      test the $0100 flag bit
                     clrb                clear the low byte
                     std       -$02,s    store the test result
@@ -1887,7 +1891,7 @@ OptCheckPredecessor ldd       $06,u     load the flags
                     leax      >GlbPtr0015,y  address the list head
                     cmpx      ,s++      check for the end sentinel
                     lbeq      WalkExit  skip if at the list head
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     clra                keep only the low byte
                     andb      #$3f      mask the opcode bits
                     cmpd      #$0021    compare with opcode $21
@@ -2055,7 +2059,7 @@ WalkExit            leas      12,s       release the locals
 
 InvertBranchNode    pshs      u         save the frame register
                     ldu       $04,s     load the node argument
-                    ldd       $06,u     read the attribute word
+                    ldd       Flags,u     read the attribute word
                     clra                keep only the low byte
                     andb      #$3f      isolate the condition bits
                     eorb      #$01      invert the branch sense
@@ -2066,7 +2070,7 @@ InvertBranchNode    pshs      u         save the frame register
                     andb      #$C0      keep the top two bits
                     ora       ,s+       merge the inverted condition high
                     orb       ,s+       merge the inverted condition low
-                    std       $06,u     write back the rewritten attribute
+                    std       Flags,u     write back the rewritten attribute
                     clra                zero high byte
                     andb      #$1f      isolate the opcode index
                     aslb                scale to a word index
@@ -2112,7 +2116,7 @@ MatchPattern        pshs      u         save the frame register
                     lbra      MatchNextChar resume the match loop
 
 MatchPlaceholder    ldb       [$06,s]   load the current pattern char
-                    cmpb      #$3C      is it the < placeholder
+                    cmpb      #'<      is it the < placeholder
                     lbne      MatchLiteral no, do a literal compare
                     ldb       ,u        load the input class byte
                     sex                 extend to a word
@@ -2331,12 +2335,12 @@ SecondBlockSet      std       $06,s     set the current block
                     pshs      d         push it
                     lbsr      UpdateUseChain process the list
                     leas      4,s        drop the arguments
-CheckListFlag       ldd       $06,u     load the list attributes
+CheckListFlag       ldd       Flags,u     load the list attributes
                     anda      #$01      test the flag bit
                     clrb                clear low byte
                     std       -$02,s    save the flag
                     lbeq      ScanDone2 clear, finish
-                    ldd       $06,u     load the attributes again
+                    ldd       Flags,u     load the attributes again
                     clra                zero high byte
                     andb      #$20      test the flag bit
                     beq       AdvanceFromU clear, take the other path
@@ -2452,7 +2456,7 @@ MatchLoop           leax      >GlbPtr0015,y  load the list sentinel
                     ldd       $1a,s     load other pointer
                     cmpd      $06,s     other back at original
                     lbeq      MatchEnd  stop on wrap
-                    ldd       $06,u     load u flags
+                    ldd       Flags,u     load u flags
                     clra                clear high byte
                     andb      #$3f      mask opcode class bits
                     pshs      d         push opcode class
@@ -2462,11 +2466,11 @@ MatchLoop           leax      >GlbPtr0015,y  load the list sentinel
                     andb      #$3f      mask opcode class bits
                     cmpd      ,s++      same opcode class
                     lbne      MatchEnd  differ so no match
-                    ldd       $06,u     load u flags
+                    ldd       Flags,u     load u flags
                     clra                clear high byte
                     andb      #$80      test the high flag bit
                     lbne      MatchEnd  set means no match
-                    ldd       $06,u     load u flags again
+                    ldd       Flags,u     load u flags again
                     clra                clear high byte
                     andb      #$20      test bit five
                     beq       CompareOperandText branch to text compare if clear
@@ -2596,12 +2600,12 @@ UseNextLoop         ldx       $06,s     load operand base
 
 UseCheckLoop        ldx       ,s        load use list head
                     ldu       $02,x     load use record pointer
-                    ldd       $06,u     load its flags
+                    ldd       Flags,u     load its flags
                     anda      #$01      isolate low flag bit
                     clrb                clear low byte
                     std       -$02,s    save masked flag
                     beq       UseFollow skip if flag clear
-                    ldd       $06,u     load flags again
+                    ldd       Flags,u     load flags again
                     clra                clear high byte
                     andb      #$80      test high flag bit
                     bne       UseFollow skip if set
@@ -2626,35 +2630,35 @@ UseLoopTest         ldd       $06,s     load block pointer
                     leas      2,s        pop result slot
                     puls      pc,u      return
 
-                    fcb       $2C,$78,$2B
+Otxt_17A9           fcb       $2C,$78,$2B
                     fcb       C$NULL
-                    fcb       $2C,$79,$2B
+Otxt_17AD           fcb       $2C,$79,$2B
                     fcb       C$NULL
-                    fcb       $2C,$75,$2B
+Otxt_17B1           fcb       $2C,$75,$2B
                     fcb       C$NULL
-                    fcb       $2C,$2D,$78
+Otxt_17B5           fcb       $2C,$2D,$78
                     fcb       C$NULL
-                    fcb       $2C,$2D,$79
+Otxt_17B9           fcb       $2C,$2D,$79
                     fcb       C$NULL
-                    fcb       $2C,$2D,$75
+Otxt_17BD           fcb       $2C,$2D,$75
                     fcb       C$NULL
-                    fcc       /,x++/
+Otxt_17C1           fcc       /,x++/
                     fcb       C$NULL
-                    fcc       /,y++/
+Otxt_17C6           fcc       /,y++/
                     fcb       C$NULL
-                    fcc       /,u++/
+Otxt_17CB           fcc       /,u++/
                     fcb       C$NULL
-                    fcc       /,--x/
+Otxt_17D0           fcc       /,--x/
                     fcb       C$NULL
-                    fcc       /,--y/
+Otxt_17D5           fcc       /,--y/
                     fcb       C$NULL
-                    fcc       /,--u/
+Otxt_17DA           fcc       /,--u/
                     fcb       C$NULL
-                    fcc       /,s++/
+Otxt_17DF           fcc       /,s++/
                     fcb       C$NULL
-                    fcc       /-4,s/
+Otxt_17E4           fcc       /-4,s/
                     fcb       C$NULL
-                    fcc       /-6,s/
+Otxt_17E9           fcc       /-6,s/
                     fcb       C$NULL
 OpLbra              fcc       /lbra/
                     fcb       C$NULL
@@ -2696,7 +2700,7 @@ FatalError          pshs      u         save u
                     pshs      x         push stream argument
                     ldd       #$000D    prepare carriage return
                     pshs      d         push it
-                    lbsr      $1FB2     write the newline
+                    lbsr      Putc      write the newline
                     leas      4,s        pop arguments
                     ldd       #$0001    prepare exit status one
                     pshs      d         push status
@@ -2710,7 +2714,7 @@ MsgOptimiserError   fcc       /C optimiser error: /
                     fcb       C$NULL
 AllocOperand        pshs      u         save u
                     leau      InputPathBuffer,y   point at the operand table base
-AllocScanLoop       ldd       $06,u     load entry flags
+AllocScanLoop       ldd       Flags,u     load entry flags
                     clra                clear high byte
                     andb      #$03      mask the in-use bits
                     lbeq      ReturnSlot free slot found
@@ -2736,23 +2740,23 @@ FillOperand         stu       -$02,s    save the slot pointer
                     std       $08,u     store into operand record
                     ldx       $06,s     load text pointer
                     ldb       $01,x     load first character
-                    cmpb      #$2b      is it a plus sign
+                    cmpb      #'+      is it a plus sign
                     beq       SetIncFlags branch to set increment flags
                     ldx       $06,s     load text pointer
                     ldb       $02,x     load second character
-                    cmpb      #$2b      is it a plus sign
+                    cmpb      #'+      is it a plus sign
                     bne       CheckRegType branch if no increment
-SetIncFlags         ldd       $06,u     load operand flags
+SetIncFlags         ldd       Flags,u     load operand flags
                     orb       #$03      set auto-increment flag bits
                     bra       StoreOperandFlags go store the flags
 
-CheckRegType        ldd       $06,u     load operand flags
+CheckRegType        ldd       Flags,u     load operand flags
                     pshs      d         push them
                     ldb       [$08,s]   load indirect text character
-                    cmpb      #$72      is it register r
+                    cmpb      #'r      is it register r
                     beq       RegTypeOne branch if r
                     ldb       [$08,s]   reload character
-                    cmpb      #$64      is it register d
+                    cmpb      #'d      is it register d
                     bne       RegTypeTwo branch if not d
 RegTypeOne          ldd       #$0001    select flag value one
                     bra       MergeRegFlags go merge flags
@@ -2760,9 +2764,9 @@ RegTypeOne          ldd       #$0001    select flag value one
 RegTypeTwo          ldd       #$0002    select flag value two
 MergeRegFlags       ora       ,s+       merge into flag high byte
                     orb       ,s+       merge into flag low byte
-StoreOperandFlags   std       $06,u     store the operand flags
+StoreOperandFlags   std       Flags,u     store the operand flags
                     ldd       $02,u     load operand base value
-                    addd      $0b,u     add operand length
+                    addd      BufferSize,u     add operand length
                     std       $04,u     store end pointer
                     std       ,u        store current pointer
 ReturnSlot          tfr       u,d       return the slot pointer
@@ -2786,7 +2790,7 @@ OperandEntry        pshs      u         save u
 
 OperIndexX          ldx       $0a,s     reload operand token pointer
                     ldb       $02,x     read third char of token
-                    cmpb      #$2b      is it a plus
+                    cmpb      #'+      is it a plus
                     bne       OperIndexXPlain no plus, use plain index flag
                     ldd       #$0007    x index with post-increment flag
                     bra       OperStoreMode store mode flag
@@ -3042,7 +3046,7 @@ doprnt              pshs      u         save frame pointer
                     leas      -11,s      reserve formatter locals
 DoprntLoop          ldb       ,u+       fetch next format char
                     stb       $08,s     save char
-                    cmpb      #$25      is it a percent
+                    cmpb      #'%      is it a percent
                     beq       DoprntConv handle conversion
                     ldb       $08,s     reload char
                     lbeq      FmtReturn null terminates format
@@ -3102,7 +3106,7 @@ WidthLoop           ldb       $08,s     load current char
                     bra       WidthLoop continue width digits
 
 CheckPrecision      ldb       $08,s     load current char
-                    cmpb      #$2e      is precision dot
+                    cmpb      #'.      is precision dot
                     bne       NoPrecision no precision field
                     ldd       #$0001    mark precision present
                     std       $04,s     store flag
@@ -3200,7 +3204,7 @@ FloatConvGo         ldd       $06,s     load float value
                     ldb       $0e,s     load conversion char
                     sex                 sign extend char
                     pshs      d         push conversion char
-                    lbsr      $23EC     call float format routine
+                    lbsr      StrlenThunk+1 call float format routine
                     leas      6,s        clean call arguments
                     lbra      PushConvStr go emit result
 
@@ -3546,7 +3550,7 @@ EmitStrField        pshs      u         entry: emit string field
                     ldd       $08,s     load field width
                     pshs      d         push width
                     pshs      u         push string pointer
-                    lbsr      $23F7     compute string length
+                    lbsr      StrLen+1  compute string length
                     leas      2,s        clean argument
                     nega                negate high byte
                     negb                negate low byte
@@ -3595,7 +3599,7 @@ PutcStdout          pshs      u         save frame register
                     pshs      d         pass stream as first argument
                     ldd       $06,s     fetch the byte to write
                     pshs      d         pass byte as second argument
-                    lbsr      $1FB2     call putc on the default stream
+                    lbsr      Putc      call putc on the default stream
 PutcStdoutDone      leas      4,s        drop the two arguments
                     puls      pc,u      restore and return
 
@@ -3609,14 +3613,14 @@ BufAppendByte       pshs      u         save frame register
 
 MsgIntMin           fcc       /-32768/
                     fcb       C$NULL
-                    pshs      u         save frame register
+Putc                pshs      u         save frame register
                     ldu       $06,s     load the FILE stream pointer
-                    ldd       $06,u     load the stream flags
+                    ldd       Flags,u     load the stream flags
                     anda      #$80      isolate the high flag bit
                     andb      #$22      isolate write and error bits
                     cmpd      #$8002    test the special error-write state
                     beq       PutcModeCheck skip buffer setup if already flagged
-                    ldd       $06,u     reload the flags
+                    ldd       Flags,u     reload the flags
                     clra                keep only the low flag byte
                     andb      #$22      isolate the write-mode bits
                     cmpd      #$0002    check the stream is open for writing
@@ -3624,7 +3628,7 @@ MsgIntMin           fcc       /-32768/
                     pshs      u         pass the stream to the allocator
                     lbsr      FillBuf   allocate the stream buffer
                     leas      2,s        drop the argument
-PutcModeCheck       ldd       $06,u     load the flags
+PutcModeCheck       ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$04      test the unbuffered bit
                     beq       PutcBuffered branch to the buffered path
@@ -3634,7 +3638,7 @@ PutcModeCheck       ldd       $06,u     load the flags
                     pshs      x         push the buffer address
                     ldd       $08,u     load the file descriptor
                     pshs      d         push the descriptor
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$40      test the text-translation bit
                     beq       PutcSelectBin choose the binary writer
@@ -3648,12 +3652,12 @@ PutcInvokeWrite     tfr       x,d       move the routine address
                     leas      6,s        drop the three arguments
                     cmpd      #$FFFF    check for a write error
                     bne       PutcReturn return the byte if written
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     orb       #$20      mark the stream in error
-                    std       $06,u     store the updated flags
+                    std       Flags,u     store the updated flags
                     lbra      IoErr     return the error
 
-PutcBuffered        ldd       $06,u     load the flags
+PutcBuffered        ldd       Flags,u     load the flags
                     anda      #$01      isolate the read-active bit
                     clrb                clear the low byte
                     std       -$02,s    save the test result
@@ -3671,7 +3675,7 @@ PutcStore           ldd       ,u        load the buffer write pointer
                     ldd       ,u        reload the write pointer
                     cmpd      $04,u     compare against the buffer end
                     bcc       PutcFlush flush when the buffer is full
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$40      test the line-buffer bit
                     beq       PutcReturn done if not line buffered
@@ -3693,12 +3697,12 @@ PutcReturn          ldd       $04,s     return the written byte
                     ldd       #$0008    prepare a shift of eight bits
                     lbsr      LsrEntry  extract the high byte
                     pshs      d         push the high byte argument
-                    lbsr      $1FB2     write the high byte first
+                    lbsr      Putc      write the high byte first
                     leas      4,s        drop the arguments
                     ldd       $06,s     reload the word
                     pshs      d         push the low byte argument
                     pshs      u         push the stream argument
-                    lbsr      $1FB2     write the low byte
+                    lbsr      Putc      write the low byte
                     lbra      FlushBufDone return through the common exit
 
 FlushAll            pshs      u,d       save registers for flush-all
@@ -3726,12 +3730,12 @@ FcloseOne           pshs      u         save frame register for fclose
                     leas      -2,s       reserve a local
                     cmpu      #$0000    check for a null stream
                     beq       FcloseNull fail if null
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     bne       FcloseFlush proceed if the stream is in use
 FcloseNull          ldd       #$FFFF    return failure
                     puls      pc,u,x    restore and return
 
-FcloseFlush         ldd       $06,u     load the flags
+FcloseFlush         ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$02      test the write-mode bit
                     beq       FcloseNoFlush skip flush if not writing
@@ -3749,14 +3753,14 @@ FcloseCallClose     std       ,s        save the flush result
                     leas      2,s        drop the argument
                     clra                clear the flags
                     clrb                clear the flags
-                    std       $06,u     mark the stream free
+                    std       Flags,u     mark the stream free
                     ldd       ,s        return the flush result
                     puls      pc,u,x    restore and return
 
 Fflush              pshs      u         save frame register for fflush
                     ldu       $04,s     load the stream pointer
                     beq       IoErr     fail if null stream
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$22      isolate write and error bits
                     cmpd      #$0002    check the stream is writable
@@ -3764,7 +3768,7 @@ Fflush              pshs      u         save frame register for fflush
 IoErr               ldd       #$FFFF    return the error code
                     puls      pc,u      restore and return
 
-FflushWrite         ldd       $06,u     load the flags
+FflushWrite         ldd       Flags,u     load the flags
                     anda      #$80      isolate the high flag bit
                     clrb                clear the low byte
                     std       -$02,s    save the test result
@@ -3779,7 +3783,7 @@ FflushTail          pshs      u         pass the stream
 FlushBuf            pshs      u         save frame register for flush
                     ldu       $04,s     load the stream pointer
                     leas      -4,s       reserve locals
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     anda      #$01      isolate the read bit
                     clrb                clear the low byte
                     std       -$02,s    save the test result
@@ -3805,12 +3809,12 @@ FlushBufCount       ldd       ,u        load the write pointer
                     subd      $02,u     compute the bytes buffered
                     std       $02,s     save the byte count
                     lbeq      FlushResetPtr reset if nothing to write
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     anda      #$01      isolate the read bit
                     clrb                clear the low byte
                     std       -$02,s    save the test result
                     lbeq      FlushResetPtr reset if a read stream
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$40      test the text-mode bit
                     beq       FlushWriteBlock block write if binary
@@ -3852,20 +3856,20 @@ FlushWriteBlock     ldd       $02,s     load the byte count
                     bra       FlushSetErr otherwise flag an error
 
 FlushErrAdjust      leas      -$04,x    restore stack after the error
-FlushSetErr         ldd       $06,u     load the flags
+FlushSetErr         ldd       Flags,u     load the flags
                     orb       #$20      mark the stream in error
-                    std       $06,u     store the flags
+                    std       Flags,u     store the flags
                     ldd       $04,u     load the buffer limit
                     std       ,u        reset the write pointer
                     ldd       #$FFFF    return the error
                     bra       FlushBufDone exit through the common tail
 
-FlushResetPtr       ldd       $06,u     load the flags
+FlushResetPtr       ldd       Flags,u     load the flags
                     ora       #$01      mark the empty/read state
-                    std       $06,u     store the flags
+                    std       Flags,u     store the flags
                     ldd       $02,u     load the buffer base
                     std       ,u        reset the current pointer
-                    addd      $0b,u     add the buffer size
+                    addd      BufferSize,u     add the buffer size
                     std       $04,u     set the buffer end pointer
                     clra                return success zero
                     clrb                return success zero
@@ -3878,7 +3882,7 @@ TellPos             pshs      u         save frame register
 Getc                pshs      u         save frame register for getc
                     ldu       $04,s     load the stream pointer
                     beq       GetcEof   eof if null stream
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     anda      #$01      isolate the error bit
                     clrb                clear the low byte
                     std       -$02,s    save the test result
@@ -3903,7 +3907,7 @@ GetcRet             puls      pc,u      restore and return
                     pshs      u         save frame register for ungetc
                     ldu       $06,s     load the stream pointer
                     beq       GetcEof   fail if null stream
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$01      test the read-mode bit
                     beq       GetcEof   fail if not reading
@@ -3954,12 +3958,12 @@ GetwDone            leas      4,s        drop the locals
 Filbuf              pshs      u         save frame register for fill
                     ldu       $04,s     load the stream pointer
                     leas      -2,s       reserve a local
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     anda      #$80      isolate the high flag bit
                     andb      #$31      isolate read and mode bits
                     cmpd      #$8001    test an uninitialized read stream
                     beq       FilbufSyncStdin initialize the buffer if so
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$31      isolate the read-mode bits
                     cmpd      #$0001    check open for reading
@@ -3974,7 +3978,7 @@ FilbufSyncStdin     leax      InputPathBuffer,y   point at the standard input en
                     pshs      x         push it for comparison
                     cmpu      ,s++      is this the console input
                     bne       FilbufSeek skip sync if not stdin
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$40      test the line-buffer bit
                     beq       FilbufSeek skip if not line buffered
@@ -3982,17 +3986,17 @@ FilbufSyncStdin     leax      InputPathBuffer,y   point at the standard input en
                     pshs      x         push stdout
                     lbsr      Fflush    flush stdout before reading
                     leas      2,s        drop the argument
-FilbufSeek          ldd       $06,u     load the flags
+FilbufSeek          ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$08      test the seek-required bit
                     beq       GetcReadOne skip seek if not needed
-                    ldd       $0b,u     load the buffer size
+                    ldd       BufferSize,u     load the buffer size
                     pshs      d         push the size
                     ldd       $02,u     load the buffer base
                     pshs      d         push the base pointer
                     ldd       $08,u     load the descriptor
                     pshs      d         push the descriptor
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$40      test the text-mode bit
                     beq       FilbufSelectBin choose the binary reader
@@ -4017,7 +4021,7 @@ GetcCheckRead       leas      6,s        drop the three arguments
                     std       ,s        save the bytes-read count
                     ldd       ,s        reload the count
                     bgt       GetcReturnByte branch if a byte was read
-                    ldd       $06,u     load the stream flags
+                    ldd       Flags,u     load the stream flags
                     pshs      d         save the flags
                     ldd       $02,s     test the returned count
                     beq       GetcSetEof zero means end of file
@@ -4027,7 +4031,7 @@ GetcCheckRead       leas      6,s        drop the three arguments
 GetcSetEof          ldd       #$0010    end-of-file flag bit
 GetcOrFlags         ora       ,s+       merge the flag into the stream flags
                     orb       ,s+       low byte too
-                    std       $06,u     store the updated flags
+                    std       Flags,u     store the updated flags
                     ldd       #$FFFF    return -1 for eof
                     puls      pc,u,x    return
 
@@ -4043,7 +4047,7 @@ GetcReturnByte      ldd       $02,u     load the current buffer pointer
 
 FillBuf             pshs      u         save the frame
                     ldu       $04,s     load the stream pointer argument
-                    ldd       $06,u     load the stream flags
+                    ldd       Flags,u     load the stream flags
                     clra                isolate the low byte
                     andb      #$C0      test the buffering bits
                     bne       FillBufMarkActive already set up, skip allocation
@@ -4057,7 +4061,7 @@ FillBuf             pshs      u         save the frame
                     pshs      d         push a zero argument
                     lbsr      QueryOperand query the device information
                     leas      6,s        drop the arguments
-                    ldd       $06,u     reload the flags
+                    ldd       Flags,u     reload the flags
                     pshs      d         save them
                     ldb       $02,s     test the device-type result
                     bne       FillBufFully nonzero selects block buffering
@@ -4067,19 +4071,19 @@ FillBuf             pshs      u         save the frame
 FillBufFully        ldd       #$0080    fully-buffered flag
 FillBufOrMode       ora       ,s+       merge the buffering-mode flag
                     orb       ,s+       low byte too
-                    std       $06,u     store the flags
+                    std       Flags,u     store the flags
                     leas      32,s       release the local buffer
-FillBufMarkActive   ldd       $06,u     load the flags
+FillBufMarkActive   ldd       Flags,u     load the flags
                     ora       #$80      mark the stream active
-                    std       $06,u     store back
+                    std       Flags,u     store back
                     clra                isolate the low byte
                     andb      #$0C      test the eof/error bits
                     beq       FillBufSize none set, continue
                     puls      pc,u      abort on eof or error
 
-FillBufSize         ldd       $0b,u     load the buffer size
+FillBufSize         ldd       BufferSize,u     load the buffer size
                     bne       FillBufAlloc already sized, skip default
-                    ldd       $06,u     load the flags
+                    ldd       Flags,u     load the flags
                     clra                isolate the low byte
                     andb      #$40      test line-buffered
                     beq       FillBufDefSize not line-buffered
@@ -4087,30 +4091,30 @@ FillBufSize         ldd       $0b,u     load the buffer size
                     bra       FillBufStoreSize go store it
 
 FillBufDefSize      ldd       #$0100    default buffer size
-FillBufStoreSize    std       $0b,u     store the buffer size
+FillBufStoreSize    std       BufferSize,u     store the buffer size
 FillBufAlloc        ldd       $02,u     load the current pointer
                     bne       FillBufAllocOk buffer already allocated
-                    ldd       $0b,u     load the buffer size
+                    ldd       BufferSize,u     load the buffer size
                     pshs      d         push it
                     lbsr      MemExtend allocate the buffer
                     leas      2,s        drop the argument
                     std       $02,u     store the buffer pointer
                     cmpd      #$FFFF    check the allocation result
                     beq       FillBufAllocFail allocation failed
-FillBufAllocOk      ldd       $06,u     load the flags
+FillBufAllocOk      ldd       Flags,u     load the flags
                     orb       #$08      mark heap-allocated buffer
-                    std       $06,u     store back
+                    std       Flags,u     store back
                     bra       FillBufSetPtrs go finish setup
 
-FillBufAllocFail    ldd       $06,u     load the flags
+FillBufAllocFail    ldd       Flags,u     load the flags
                     orb       #$04      mark use of the inline buffer
-                    std       $06,u     store back
+                    std       Flags,u     store back
                     leax      $0a,u     point at the inline buffer
                     stx       $02,u     use it as the buffer
                     ldd       #$0001    size of one byte
-                    std       $0b,u     store the size
+                    std       BufferSize,u     store the size
 FillBufSetPtrs      ldd       $02,u     load the buffer base
-                    addd      $0b,u     add the size
+                    addd      BufferSize,u     add the size
                     std       $04,u     set the end pointer
                     std       ,u        set the current pointer
                     puls      pc,u      return
@@ -4403,7 +4407,7 @@ RetPathNum          tfr       a,b       move path number to b
                     clra                clear high byte
                     rts                 return path number
 
-CreateExisting      cmpb      #$DA      file-already-exists error
+CreateExisting      cmpb      #E$CEF    file-already-exists error
                     lbne      SetErrnoRet other errors return -1
                     lda       $05,s     reload mode
                     bita      #$80      test exclusive-create bit
@@ -4442,7 +4446,7 @@ ReadBytes           pshs      y         save y
                     pshs      y         save count for return
                     os9       I$Read    read the bytes
 IoDone              bcc       IoRetCount success handles count
-                    cmpb      #$D3      end-of-file error
+                    cmpb      #E$EOF    end-of-file error
                     bne       IoErr2    other error path
                     clra                zero count at eof
                     clrb                zero count at eof
@@ -4608,324 +4612,330 @@ RtsStub             rts                 return stub
                     * ============ WorkBlockImage: cstart init/relocation tables ============
 
                     * ---- count1: DP-data length (bytes copied to the DP base)
-WorkBlockImage      fdb       $0007
+WorkBlockImage      fdb       WBIcount2-WBIblock1
 
                     * ---- block1: DP data image  ->  data base
-                    fcb       $00,$00,$00,$00,$00,$00
+WBIblock1           fcb       $00,$00,$00,$00,$00,$00
                     fcb       $00
 
                     * ---- count2: non-DP-data length (bytes copied to base+HDRADV)
-                    fdb       $04F2
+WBIcount2           fdb       WBIblk2End-WBIblock2
 
                     * ---- block2: non-DP data image  ->  data base + HDRADV
-WBIblock2           fcb       $00,$00,$01
-                    fcb       $2C
-                    fcb       $10
-                    fcb       $52
-                    fcb       $10
-                    fcb       $55
-                    fcb       $10
-                    fcb       $58
-                    fcb       $10
-                    fcb       $5B
-                    fcb       $10
-                    fcb       $5E
-                    fcb       $10
-                    fcb       $61
-                    fcb       $10
-                    fcb       $64
-                    fcb       $10
-                    fcb       $67
-                    fcb       $10
-                    fcb       $6A
-                    fcb       $10
-                    fcb       $6D
-                    fcb       $10
-                    fcb       $70
-                    fcb       $10
-                    fcb       $73
-                    fcb       $10
-                    fcb       $76
-                    fcb       $10
-                    fcb       $79
-                    fcb       $10
-                    fcb       $7C
-                    fcb       $10,$7F,$10,$82,$10,$85
-                    fcb       $64
-                    fcb       C$NULL
-                    fcb       $78
-                    fcb       C$NULL
-                    fcb       $79
-                    fcb       C$NULL
-                    fcb       $75
-                    fcb       C$NULL
-                    fcb       $64,$2C,$78
-                    fcb       C$NULL
-                    fcb       $64,$2C,$79
-                    fcb       C$NULL
-                    fcb       $64,$2C,$75
-                    fcb       C$NULL
-                    fcc       /d,x,u/
-                    fcb       C$NULL
-                    fcc       /d,x,y,u/
-                    fcb       C$NULL
-                    fcc       /x,u,pc/
-                    fcb       C$NULL
-                    fcb       $79,$2C,$64
-                    fcb       C$NULL
-                    fcb       $79,$2C,$75
-                    fcb       C$NULL
-                    fcb       $75,$2C,$64
-                    fcb       C$NULL
-                    fcc       /u,pc/
-                    fcb       C$NULL
-                    fcc       /clra/
-                    fcb       C$NULL
-                    fcc       /cmpb/
-                    fcb       C$NULL
-                    fcc       /cmpd/
-                    fcb       C$NULL
-                    fcc       /cmpx/
-                    fcb       C$NULL
-                    fcc       /cmpy/
-                    fcb       C$NULL
-                    fcc       /cmpu/
-                    fcb       C$NULL
-                    fcb       $6C,$64,$62
-                    fcb       C$NULL
-                    fcb       $6C,$64,$64
-                    fcb       C$NULL
-                    fcb       $6C,$64,$78
-                    fcb       C$NULL
-                    fcb       $6C,$64,$79
-                    fcb       C$NULL
-                    fcb       $6C,$64,$75
-                    fcb       C$NULL
-                    fcb       $73,$74,$62
-                    fcb       C$NULL
-                    fcb       $73,$74,$64
-                    fcb       C$NULL
-                    fcb       $73,$74,$78
-                    fcb       C$NULL
-                    fcb       $73,$74,$79
-                    fcb       C$NULL
-                    fcb       $73,$74,$75
-                    fcb       C$NULL
-                    fcc       /pshs/
-                    fcb       C$NULL
-                    fcc       /puls/
-                    fcb       C$NULL
-                    fcc       /leax/
-                    fcb       C$NULL
-                    fcc       /leay/
-                    fcb       C$NULL
-                    fcc       /leau/
-                    fcb       C$NULL
-                    fcc       /leas/
-                    fcb       C$NULL
-                    fcb       $73,$65,$78
-                    fcb       C$NULL
-                    fcb       $74,$66,$72
-                    fcb       C$NULL
-                    fcb       $23,$30
-                    fcb       C$NULL
-                    fcb       $32,$2C,$78
-                    fcb       C$NULL
-                    fcb       $31,$2C,$78
-                    fcb       C$NULL
-                    fcb       $30,$2C,$78
-                    fcb       C$NULL
-                    fcc       /-1,x/
-                    fcb       C$NULL
-                    fcc       /-2,x/
-                    fcb       C$NULL
-                    fcb       $32,$2C,$79
-                    fcb       C$NULL
-                    fcb       $31,$2C,$79
-                    fcb       C$NULL
-                    fcb       $30,$2C,$79
-                    fcb       C$NULL
-                    fcc       /-1,y/
-                    fcb       C$NULL
-                    fcc       /-2,y/
-                    fcb       C$NULL
-                    fcb       $32,$2C,$75
-                    fcb       C$NULL
-                    fcb       $31,$2C,$75
-                    fcb       C$NULL
-                    fcb       $30,$2C,$75
-                    fcb       C$NULL
-                    fcc       /-1,u/
-                    fcb       C$NULL
-                    fcc       /-2,u/
-                    fcb       C$NULL
-                    fcb       $32,$2C,$73
-                    fcb       C$NULL
-                    fcb       $30,$2C,$73
-                    fcb       C$NULL
-                    fcc       /-2,s/
-                    fcb       C$NULL
-                    fcb       $23,$3C
-                    fcb       $00,$00,$02,$00,$BB,$00,$00,$00
-                    fcb       $A7,$00,$01,$00,$01,$00,$01,$00
-                    fcb       $00,$00,$02,$00,$BF,$00,$00,$00
-                    fcb       $AB,$00,$01,$00,$01,$00,$01,$00
-                    fcb       $00,$00,$02,$00,$B7,$00,$00,$00
-                    fcb       $A3,$00,$01,$00,$01,$00,$01,$00
-                    fcb       $00,$00,$02,$00,$A7,$00,$00,$00
-                    fcb       $BB,$00,$01,$00,$01,$00,$01,$00
-                    fcb       $00,$00,$02,$00,$AB,$00,$00,$00
-                    fcb       $BF,$00,$01,$00,$01,$00,$01,$00
-                    fcb       $00,$00,$01,$00,$ED,$00
-                    fcb       $74
-                    fcb       $00,$CB,$00
-                    fcb       $4B
-                    fcb       $00,$02,$00
-                    fcb       $4F
-                    fcb       $00,$00,$00,$01,$00,$ED,$00
-                    fcb       $7C
-                    fcb       $00,$CB,$00
-                    fcb       $4B
-                    fcb       $00,$02,$00
-                    fcb       $51
-                    fcb       $00,$00,$00,$02,$00,$CB,$00
-                    fcb       $4D
-                    fcb       $00,$CB,$00
-                    fcb       $4B
-                    fcb       $00,$01,$00
-                    fcb       $53
-                    fcb       $00,$00,$00,$02,$00,$CB,$00
-                    fcb       $51
-                    fcb       $00,$CB,$00
-                    fcb       $4B
-                    fcb       $00,$01,$00
-                    fcb       $5B
-                    fcb       $00,$00,$00,$02,$00,$CB,$00
-                    fcb       $4F
-                    fcb       $00,$CB,$00
-                    fcb       $4B
-                    fcb       $00,$01,$00
-                    fcb       $57
-                    fcb       $00,$00,$00,$02,$00,$CB,$00
-                    fcb       $51
-                    fcb       $00,$CB,$00
-                    fcb       $4F
-                    fcb       $00,$01,$00
-                    fcb       $78
-                    fcb       $00,$00,$00,$02,$00,$A7,$00,$00
-                    fcb       $00,$8F,$00,$F1,$00,$01,$00,$01
-                    fcb       $00,$00,$00,$02,$00,$AB,$00,$00
-                    fcb       $00,$94,$00,$F1,$00,$01,$00,$01
-                    fcb       $00,$00,$00,$02,$00,$AF,$00,$00
-                    fcb       $00,$99,$00,$F1,$00,$01,$00,$01
-                    fcb       $00,$00,$00,$02,$00,$B3,$00,$00
-                    fcb       $00,$9E,$00,$F1,$00,$01,$00,$01
-                    fcb       $00,$00,$00,$02,$00,$C3,$00,$00
-                    fcb       $00,$99,$00,$F1,$00,$01,$00,$01
-                    fcb       $00,$00,$00,$02,$00,$C7,$00,$00
-                    fcb       $00,$9E,$00,$F1,$00,$01,$00,$01
-                    fcb       $00,$00,$00,$02,$00,$A3,$00,$00
-                    fcb       $00,$B7,$00,$01,$00,$01,$00,$01
-                    fcb       $00,$00,$00,$01,$00,$E9,$00,$00
-                    fcb       $00,$85,$00,$00,$00,$02,$00,$00
-                    fcb       $00,$00,$00,$02,$00,$D5,$00,$F8
-                    fcb       $00,$00,$01,$00,$00,$02,$17,$A9
-                    fcb       $00,$00,$00,$02,$00,$DA,$01,$0E
-                    fcb       $00,$00,$01,$16,$00,$02,$17,$AD
-                    fcb       $00,$00,$00,$02,$00,$DF,$01
-                    fcb       $24
-                    fcb       $00,$00,$01
-                    fcb       $2C
-                    fcb       $00,$02,$17,$B1,$00,$00,$00,$02
-                    fcb       $00,$D5,$01,$00,$00,$00,$00,$FC
-                    fcb       $00,$02,$17,$B5,$00,$00,$00,$02
-                    fcb       $00,$DA,$01,$16,$00,$00,$01,$12
-                    fcb       $00,$02,$17,$B9,$00,$00,$00,$02
-                    fcb       $00,$DF,$01
-                    fcb       $2C
-                    fcb       $00,$00,$01
-                    fcb       $28
-                    fcb       $00,$02,$17,$BD,$00,$00,$00,$02
-                    fcb       $00,$D5,$00,$F4,$00,$00,$01,$05
-                    fcb       $00,$02,$17,$C1,$00,$00,$00,$02
-                    fcb       $00,$DA,$01,$0A,$00,$00,$01,$1B
-                    fcb       $00,$02,$17,$C6,$00,$00,$00,$02
-                    fcb       $00,$DF,$01
-                    fcb       $20
-                    fcb       $00,$00,$01
-                    fcb       $31
-                    fcb       $00,$02,$17,$CB,$00,$00,$00,$02
-                    fcb       $00,$D5,$01,$05,$00,$00,$00,$FC
-                    fcb       $00,$02,$17,$D0,$00,$00,$00,$02
-                    fcb       $00,$DA,$01,$1B,$00,$00,$01,$12
-                    fcb       $00,$02,$17,$D5,$00,$00,$00,$02
-                    fcb       $00,$DF,$01
-                    fcb       $31
-                    fcb       $00,$00,$01
-                    fcb       $28
-                    fcb       $00,$02,$17,$DA,$00,$00,$00,$02
-                    fcb       $00,$E9,$00,$00,$00,$8F,$01
-                    fcb       $43
-                    fcb       $00,$8A,$00,$02,$00,$00,$00,$02
-                    fcb       $00,$85,$00,$00,$00,$8F,$01
-                    fcb       $43
-                    fcb       $00,$8A,$00,$02,$00,$00,$00,$02
-                    fcb       $00,$E4,$01
-                    fcb       $36
-                    fcb       $00,$BB,$01
-                    fcb       $3E
-                    fcb       $00,$02,$17,$DF,$00,$00,$00,$02
-                    fcb       $00,$E4,$01
-                    fcb       $36
-                    fcb       $00,$CB,$00
-                    fcb       $4B
-                    fcb       $00,$BB,$01
-                    fcb       $3A
-                    fcb       $00,$00,$00,$02,$00,$CB,$00
-                    fcb       $51
-                    fcb       $00,$E4,$01
-                    fcb       $3E
-                    fcb       $00,$01,$00
-                    fcb       $5B
-                    fcb       $00,$00,$00,$02,$00,$CB,$00
-                    fcb       $51
-                    fcb       $00,$E4,$17,$E4,$00,$01,$00
-                    fcb       $5F
-                    fcb       $00,$00,$00,$02,$00,$CB,$00
-                    fcb       $51
-                    fcb       $00,$E4,$17,$E9,$00,$01,$00
-                    fcb       $65
+WBIblock2           fcb       $00,$00,$01,$2C
+WBIp0027            fdb       Otxt_1052
+WBIp0029            fdb       Otxt_1055
+WBIp002B            fdb       Otxt_1058
+WBIp002D            fdb       Otxt_105B
+WBIp002F            fdb       Otxt_105E
+WBIp0031            fdb       Otxt_1061
+WBIp0033            fdb       Otxt_1064
+WBIp0035            fdb       Otxt_1067
+WBIp0037            fdb       Otxt_106A
+WBIp0039            fdb       Otxt_106D
+WBIp003B            fdb       Otxt_1070
+WBIp003D            fdb       BraCondHi
+WBIp003F            fdb       Otxt_1076
+WBIp0041            fdb       BraCondMi
+WBIp0043            fdb       Otxt_107C
+WBIp0045            fdb       BraCondCs
+WBIp0047            fdb       Otxt_1082
+WBIp0049            fdb       Otxt_1085
+                    fcb       $64,$00,$78,$00,$79,$00,$75,$00
+                    fcb       $64,$2C,$78,$00,$64,$2C,$79,$00
+                    fcb       $64,$2C,$75,$00,$64,$2C,$78,$2C
+                    fcb       $75,$00,$64,$2C,$78,$2C,$79,$2C
+                    fcb       $75,$00,$78,$2C,$75,$2C,$70,$63
+                    fcb       $00,$79,$2C,$64,$00,$79,$2C,$75
+                    fcb       $00,$75,$2C,$64,$00,$75,$2C,$70
+                    fcb       $63,$00,$63,$6C,$72,$61,$00,$63
+                    fcb       $6D,$70,$62,$00,$63,$6D,$70,$64
+                    fcb       $00,$63,$6D,$70,$78,$00,$63,$6D
+                    fcb       $70,$79,$00,$63,$6D,$70,$75,$00
+                    fcb       $6C,$64,$62,$00,$6C,$64,$64,$00
+                    fcb       $6C,$64,$78,$00,$6C,$64,$79,$00
+                    fcb       $6C,$64,$75,$00,$73,$74,$62,$00
+                    fcb       $73,$74,$64,$00,$73,$74,$78,$00
+                    fcb       $73,$74,$79,$00,$73,$74,$75,$00
+                    fcb       $70,$73,$68,$73,$00,$70,$75,$6C
+                    fcb       $73,$00,$6C,$65,$61,$78,$00,$6C
+                    fcb       $65,$61,$79,$00,$6C,$65,$61,$75
+                    fcb       $00,$6C,$65,$61,$73,$00,$73,$65
+                    fcb       $78,$00,$74,$66,$72,$00,$23,$30
+                    fcb       $00,$32,$2C,$78,$00,$31,$2C,$78
+                    fcb       $00,$30,$2C,$78,$00,$2D,$31,$2C
+                    fcb       $78,$00,$2D,$32,$2C,$78,$00,$32
+                    fcb       $2C,$79,$00,$31,$2C,$79,$00,$30
+                    fcb       $2C,$79,$00,$2D,$31,$2C,$79,$00
+                    fcb       $2D,$32,$2C,$79,$00,$32,$2C,$75
+                    fcb       $00,$31,$2C,$75,$00,$30,$2C,$75
+                    fcb       $00,$2D,$31,$2C,$75,$00,$2D,$32
+                    fcb       $2C,$75,$00,$32,$2C,$73,$00,$30
+                    fcb       $2C,$73,$00,$2D,$32,$2C,$73,$00
+                    fcb       $23,$3C,$00,$00,$02
+WBIp0148            fdb       StringArgument2+$70
+                    fcb       $00,$00
+WBIp014C            fdb       StringArgument2+$5C
+                    fcb       $00,$01,$00,$01,$00,$01,$00,$00
+                    fcb       $00,$02
+WBIp0158            fdb       StringArgument2+$74
+                    fcb       $00,$00
+WBIp015C            fdb       StringArgument2+$60
+                    fcb       $00,$01,$00,$01,$00,$01,$00,$00
+                    fcb       $00,$02
+WBIp0168            fdb       StringArgument2+$6C
+                    fcb       $00,$00
+WBIp016C            fdb       StringArgument2+$58
+                    fcb       $00,$01,$00,$01,$00,$01,$00,$00
+                    fcb       $00,$02
+WBIp0178            fdb       StringArgument2+$5C
+                    fcb       $00,$00
+WBIp017C            fdb       StringArgument2+$70
+                    fcb       $00,$01,$00,$01,$00,$01,$00,$00
+                    fcb       $00,$02
+WBIp0188            fdb       StringArgument2+$60
+                    fcb       $00,$00
+WBIp018C            fdb       StringArgument2+$74
+                    fcb       $00,$01,$00,$01,$00,$01,$00,$00
+                    fcb       $00,$01
+WBIp0198            fdb       StringArgument2+$A2
+WBIp019A            fdb       StringArgument2+$29
+WBIp019C            fdb       StringArgument2+$80
+WBIp019E            fdb       StringArgument2
+                    fcb       $00,$02
+WBIp01A2            fdb       StringArgument2+$4
+                    fcb       $00,$00,$00,$01
+WBIp01A8            fdb       StringArgument2+$A2
+WBIp01AA            fdb       StringArgument2+$31
+WBIp01AC            fdb       StringArgument2+$80
+WBIp01AE            fdb       StringArgument2
+                    fcb       $00,$02
+WBIp01B2            fdb       StringArgument2+$6
+                    fcb       $00,$00,$00,$02
+WBIp01B8            fdb       StringArgument2+$80
+WBIp01BA            fdb       StringArgument2+$2
+WBIp01BC            fdb       StringArgument2+$80
+WBIp01BE            fdb       StringArgument2
+                    fcb       $00,$01
+WBIp01C2            fdb       StringArgument2+$8
+                    fcb       $00,$00,$00,$02
+WBIp01C8            fdb       StringArgument2+$80
+WBIp01CA            fdb       StringArgument2+$6
+WBIp01CC            fdb       StringArgument2+$80
+WBIp01CE            fdb       StringArgument2
+                    fcb       $00,$01
+WBIp01D2            fdb       StringArgument2+$10
+                    fcb       $00,$00,$00,$02
+WBIp01D8            fdb       StringArgument2+$80
+WBIp01DA            fdb       StringArgument2+$4
+WBIp01DC            fdb       StringArgument2+$80
+WBIp01DE            fdb       StringArgument2
+                    fcb       $00,$01
+WBIp01E2            fdb       StringArgument2+$C
+                    fcb       $00,$00,$00,$02
+WBIp01E8            fdb       StringArgument2+$80
+WBIp01EA            fdb       StringArgument2+$6
+WBIp01EC            fdb       StringArgument2+$80
+WBIp01EE            fdb       StringArgument2+$4
+                    fcb       $00,$01
+WBIp01F2            fdb       StringArgument2+$2D
+                    fcb       $00,$00,$00,$02
+WBIp01F8            fdb       StringArgument2+$5C
+                    fcb       $00,$00
+WBIp01FC            fdb       StringArgument2+$44
+WBIp01FE            fdb       StringArgument2+$A6
+                    fcb       $00,$01,$00,$01,$00,$00,$00,$02
+WBIp0208            fdb       StringArgument2+$60
+                    fcb       $00,$00
+WBIp020C            fdb       StringArgument2+$49
+WBIp020E            fdb       StringArgument2+$A6
+                    fcb       $00,$01,$00,$01,$00,$00,$00,$02
+WBIp0218            fdb       StringArgument2+$64
+                    fcb       $00,$00
+WBIp021C            fdb       StringArgument2+$4E
+WBIp021E            fdb       StringArgument2+$A6
+                    fcb       $00,$01,$00,$01,$00,$00,$00,$02
+WBIp0228            fdb       StringArgument2+$68
+                    fcb       $00,$00
+WBIp022C            fdb       StringArgument2+$53
+WBIp022E            fdb       StringArgument2+$A6
+                    fcb       $00,$01,$00,$01,$00,$00,$00,$02
+WBIp0238            fdb       StringArgument2+$78
+                    fcb       $00,$00
+WBIp023C            fdb       StringArgument2+$4E
+WBIp023E            fdb       StringArgument2+$A6
+                    fcb       $00,$01,$00,$01,$00,$00,$00,$02
+WBIp0248            fdb       StringArgument2+$7C
+                    fcb       $00,$00
+WBIp024C            fdb       StringArgument2+$53
+WBIp024E            fdb       StringArgument2+$A6
+                    fcb       $00,$01,$00,$01,$00,$00,$00,$02
+WBIp0258            fdb       StringArgument2+$58
+                    fcb       $00,$00
+WBIp025C            fdb       StringArgument2+$6C
+                    fcb       $00,$01,$00,$01,$00,$01,$00,$00
+                    fcb       $00,$01
+WBIp0268            fdb       StringArgument2+$9E
+                    fcb       $00,$00
+WBIp026C            fdb       StringArgument2+$3A
+                    fcb       $00,$00,$00,$02,$00,$00,$00,$00
+                    fcb       $00,$02
+WBIp0278            fdb       StringArgument2+$8A
+WBIp027A            fdb       StringArgument2+$AD
+                    fcb       $00,$00
+WBIp027E            fdb       StringArgument2+$B5
+                    fcb       $00,$02
+WBIp0282            fdb       Otxt_17A9
+                    fcb       $00,$00,$00,$02
+WBIp0288            fdb       StringArgument2+$8F
+WBIp028A            fdb       StringArgument2+$C3
+                    fcb       $00,$00
+WBIp028E            fdb       StringArgument2+$CB
+                    fcb       $00,$02
+WBIp0292            fdb       Otxt_17AD
+                    fcb       $00,$00,$00,$02
+WBIp0298            fdb       StringArgument2+$94
+WBIp029A            fdb       StringArgument2+$D9
+                    fcb       $00,$00
+WBIp029E            fdb       StringArgument2+$E1
+                    fcb       $00,$02
+WBIp02A2            fdb       Otxt_17B1
+                    fcb       $00,$00,$00,$02
+WBIp02A8            fdb       StringArgument2+$8A
+WBIp02AA            fdb       StringArgument2+$B5
+                    fcb       $00,$00
+WBIp02AE            fdb       StringArgument2+$B1
+                    fcb       $00,$02
+WBIp02B2            fdb       Otxt_17B5
+                    fcb       $00,$00,$00,$02
+WBIp02B8            fdb       StringArgument2+$8F
+WBIp02BA            fdb       StringArgument2+$CB
+                    fcb       $00,$00
+WBIp02BE            fdb       StringArgument2+$C7
+                    fcb       $00,$02
+WBIp02C2            fdb       Otxt_17B9
+                    fcb       $00,$00,$00,$02
+WBIp02C8            fdb       StringArgument2+$94
+WBIp02CA            fdb       StringArgument2+$E1
+                    fcb       $00,$00
+WBIp02CE            fdb       StringArgument2+$DD
+                    fcb       $00,$02
+WBIp02D2            fdb       Otxt_17BD
+                    fcb       $00,$00,$00,$02
+WBIp02D8            fdb       StringArgument2+$8A
+WBIp02DA            fdb       StringArgument2+$A9
+                    fcb       $00,$00
+WBIp02DE            fdb       StringArgument2+$BA
+                    fcb       $00,$02
+WBIp02E2            fdb       Otxt_17C1
+                    fcb       $00,$00,$00,$02
+WBIp02E8            fdb       StringArgument2+$8F
+WBIp02EA            fdb       StringArgument2+$BF
+                    fcb       $00,$00
+WBIp02EE            fdb       StringArgument2+$D0
+                    fcb       $00,$02
+WBIp02F2            fdb       Otxt_17C6
+                    fcb       $00,$00,$00,$02
+WBIp02F8            fdb       StringArgument2+$94
+WBIp02FA            fdb       StringArgument2+$D5
+                    fcb       $00,$00
+WBIp02FE            fdb       StringArgument2+$E6
+                    fcb       $00,$02
+WBIp0302            fdb       Otxt_17CB
+                    fcb       $00,$00,$00,$02
+WBIp0308            fdb       StringArgument2+$8A
+WBIp030A            fdb       StringArgument2+$BA
+                    fcb       $00,$00
+WBIp030E            fdb       StringArgument2+$B1
+                    fcb       $00,$02
+WBIp0312            fdb       Otxt_17D0
+                    fcb       $00,$00,$00,$02
+WBIp0318            fdb       StringArgument2+$8F
+WBIp031A            fdb       StringArgument2+$D0
+                    fcb       $00,$00
+WBIp031E            fdb       StringArgument2+$C7
+                    fcb       $00,$02
+WBIp0322            fdb       Otxt_17D5
+                    fcb       $00,$00,$00,$02
+WBIp0328            fdb       StringArgument2+$94
+WBIp032A            fdb       StringArgument2+$E6
+                    fcb       $00,$00
+WBIp032E            fdb       StringArgument2+$DD
+                    fcb       $00,$02
+WBIp0332            fdb       Otxt_17DA
+                    fcb       $00,$00,$00,$02
+WBIp0338            fdb       StringArgument2+$9E
+                    fcb       $00,$00
+WBIp033C            fdb       StringArgument2+$44
+WBIp033E            fdb       StringArgument2+$F8
+WBIp0340            fdb       StringArgument2+$3F
+                    fcb       $00,$02,$00,$00,$00,$02
+WBIp0348            fdb       StringArgument2+$3A
+                    fcb       $00,$00
+WBIp034C            fdb       StringArgument2+$44
+WBIp034E            fdb       StringArgument2+$F8
+WBIp0350            fdb       StringArgument2+$3F
+                    fcb       $00,$02,$00,$00,$00,$02
+WBIp0358            fdb       StringArgument2+$99
+WBIp035A            fdb       StringArgument2+$EB
+WBIp035C            fdb       StringArgument2+$70
+WBIp035E            fdb       StringArgument2+$F3
+                    fcb       $00,$02
+WBIp0362            fdb       Otxt_17DF
+                    fcb       $00,$00,$00,$02
+WBIp0368            fdb       StringArgument2+$99
+WBIp036A            fdb       StringArgument2+$EB
+WBIp036C            fdb       StringArgument2+$80
+WBIp036E            fdb       StringArgument2
+WBIp0370            fdb       StringArgument2+$70
+WBIp0372            fdb       StringArgument2+$EF
+                    fcb       $00,$00,$00,$02
+WBIp0378            fdb       StringArgument2+$80
+WBIp037A            fdb       StringArgument2+$6
+WBIp037C            fdb       StringArgument2+$99
+WBIp037E            fdb       StringArgument2+$F3
+                    fcb       $00,$01
+WBIp0382            fdb       StringArgument2+$10
+                    fcb       $00,$00,$00,$02
+WBIp0388            fdb       StringArgument2+$80
+WBIp038A            fdb       StringArgument2+$6
+WBIp038C            fdb       StringArgument2+$99
+WBIp038E            fdb       Otxt_17E4
+                    fcb       $00,$01
+WBIp0392            fdb       StringArgument2+$14
+                    fcb       $00,$00,$00,$02
+WBIp0398            fdb       StringArgument2+$80
+WBIp039A            fdb       StringArgument2+$6
+WBIp039C            fdb       StringArgument2+$99
+WBIp039E            fdb       Otxt_17E9
+                    fcb       $00,$01
+WBIp03A2            fdb       StringArgument2+$1A
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00
-CtypeTabImg         fcb       $00,$00,$00,$00
+CtypeTabImg         fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
-                    fcb       $00,$00,$00,$00,$00,$00,$00,$00
-                    fcb       $01,$00,$00,$00,$00,$00,$00,$00
-                    fcb       C$NULL,C$NULL,$02,C$NULL
-                    fcc       /88((((((((/
-                    fcb       $00,$00,$00,$00,$00,$00,$02
-                    fcc       /""""""/
+                    fcb       $00,$00,$00,$00,$01,$00,$00,$00
+                    fcb       $00,$00,$00,$00,$00,$00,$02,$00
+                    fcb       $38,$38,$28,$28,$28,$28,$28,$28
+                    fcb       $28,$28,$00,$00,$00,$00,$00,$00
+                    fcb       $02,$22,$22,$22,$22,$22,$22,$02
                     fcb       $02,$02,$02,$02,$02,$02,$02,$02
                     fcb       $02,$02,$02,$02,$02,$02,$02,$02
-                    fcb       $02,$02,$02,$02,$00,$00,$00,$00
-                    fcb       $02,$00,$04,$04,$04,$04,$04,$04
+                    fcb       $02,$02,$02,$00,$00,$00,$00,$02
+                    fcb       $00,$04,$04,$04,$04,$04,$04,$04
                     fcb       $04,$04,$04,$04,$04,$04,$04,$04
                     fcb       $04,$04,$04,$04,$04,$04,$04,$04
-                    fcb       $04,$04,$04,$04,$00,$00,$00,$00
-                    fcb       $00
-Pow10Img            fdb       10000,1000,100,10 powers of ten
-                    fcb       $04
-                    fcb       $40,$6C,$78
-                    fcb       $00,$00,$00,$00,$00,$00,$00,$00
-                    fcb       $01,$00,$00,$00,$00,$00,$00,$00
-                    fcb       $00,$00,$00,$00,$00,$02,$00,$01
-                    fcb       $00,$00,$00,$00,$00,$00,$00,$00
-                    fcb       $00,$00
-                    fcb       $42
-                    fcb       $00,$02,$00,$00,$00,$00,$00,$00
+                    fcb       $04,$04,$04,$00,$00,$00,$00,$00
+Pow10Img            fcb       $27,$10,$03,$E8,$00,$64,$00,$0A
+WBIp0440            fdb       TableEnd
+                    fcb       $6C,$78,$00,$00,$00,$00,$00,$00
+                    fcb       $00,$00,$01,$00,$00,$00,$00,$00
+                    fcb       $00,$00,$00,$00,$00,$00,$00,$02
+                    fcb       $00,$01,$00,$00,$00,$00,$00,$00
+                    fcb       $00,$00,$00,$00,$42,$00,$02,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
@@ -4946,39 +4956,62 @@ Pow10Img            fdb       10000,1000,100,10 powers of ten
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00
-                    fcb       $00,$00,$00,$00,$00,$00
+                    fcb       $00,$00,$00,$00,$00,$00,$00,$00
+                    fcb       $00,$00,$00
 
                     * ---- nreloc1: text-relocation count  (each offset patched by +module base)
-                    fdb       $0021
+WBIblk2End          fdb       (reloc1End-reloc1Start)/2
 
                     * ---- reloc1: text relocation offsets
-                    fdb       $02C2,$02B2,$02A2,$0292,$0282,$0332,$0322,$0312
-                    fdb       $0302,$02F2,$02E2,$02D2,$002D,$002B,$0029,$0027
-                    fdb       $039E,$038E,$0362,$003B,$0039,$0037,$0035,$0033
-                    fdb       $0031,$002F,$0049,$0047,$0045,$0043,$0041,$003F
-                    fdb       $003D
+reloc1Start         fdb       HDRADV+WBIp02C2-WBIblock2,HDRADV+WBIp02B2-WBIblock2,HDRADV+WBIp02A2-WBIblock2,HDRADV+WBIp0292-WBIblock2
+                    fdb       HDRADV+WBIp0282-WBIblock2,HDRADV+WBIp0332-WBIblock2,HDRADV+WBIp0322-WBIblock2,HDRADV+WBIp0312-WBIblock2
+                    fdb       HDRADV+WBIp0302-WBIblock2,HDRADV+WBIp02F2-WBIblock2,HDRADV+WBIp02E2-WBIblock2,HDRADV+WBIp02D2-WBIblock2
+                    fdb       HDRADV+WBIp002D-WBIblock2,HDRADV+WBIp002B-WBIblock2,HDRADV+WBIp0029-WBIblock2,HDRADV+WBIp0027-WBIblock2
+                    fdb       HDRADV+WBIp039E-WBIblock2,HDRADV+WBIp038E-WBIblock2,HDRADV+WBIp0362-WBIblock2,HDRADV+WBIp003B-WBIblock2
+                    fdb       HDRADV+WBIp0039-WBIblock2,HDRADV+WBIp0037-WBIblock2,HDRADV+WBIp0035-WBIblock2,HDRADV+WBIp0033-WBIblock2
+                    fdb       HDRADV+WBIp0031-WBIblock2,HDRADV+WBIp002F-WBIblock2,HDRADV+WBIp0049-WBIblock2,HDRADV+WBIp0047-WBIblock2
+                    fdb       HDRADV+WBIp0045-WBIblock2,HDRADV+WBIp0043-WBIblock2,HDRADV+WBIp0041-WBIblock2,HDRADV+WBIp003F-WBIblock2
+                    fdb       HDRADV+WBIp003D-WBIblock2
+reloc1End           equ       *
 
                     * ---- nreloc2: data-relocation count  (each offset patched by +work base)
-                    fdb       $0082
+                    fdb       (reloc2End-reloc2Start)/2
 
                     * ---- reloc2: data relocation offsets
-                    fdb       $0158,$014C,$0148,$0440,$018C,$0188,$017C,$0178
-                    fdb       $016C,$0168,$015C,$01AA,$01A8,$01A2,$019E,$019C
-                    fdb       $019A,$0198,$01BE,$01BC,$01BA,$01B8,$01B2,$01AE
-                    fdb       $01AC,$01D8,$01D2,$01CE,$01CC,$01CA,$01C8,$01C2
-                    fdb       $01EC,$01EA,$01E8,$01E2,$01DE,$01DC,$01DA,$020C
-                    fdb       $0208,$01FE,$01FC,$01F8,$01F2,$01EE,$022E,$022C
-                    fdb       $0228,$021E,$021C,$0218,$020E,$0258,$024E,$024C
-                    fdb       $0248,$023E,$023C,$0238,$0288,$027E,$027A,$0278
-                    fdb       $026C,$0268,$025C,$02AA,$02A8,$029E,$029A,$0298
-                    fdb       $028E,$028A,$02CE,$02CA,$02C8,$02BE,$02BA,$02B8
-                    fdb       $02AE,$02F8,$02EE,$02EA,$02E8,$02DE,$02DA,$02D8
-                    fdb       $031A,$0318,$030E,$030A,$0308,$02FE,$02FA,$033E
-                    fdb       $033C,$0338,$032E,$032A,$0328,$031E,$035A,$0358
-                    fdb       $0350,$034E,$034C,$0348,$0340,$0370,$036E,$036C
-                    fdb       $036A,$0368,$035E,$035C,$0388,$0382,$037E,$037C
-                    fdb       $037A,$0378,$0372,$03A2,$039C,$039A,$0398,$0392
-                    fdb       $038C,$038A
+reloc2Start         fdb       HDRADV+WBIp0158-WBIblock2,HDRADV+WBIp014C-WBIblock2,HDRADV+WBIp0148-WBIblock2,HDRADV+WBIp0440-WBIblock2
+                    fdb       HDRADV+WBIp018C-WBIblock2,HDRADV+WBIp0188-WBIblock2,HDRADV+WBIp017C-WBIblock2,HDRADV+WBIp0178-WBIblock2
+                    fdb       HDRADV+WBIp016C-WBIblock2,HDRADV+WBIp0168-WBIblock2,HDRADV+WBIp015C-WBIblock2,HDRADV+WBIp01AA-WBIblock2
+                    fdb       HDRADV+WBIp01A8-WBIblock2,HDRADV+WBIp01A2-WBIblock2,HDRADV+WBIp019E-WBIblock2,HDRADV+WBIp019C-WBIblock2
+                    fdb       HDRADV+WBIp019A-WBIblock2,HDRADV+WBIp0198-WBIblock2,HDRADV+WBIp01BE-WBIblock2,HDRADV+WBIp01BC-WBIblock2
+                    fdb       HDRADV+WBIp01BA-WBIblock2,HDRADV+WBIp01B8-WBIblock2,HDRADV+WBIp01B2-WBIblock2,HDRADV+WBIp01AE-WBIblock2
+                    fdb       HDRADV+WBIp01AC-WBIblock2,HDRADV+WBIp01D8-WBIblock2,HDRADV+WBIp01D2-WBIblock2,HDRADV+WBIp01CE-WBIblock2
+                    fdb       HDRADV+WBIp01CC-WBIblock2,HDRADV+WBIp01CA-WBIblock2,HDRADV+WBIp01C8-WBIblock2,HDRADV+WBIp01C2-WBIblock2
+                    fdb       HDRADV+WBIp01EC-WBIblock2,HDRADV+WBIp01EA-WBIblock2,HDRADV+WBIp01E8-WBIblock2,HDRADV+WBIp01E2-WBIblock2
+                    fdb       HDRADV+WBIp01DE-WBIblock2,HDRADV+WBIp01DC-WBIblock2,HDRADV+WBIp01DA-WBIblock2,HDRADV+WBIp020C-WBIblock2
+                    fdb       HDRADV+WBIp0208-WBIblock2,HDRADV+WBIp01FE-WBIblock2,HDRADV+WBIp01FC-WBIblock2,HDRADV+WBIp01F8-WBIblock2
+                    fdb       HDRADV+WBIp01F2-WBIblock2,HDRADV+WBIp01EE-WBIblock2,HDRADV+WBIp022E-WBIblock2,HDRADV+WBIp022C-WBIblock2
+                    fdb       HDRADV+WBIp0228-WBIblock2,HDRADV+WBIp021E-WBIblock2,HDRADV+WBIp021C-WBIblock2,HDRADV+WBIp0218-WBIblock2
+                    fdb       HDRADV+WBIp020E-WBIblock2,HDRADV+WBIp0258-WBIblock2,HDRADV+WBIp024E-WBIblock2,HDRADV+WBIp024C-WBIblock2
+                    fdb       HDRADV+WBIp0248-WBIblock2,HDRADV+WBIp023E-WBIblock2,HDRADV+WBIp023C-WBIblock2,HDRADV+WBIp0238-WBIblock2
+                    fdb       HDRADV+WBIp0288-WBIblock2,HDRADV+WBIp027E-WBIblock2,HDRADV+WBIp027A-WBIblock2,HDRADV+WBIp0278-WBIblock2
+                    fdb       HDRADV+WBIp026C-WBIblock2,HDRADV+WBIp0268-WBIblock2,HDRADV+WBIp025C-WBIblock2,HDRADV+WBIp02AA-WBIblock2
+                    fdb       HDRADV+WBIp02A8-WBIblock2,HDRADV+WBIp029E-WBIblock2,HDRADV+WBIp029A-WBIblock2,HDRADV+WBIp0298-WBIblock2
+                    fdb       HDRADV+WBIp028E-WBIblock2,HDRADV+WBIp028A-WBIblock2,HDRADV+WBIp02CE-WBIblock2,HDRADV+WBIp02CA-WBIblock2
+                    fdb       HDRADV+WBIp02C8-WBIblock2,HDRADV+WBIp02BE-WBIblock2,HDRADV+WBIp02BA-WBIblock2,HDRADV+WBIp02B8-WBIblock2
+                    fdb       HDRADV+WBIp02AE-WBIblock2,HDRADV+WBIp02F8-WBIblock2,HDRADV+WBIp02EE-WBIblock2,HDRADV+WBIp02EA-WBIblock2
+                    fdb       HDRADV+WBIp02E8-WBIblock2,HDRADV+WBIp02DE-WBIblock2,HDRADV+WBIp02DA-WBIblock2,HDRADV+WBIp02D8-WBIblock2
+                    fdb       HDRADV+WBIp031A-WBIblock2,HDRADV+WBIp0318-WBIblock2,HDRADV+WBIp030E-WBIblock2,HDRADV+WBIp030A-WBIblock2
+                    fdb       HDRADV+WBIp0308-WBIblock2,HDRADV+WBIp02FE-WBIblock2,HDRADV+WBIp02FA-WBIblock2,HDRADV+WBIp033E-WBIblock2
+                    fdb       HDRADV+WBIp033C-WBIblock2,HDRADV+WBIp0338-WBIblock2,HDRADV+WBIp032E-WBIblock2,HDRADV+WBIp032A-WBIblock2
+                    fdb       HDRADV+WBIp0328-WBIblock2,HDRADV+WBIp031E-WBIblock2,HDRADV+WBIp035A-WBIblock2,HDRADV+WBIp0358-WBIblock2
+                    fdb       HDRADV+WBIp0350-WBIblock2,HDRADV+WBIp034E-WBIblock2,HDRADV+WBIp034C-WBIblock2,HDRADV+WBIp0348-WBIblock2
+                    fdb       HDRADV+WBIp0340-WBIblock2,HDRADV+WBIp0370-WBIblock2,HDRADV+WBIp036E-WBIblock2,HDRADV+WBIp036C-WBIblock2
+                    fdb       HDRADV+WBIp036A-WBIblock2,HDRADV+WBIp0368-WBIblock2,HDRADV+WBIp035E-WBIblock2,HDRADV+WBIp035C-WBIblock2
+                    fdb       HDRADV+WBIp0388-WBIblock2,HDRADV+WBIp0382-WBIblock2,HDRADV+WBIp037E-WBIblock2,HDRADV+WBIp037C-WBIblock2
+                    fdb       HDRADV+WBIp037A-WBIblock2,HDRADV+WBIp0378-WBIblock2,HDRADV+WBIp0372-WBIblock2,HDRADV+WBIp03A2-WBIblock2
+                    fdb       HDRADV+WBIp039C-WBIblock2,HDRADV+WBIp039A-WBIblock2,HDRADV+WBIp0398-WBIblock2,HDRADV+WBIp0392-WBIblock2
+                    fdb       HDRADV+WBIp038C-WBIblock2,HDRADV+WBIp038A-WBIblock2
+reloc2End           equ       *
 
                     * ---- name: trailing module-name string
                     fcc       /c.opt/

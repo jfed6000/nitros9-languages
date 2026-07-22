@@ -114,7 +114,7 @@ ResultSignFlag      rmb       $1
 DivideRoutinePointer rmb       $2
 FreeSpace           rmb       $2
 UserHandlerPointer  rmb       $2
-                    rmb       $F80     remaining data, bss and heap
+HeapStart           rmb       $F80     start of heap/bss (end of static data)
 size                equ       .
 
 name                equ       *
@@ -122,9 +122,17 @@ name                equ       *
                     fcb       edition
 
 * --- shared C runtime startup (see cstart.i) ---
-RTBASE              equ       $01DA     runtime-globals block base in the data area
-DATAEND             equ       $068E     end of static data / heap start / stack limit
-HDRADV              equ       $0060     initialized-data header advance
+RTBASE              equ       CtypeTab+$80 runtime-globals block base (after the 128-byte ctype table)
+DATAEND             equ       HeapStart end of static data / heap start / stack limit
+HDRADV              equ       ListHeadAddress initialized-data header advance (non-DP data start)
+
+* ---- shared node-record header fields (symbol/section/module linked records)
+NdNext              equ       $0e       list/sibling link (next in a node list)
+NdLink              equ       $11       module / free-list chain link
+NdMFlags            equ       $13       module flags
+NdExec              equ       $23       module exec offset
+NdHead              equ       $2d       head of a node child list
+NdName              equ       $2f       name / section id
                     use       lib/cstart.asm
 
 main                pshs      u         save the data base
@@ -333,7 +341,7 @@ ArgLoop             ldd       $0a,s     get remaining argument count
                     leas      2,s        drop the argument
 RefsResolved        ldd       NamePointer,y   get the module name
                     pshs      d         push the name pointer
-                    lbsr      $2EC4     create the output module
+                    lbsr      StrLen+1  create the output module
                     leas      2,s        drop the argument
                     std       GlbOutPath save the output path
                     lbsr      ComputeSectionSizes write the module header
@@ -692,12 +700,12 @@ BuildSymNode        pshs      u         save caller frame pointer
 ReuseFreeNode       ldd       GlbVar003C free node list head
                     std       $27,s     use it as the node
                     ldx       $27,s     node pointer
-                    ldd       $11,x     load next free node
+                    ldd       NdLink,x     load next free node
                     std       GlbVar003C advance the free list
 NodeAcquired        clra                clear high byte
                     clrb                clear low byte
                     ldx       $27,s     node pointer
-                    std       $2d,x     clear node symbol field
+                    std       NdHead,x     clear node symbol field
                     clra                clear high byte
                     clrb                clear low byte
                     ldx       $27,s     node pointer
@@ -734,7 +742,7 @@ StoreNodeName       clra                clear high byte
                     stb       [$1b,s]   null terminate buffer
                     ldd       GlbVar0042 current section pointer
                     ldx       $27,s     node pointer
-                    std       $2f,x     store section into node
+                    std       NdName,x     store section into node
                     ldd       #$0010    push length argument
                     pshs      d         node section name field
                     ldd       $2f,s     offset into name
@@ -755,12 +763,12 @@ StoreNodeName       clra                clear high byte
 SymbolLoop          lbsr      AllocNode read next symbol
                     std       $25,s     save new symbol node
                     ldx       $27,s     parent node pointer
-                    ldd       $2d,x     current child list head
+                    ldd       NdHead,x     current child list head
                     ldx       $25,s     new symbol pointer
-                    std       $0e,x     link old head after new
+                    std       NdNext,x     link old head after new
                     ldd       $25,s     new symbol pointer
                     ldx       $27,s     parent node pointer
-                    std       $2d,x     update child list head
+                    std       NdHead,x     update child list head
                     ldd       $25,s     new symbol pointer
                     pshs      d         push symbol argument
                     lbsr      ReadSymName insert into hash table
@@ -785,7 +793,7 @@ ReadRelLoop         ldd       $1f,s     load loop counter
                     ldd       $2f,s     load flag argument
                     lbeq      MergeSection skip merge when zero
                     ldx       $27,s     point to module record
-                    ldd       $2d,x     load symbol list head
+                    ldd       NdHead,x     load symbol list head
                     bra       FindSymNext enter search loop
 
 FindSymLoop         ldd       #$0001    push mode flag one
@@ -797,7 +805,7 @@ FindSymLoop         ldd       #$0001    push mode flag one
                     std       -$02,s    save match result
                     bne       FindSymDone stop when match found
                     ldx       $25,s     point to current entry
-                    ldd       $0e,x     load next entry link
+                    ldd       NdNext,x     load next entry link
 FindSymNext         std       $25,s     set current entry
                     ldd       $25,s     reload current entry
                     bne       FindSymLoop continue while entries remain
@@ -805,16 +813,16 @@ FindSymDone         ldd       $25,s     load found entry
                     bne       MergeSection merge into existing entry
                     leas      -2,s       reserve local
                     ldx       $29,s     point to source record
-                    ldd       $2d,x     load symbol name pointer
+                    ldd       NdHead,x     load symbol name pointer
                     pshs      d         pass name pointer
                     lbsr      FindListTail allocate new entry
                     leas      2,s        drop argument
                     std       ,s        save new entry pointer
                     ldd       GlbVar0001 load list head at $0001
                     ldx       ,s        point to new entry
-                    std       $0e,x     link previous head
+                    std       NdNext,x     link previous head
                     ldx       $29,s     point to source record
-                    ldd       $0e,x     load source next link
+                    ldd       NdNext,x     load source next link
                     std       GlbVar0001 update list head
                     ldd       $29,s     load source record
                     pshs      d         pass source record
@@ -829,14 +837,14 @@ FindSymDone         ldd       $25,s     load found entry
                     leas      2,s        drop argument
                     ldd       GlbVar003C load previous tail link
                     ldx       $29,s     point to source record
-                    std       $11,x     store link field
+                    std       NdLink,x     store link field
                     ldd       $29,s     load source record
                     std       GlbVar003C update list tail
                     leas      43,s       release frame
                     puls      pc,u      return
 
 MergeSection        ldx       $27,s     point to module record
-                    ldd       $2d,x     load symbol list head
+                    ldd       NdHead,x     load symbol list head
                     bra       DupSymJoin enter duplicate scan
 
 DupSymLoop          ldd       $25,s     load current symbol
@@ -858,7 +866,7 @@ DupSymLoop          ldd       $25,s     load current symbol
                     addd      #$0001    bump error count
                     std       GlbVar0044 save error count
 DupSymNext          ldx       $25,s     point to current symbol
-                    ldd       $0e,x     load next symbol link
+                    ldd       NdNext,x     load next symbol link
 DupSymJoin          std       $25,s     set current symbol
                     ldd       $25,s     reload current symbol
                     bne       DupSymLoop continue scanning symbols
@@ -871,7 +879,7 @@ DupSymJoin          std       $25,s     set current symbol
 
 AppendRecord        ldd       $27,s     load module record
                     ldx       GlbVar0040 point to list tail
-                    std       $11,x     link new record
+                    std       NdLink,x     link new record
                     std       GlbVar0040 update list tail
 LinkDone            ldx       $27,s     point to module record
                     leax      $29,x     point to symbol subfield
@@ -927,7 +935,7 @@ NewSymEntry         leas      -2,s       reserve local
                     leas      4,s        drop two arguments
                     ldd       $29,s     load new entry
                     ldx       ,s        point to previous head
-                    std       $0e,x     link entry
+                    std       NdNext,x     link entry
                     leas      2,s        release local
 ApplyReloc2         ldx       $27,s     point to module record
                     ldd       $27,x     load section base
@@ -988,7 +996,7 @@ ComputeSectionSizes pshs      u         save frame pointer
                     lbra      SumModLoop enter module loop
 
 SumModEnter         ldx       ,s        point to current module
-                    ldu       $2d,x     load section list head
+                    ldu       NdHead,x     load section list head
                     lbra      SumSectTest enter section loop
 
 SumSectLoop         ldd       $0a,u     load section flags
@@ -997,9 +1005,9 @@ SumSectLoop         ldd       $0a,u     load section flags
                     std       -$02,s    save flag
                     lbeq      SumSectNext skip excluded section
                     ldx       ,s        point to current module
-                    ldd       $13,x     load module flags
+                    ldd       NdMFlags,x     load module flags
                     ora       #$01      mark module used
-                    std       $13,x     save module flags
+                    std       NdMFlags,x     save module flags
                     ldd       GlbVar001E load text accumulator
                     pshs      d         save accumulator
                     ldx       $02,s     point to section
@@ -1055,11 +1063,11 @@ SumSectLoop         ldd       $0a,u     load section flags
                     std       GlbVar0034 update max size
                     bra       SumModNext advance module
 
-SumSectNext         ldu       $0e,u     load next section
+SumSectNext         ldu       NdNext,u     load next section
 SumSectTest         stu       -$02,s    save section pointer
                     lbne      SumSectLoop loop while sections remain
 SumModNext          ldx       ,s        point to current module
-                    ldd       $11,x     load next module link
+                    ldd       NdLink,x     load next module link
 SumModLoop          std       ,s        set current module
                     ldd       ,s        reload current module
                     lbne      SumModEnter loop while modules remain
@@ -1126,13 +1134,13 @@ ApplySectionBase    pshs      u         save frame pointer
                     lbra      ModuleLoop enter module loop
 
 RelocModLoop        ldx       $03,s     point to current module
-                    ldd       $13,x     load module flags
+                    ldd       NdMFlags,x     load module flags
                     anda      #$01      test used flag
                     clrb                clear low byte
                     std       -$02,s    save flag
                     lbeq      NextModule skip unused module
                     ldx       $03,s     point to current module
-                    ldu       $2d,x     load section list head
+                    ldu       NdHead,x     load section list head
                     lbra      EntryLoop enter section loop
 
 SelectSectionBase   ldd       $0a,u     load section flags
@@ -1163,7 +1171,7 @@ StoreBase           std       $0C,u     store adjusted offset
                     bra       NextEntry advance section
 
 RelocEntryLoop      ldx       $03,s     point to current module
-                    ldd       $2f,x     load relocation list
+                    ldd       NdName,x     load relocation list
                     pshs      d         pass relocation list
                     ldd       $05,s     load argument
                     pshs      d         pass argument
@@ -1185,7 +1193,7 @@ TypeSwitch          stx       -$02,s    save entry type for testing
                     beq       AddBaseFive type four handler
                     bra       RelocEntryLoop unknown entry type
 
-NextEntry           ldu       $0e,u     follow link to next entry
+NextEntry           ldu       NdNext,u     follow link to next entry
 EntryLoop           stu       -$02,s    test the entry pointer
                     lbne      SelectSectionBase loop while entries remain
                     ldd       GlbVar001C accumulate text size total
@@ -1219,7 +1227,7 @@ EntryLoop           stu       -$02,s    test the entry pointer
                     addd      ,s++      add and pop
                     std       GlbVar002C update total dp size
 NextModule          ldx       $03,s     current module pointer
-                    ldd       $11,x     next module link
+                    ldd       NdLink,x     next module link
 ModuleLoop          std       $03,s     advance the module pointer
                     ldd       $03,s     test the module pointer
                     lbne      RelocModLoop loop while modules remain
@@ -1267,12 +1275,12 @@ AddSymbol           pshs      u         save frame pointer
                     bsr       AllocNode allocate a node
                     std       ,s        save the new node
                     ldx       $06,s     parent record
-                    ldd       $2d,x     current list head
+                    ldd       NdHead,x     current list head
                     ldx       ,s        new node
-                    std       $0e,x     link old head into node
+                    std       NdNext,x     link old head into node
                     ldd       ,s        new node pointer
                     ldx       $06,s     parent record
-                    std       $2d,x     set node as new head
+                    std       NdHead,x     set node as new head
                     ldd       #$0009    copy nine bytes
                     pshs      d         push length
                     ldd       $0a,s     source pointer
@@ -1303,7 +1311,7 @@ AllocNode           pshs      u         save frame pointer
                     bra       ReturnNode return the node
 
 ReuseFreed          ldu       GlbVar0001 pop the free list
-                    ldd       $0e,u     next free node
+                    ldd       NdNext,u     next free node
                     std       GlbVar0001 update free head
 ReturnNode          tfr       u,d       return node pointer
                     puls      pc,u      return
@@ -1337,7 +1345,7 @@ WriteBuffer         lbsr      UIntToLong get buffer descriptor
                     pshs      d         push address
                     ldd       GlbVar0038 output file path
                     pshs      d         push path
-                    lbsr      $28C3     write to output file
+                    lbsr      Fseek     write to output file
                     leas      8,s        drop arguments
                     puls      pc,u      return
 
@@ -1418,7 +1426,7 @@ FindListTail        pshs      u         save frame pointer
                     bra       TailTest  enter loop test
 
 TailAdvance         stu       ,s        remember non-null node
-                    ldu       $0e,u     follow link
+                    ldu       NdNext,u     follow link
 TailTest            stu       -$02,s    test node pointer
                     bne       TailAdvance loop to end of list
                     ldd       ,s        return last node
@@ -1484,7 +1492,7 @@ ErrDualMainline     pshs      u         save frame pointer
                     ldd       GlbVar0042 module name pointer
                     pshs      d         push name
                     ldx       GlbListHead current module
-                    ldd       $2f,x     module name field
+                    ldd       NdName,x     module name field
                     pshs      d         push name
                     leax      MsgMainlineDup,pcr mainline in both message
                     pshs      x         push message
@@ -1522,15 +1530,15 @@ BaseNameLoop        ldb       ,u        next character
                     ldd       ,s        return basename pointer
                     puls      pc,u,x    return
 
-                    fcc       /etext/
+SymEtext            fcc       /etext/
                     fcb       C$NULL
-                    fcc       /edata/
+SymEdata            fcc       /edata/
                     fcb       C$NULL
-                    fcb       $65,$6E,$64
+SymEnd              fcb       $65,$6E,$64
                     fcb       C$NULL
-                    fcc       /dpsiz/
+SymDpsiz            fcc       /dpsiz/
                     fcb       C$NULL
-                    fcc       /btext/
+SymBtext            fcc       /btext/
                     fcb       C$NULL
 MsgLibSpecErr       fcc       /error specifying library: -l%s/
                     fcb       C$CR,C$NULL
@@ -1632,7 +1640,7 @@ WriteOutModule      pshs      u         save u across module write
                     bra       StoreExecOff join header store
 
 NoCopyExecOff       ldx       GlbListHead point at module record
-                    ldd       $23,x     load exec offset field
+                    ldd       NdExec,x     load exec offset field
                     addd      GlbVar002C add relocation offset
 StoreExecOff        std       $0b,s     store exec offset in header
                     ldd       GlbVar002A load data size
@@ -1802,7 +1810,7 @@ AfterLongLitB       puls      x         get pointer to inline constant
                     bra       StoreSymPtr enter symbol loop test
 
 SymFixupLoop        ldx       GlbVar0050 load current symbol
-                    ldd       $13,x     load symbol flags
+                    ldd       NdMFlags,x     load symbol flags
                     anda      #$01      test emit bit
                     clrb                clear low byte
                     std       -$02,s    save flag result
@@ -1810,7 +1818,7 @@ SymFixupLoop        ldx       GlbVar0050 load current symbol
                     lbsr      ProcessObjModule emit this symbol
                     lbsr      ErrWriteFile check for write error
 NextSym             ldx       GlbVar0050 load current symbol
-                    ldd       $11,x     load next-symbol pointer
+                    ldd       NdLink,x     load next-symbol pointer
 StoreSymPtr         std       GlbVar0050 store current symbol pointer
                     ldd       GlbVar0050 test for end of list
                     bne       SymFixupLoop loop while entries remain
@@ -1824,7 +1832,7 @@ StoreSymPtr         std       GlbVar0050 store current symbol pointer
                     pshs      d         pass high word
                     ldd       GlbVar003A load file handle
                     pshs      d         pass handle
-                    lbsr      $28C3     seek and patch file
+                    lbsr      Fseek     seek and patch file
                     leas      8,s        drop arguments
                     leax      >Buffer,y  point at buffer
                     pshs      x         pass destination
@@ -1889,7 +1897,7 @@ DataSizeDone        clra                clear high byte
                     pshs      d         pass high word
                     ldd       GlbVar003A load file handle
                     pshs      d         pass handle
-                    lbsr      $28C3     seek and patch file
+                    lbsr      Fseek     seek and patch file
                     leas      8,s        drop arguments
                     leax      >Buffer,y  point at buffer
                     pshs      x         pass destination
@@ -2017,7 +2025,7 @@ CopyInputData       pshs      u         save frame register (entry)
                     pshs      d         push argument
                     ldd       GlbVar003A load input file pointer
                     pshs      d         push file pointer
-                    lbsr      $28C3     call fseek
+                    lbsr      Fseek     call fseek
                     leas      8,s        drop arguments
                     bra       CopyBlockTest enter copy loop test
 
@@ -2061,14 +2069,14 @@ ProcessObjModule    pshs      u         save frame register (entry)
                     leas      -7,s       reserve locals
                     ldd       GlbVar004A load last name id
                     ldx       GlbVar0050 load module record pointer
-                    cmpd      $2f,x     compare with current name id
+                    cmpd      NdName,x     compare with current name id
                     beq       OutFileReady skip reopen if unchanged
                     ldd       GlbVar0038 load current output file
                     pshs      d         push file pointer
                     leax      MsgModeRead,pcr point to open mode string
                     pshs      x         push mode pointer
                     ldx       GlbVar0050 reload record pointer
-                    ldd       $2f,x     load new name id
+                    ldd       NdName,x     load new name id
                     std       GlbVar004A remember name id
                     pshs      d         push name id
                     lbsr      WalkExprLoop call open helper
@@ -2076,7 +2084,7 @@ ProcessObjModule    pshs      u         save frame register (entry)
                     std       GlbVar0038 store new file pointer
                     bne       OutFileReady continue if open succeeded
                     ldx       GlbVar0050 reload record pointer
-                    ldd       $2f,x     load name id
+                    ldd       NdName,x     load name id
                     pshs      d         push name id
                     leax      MsgCantReopen,pcr point to error string
                     pshs      x         push message pointer
@@ -2093,7 +2101,7 @@ OutFileReady        clra                prepare zero value
                     pshs      d         push argument
                     ldd       GlbVar0038 load output file
                     pshs      d         push file pointer
-                    lbsr      $28C3     call fseek
+                    lbsr      Fseek     call fseek
                     leas      8,s        drop arguments
                     ldd       GlbVar0038 load output file
                     pshs      d         push file pointer
@@ -2113,7 +2121,7 @@ OutFileReady        clra                prepare zero value
                     std       -$02,s    store bytes read
                     bne       SegCountRead continue if read succeeded
                     ldx       GlbVar0050 load record pointer
-                    ldd       $2f,x     load name id
+                    ldd       NdName,x     load name id
                     pshs      d         push name id
                     lbsr      ErrReadFile report file error
                     leas      2,s        drop argument
@@ -2128,7 +2136,7 @@ SegCountRead        ldd       GlbVar0038 load output file
                     andb      #$20      test error flag
                     lbeq      SegLoopTest skip if no error
                     ldx       GlbVar0050 load record pointer
-                    ldd       $2f,x     load name id
+                    ldd       NdName,x     load name id
                     pshs      d         push name id
                     lbsr      ErrReadFile report file error
                     leas      2,s        drop argument
@@ -2150,7 +2158,7 @@ SegLoopBody         leas      -10,s      reserve loop locals
                     andb      #$20      test error flag
                     beq       ReadRelocValue skip if no error
                     ldx       GlbVar0050 load record pointer
-                    ldd       $2f,x     load name id
+                    ldd       NdName,x     load name id
                     pshs      d         push name id
                     lbsr      ErrReadFile report file error
                     leas      2,s        drop argument
@@ -2187,7 +2195,7 @@ RelocLoop3          ldd       GlbVar0038 load output file
                     andb      #$20      test error flag
                     beq       EmitRelocEntry skip if no error
                     ldx       GlbVar0050 load record pointer
-                    ldd       $2f,x     load name id
+                    ldd       NdName,x     load name id
                     pshs      d         push name id
                     lbsr      ErrReadFile report file error
                     leas      2,s        drop argument
@@ -2218,7 +2226,7 @@ SegLoopTest         ldd       ,s        load segment count
                     andb      #$20      test error flag
                     beq       DataRelocTest2 skip if no error
                     ldx       GlbVar0050 load record pointer
-                    ldd       $2f,x     load name id
+                    ldd       NdName,x     load name id
                     pshs      d         push name id
                     lbsr      ErrReadFile report file error
                     leas      2,s        drop argument
@@ -2240,7 +2248,7 @@ DataRelocLoop       ldd       GlbVar0038 load output file
                     andb      #$20      test error flag
                     beq       DataRelocEmit skip if no error
                     ldx       GlbVar0050 load record pointer
-                    ldd       $2f,x     load name id
+                    ldd       NdName,x     load name id
                     pshs      d         push name id
                     lbsr      ErrReadFile report file error
                     leas      2,s        drop argument
@@ -2277,7 +2285,7 @@ DataRelocTest2      ldd       ,s        load remaining count
                     pshs      d         push argument
                     ldd       GlbVar003A load file pointer
                     pshs      d         push file pointer
-                    lbsr      $28C3     call fseek
+                    lbsr      Fseek     call fseek
                     leas      8,s        drop arguments
 WriteCodeSection    ldd       GlbVar003A load file pointer
                     pshs      d         push file pointer
@@ -2338,7 +2346,7 @@ CopyByteTest2       ldd       ,s        load byte index
                     pshs      d         push argument
                     ldd       GlbVar003A load file pointer
                     pshs      d         push file pointer
-                    lbsr      $28C3     call fseek
+                    lbsr      Fseek     call fseek
                     leas      8,s        drop arguments
                     ldd       GlbVar003A load file pointer
                     pshs      d         push file pointer
@@ -3007,13 +3015,13 @@ PrintLinkMap        pshs      u,d       save regs
                     lbra      PrintModTest enter module loop
 
 PrintModLoop        ldx       ,s        current module
-                    ldd       $13,x     module flags
+                    ldd       NdMFlags,x     module flags
                     anda      #$01      test print flag
                     clrb                clear low byte
                     std       -$02,s    save flag
                     lbeq      NextModule2 skip module if not flagged
                     ldx       ,s        current module
-                    ldd       $2f,x     file name pointer
+                    ldd       NdName,x     file name pointer
                     pshs      d         push argument
                     ldx       $02,s     module pointer
                     ldd       $19,x     udpd size
@@ -3039,7 +3047,7 @@ PrintModLoop        ldx       ,s        current module
                     ldd       GlbVar0010 section detail flag
                     beq       NextModule2 skip section list
                     ldx       ,s        current module
-                    ldu       $2d,x     first section
+                    ldu       NdHead,x     first section
                     bra       PrintSectTest enter section loop
 
 PrintSectLoop       ldd       $0C,u     section address
@@ -3053,11 +3061,11 @@ PrintSectLoop       ldd       $0C,u     section address
                     pshs      x         push format
                     lbsr      Printf    print section line
                     leas      8,s        drop arguments
-                    ldu       $0e,u     next section
+                    ldu       NdNext,u     next section
 PrintSectTest       stu       -$02,s    save section pointer
                     bne       PrintSectLoop more sections to print
 NextModule2         ldx       ,s        current module
-                    ldd       $11,x     next module link
+                    ldd       NdLink,x     next module link
 PrintModTest        std       ,s        store module pointer
                     ldd       ,s        reload it
                     lbne      PrintModLoop more modules to print
@@ -3094,10 +3102,10 @@ ReportUnresolved    pshs      u         save u
                     ldu       >ListHeadAddress,y  first entry
                     bra       UnresTest enter loop
 
-UnresLoop           ldx       $0e,u     referencing module
-                    ldd       $2f,x     module file name
+UnresLoop           ldx       NdNext,u     referencing module
+                    ldd       NdName,x     module file name
                     pshs      d         push argument
-                    ldd       $0e,u     module pointer
+                    ldd       NdNext,u     module pointer
                     pshs      d         push argument
                     pshs      u         push entry pointer
                     ldd       #$0004    name field offset
@@ -3440,10 +3448,10 @@ SegSetTypeBits      ldd       $06,u     entry flag word
 SegCheckName        ldd       $06,u     entry flag word
                     pshs      d         save flags
                     ldb       [$08,s]   first name character
-                    cmpb      #$72      compare against r
+                    cmpb      #'r       compare against r
                     beq       SegTypeOne read section, type 1
                     ldb       [$08,s]   first name character
-                    cmpb      #$64      compare against d
+                    cmpb      #'d       compare against d
                     bne       SegTypeTwo neither, use type 2
 SegTypeOne          ldd       #$0001    read or data section type
                     bra       SegTypeMerge merge into flags
@@ -3782,7 +3790,7 @@ EmitLiteral         ldb       $08,s     get the current char
                     leas      2,s        drop the argument
 FormatScanLoop      ldb       ,u+       fetch next format byte
                     stb       $08,s     save the current char
-                    cmpb      #$25      is it a percent sign
+                    cmpb      #'%       is it a percent sign
                     bne       EmitLiteral emit literal if not
                     ldb       ,u+       get the conversion char
                     stb       $08,s     save it
@@ -3803,7 +3811,7 @@ NoLeftJust          clra                false value high
                     clrb                false value low
                     std       LeftJustifyFlag,y   clear the left-justify flag
 CheckZeroPad        ldb       $08,s     reload the current char
-                    cmpb      #$30      is it a zero
+                    cmpb      #'0       is it a zero
                     bne       UseSpacePad use space padding otherwise
                     ldd       #$0030    zero pad character
                     bra       StorePadChar go store the pad char
@@ -3933,7 +3941,7 @@ FloatConvert        ldd       $06,s     reload the width
                     ldb       $0e,s     reload the conversion char
                     sex                 widen it
                     pshs      d         pass the conversion letter
-                    lbsr      $2EB9     convert the floating point value
+                    lbsr      StrlenThunk+1 convert the floating point value
                     leas      6,s        drop the arguments
                     lbra      PushConvResult go output the field
 
@@ -4277,7 +4285,7 @@ EmitStrField        pshs      u         save the callback register
                     ldd       $08,s     load the field width
                     pshs      d         push the width
                     pshs      u         push the string pointer
-                    lbsr      $2EC4     measure the string length
+                    lbsr      StrLen+1  measure the string length
                     leas      2,s        drop the argument
                     nega                negate the length
                     negb                negate the length
@@ -4340,7 +4348,7 @@ PutCharBuf          pshs      u         save the register
 
 MsgIntMin           fcc       /-32768/
                     fcb       C$NULL
-                    pshs      u         save the register
+Fseek               pshs      u         save the register
                     ldu       $04,s     load the node pointer argument
                     leas      -6,s       reserve the local frame
                     cmpu      #$0000    test for a null node
@@ -4500,7 +4508,7 @@ SeekDone            leas      6,s        drop pushed longs
                     pshs      d         push whence SEEK_SET
                     ldd       $0a,s     stream argument
                     pshs      d         push stream
-                    lbsr      $28C3     call fseek to rewind
+                    lbsr      Fseek     call fseek to rewind
                     leas      8,s        drop arguments
                     puls      pc,u      return from rewind
 
@@ -5606,7 +5614,7 @@ MathDispatch        lda       $05,s     load operand byte
                     beq       GetSttRegs branch for status code two
                     cmpb      #$05      check status code five
                     beq       GetSttRegs same handler for code five
-                    ldb       #$D0      unknown status code error
+                    ldb       #E$UnkSvc unknown status code error
                     lbra      SyscallErr return with error
 
 GetSttRegs          pshs      u         save caller result pointer
@@ -5632,7 +5640,7 @@ DoGetStt            os9       I$GetStt  get file status
                     beq       SetSttCode0 code zero setstt
                     cmpb      #$02      check status code two
                     beq       SetSttCode2 code two setstt with u
-                    ldb       #$D0      unknown status code error
+                    ldb       #E$UnkSvc unknown status code error
                     lbra      SyscallErr return error
 
 SetSttCode0         ldx       $06,s     load status parameter
@@ -5680,7 +5688,7 @@ CreateOk            tfr       a,b       path number to result
                     clra                clear high byte
                     rts                 return path number
 
-CreateOnExist       cmpb      #$DA      file already exists error
+CreateOnExist       cmpb      #E$CEF    file already exists error
                     lbne      SyscallErr other error returns
                     lda       $05,s     reload create mode
                     bita      #$80      test exclusive flag
@@ -5719,7 +5727,7 @@ ReadPath            pshs      y         save y
                     pshs      y         save count on stack
                     os9       I$Read    read from file
 ReadResult          bcc       ReadOk    return count on success
-                    cmpb      #$D3      end of file error
+                    cmpb      #E$EOF    end of file error
                     bne       ReadErr   other error
                     clra                clear high result
                     clrb                clear low result
@@ -5771,7 +5779,7 @@ SeekWhence          cmpd      #$0001    whence from current
                     beq       SeekCurPos get current position
                     cmpd      #$0002    whence from end
                     beq       SeekEndSize get file size
-                    ldb       #$F7      invalid whence error
+                    ldb       #E$Seek   invalid whence error
 SeekErr             clra                clear high errno byte
                     std       OutputPathHandle,y   store errno
                     ldd       #$FFFF    position minus one
@@ -5926,26 +5934,27 @@ RtsStub             rts                 empty rts stub
                     * ============ WorkBlockImage: cstart init/relocation tables ============
 
                     * ---- count1: DP-data length (bytes copied to the DP base)
-WorkBlockImage      fdb       $000A
+WorkBlockImage      fdb       WBIcount2-WBIblock1
 
                     * ---- block1: DP data image  ->  data base
-                    fcb       $00,$00,$00,$04,$00,$FF,$FF,$FF
-                    fcb       $02
-                    fcb       $77
+WBIblock1           fcb       $00,$00,$00,$04,$00,$FF,$FF,$FF
+WBIptrOutBuf2       fdb       OutputBuffer
 
                     * ---- count2: non-DP-data length (bytes copied to base+HDRADV)
-                    fdb       $017A
+WBIcount2           fdb       WBIblk2End-WBIblock2
 
                     * ---- block2: non-DP data image  ->  data base + HDRADV
-WBIblock2           fcb       $00
-                    fcb       $60
-                    fcb       $00
-                    fcb       $60
+WBIblock2           fdb       ListHeadAddress
+WBIptrListHead2     fdb       ListHeadAddress
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-SectNameTabImg      fcb       $0D,$C1,$0D,$C7,$0D,$CD,$0D,$D1,$0D,$D7,$02
-                    fcb       $77
+SectNameTabImg      fdb       SymEtext
+WBIptrEdata         fdb       SymEdata
+WBIptrEnd           fdb       SymEnd
+WBIptrDpsiz         fdb       SymDpsiz
+WBIptrBtext         fdb       SymBtext
+WBIptrOutBuf1       fdb       OutputBuffer
 Pow10Img            fdb       10000,1000,100,10 powers of ten
-                    fcb       $00,$84
+WBIptrOnes          fdb       OnesPlace
                     fcc       /lx/
                     fcb       $00,$00,$00,$00,$00,$00,$00,$00,$01,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$02,$00,$01,$00,$00,$00
 NameBufImg          fcb       $00,$00,$00,$00,$00,$00,$00
@@ -5961,16 +5970,18 @@ CtypeTabImg         fcb       $01,$01,$01,$01,$01,$01,$01,$01,$01,$11,$11,$01,$1
                     fcb       $01
 
                     * ---- nreloc1: text-relocation count  (each offset patched by +module base)
-                    fdb       $0005
+WBIblk2End          fdb       (reloc1End-reloc1Start)/2
 
                     * ---- reloc1: text relocation offsets
-                    fdb       $0078,$0076,$0074,$0072,$0070
+reloc1Start         fdb       HDRADV+WBIptrBtext-WBIblock2,HDRADV+WBIptrDpsiz-WBIblock2,HDRADV+WBIptrEnd-WBIblock2,HDRADV+WBIptrEdata-WBIblock2,HDRADV+SectNameTabImg-WBIblock2
+reloc1End           equ       *
 
                     * ---- nreloc2: data-relocation count  (each offset patched by +work base)
-                    fdb       $0005
+                    fdb       (reloc2End-reloc2Start)/2
 
                     * ---- reloc2: data relocation offsets
-                    fdb       $0062,$0060,$007A,$0008,$0084
+reloc2Start         fdb       HDRADV+WBIptrListHead2-WBIblock2,HDRADV+WBIblock2-WBIblock2,HDRADV+WBIptrOutBuf1-WBIblock2,WBIptrOutBuf2-WBIblock1,HDRADV+WBIptrOnes-WBIblock2
+reloc2End           equ       *
 
                     * ---- name: trailing module-name string
                     fcc       /c.link/
