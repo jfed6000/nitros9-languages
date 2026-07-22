@@ -4846,7 +4846,7 @@ CaseAllocNode       ldd       #$0006    case-node size
                     tfr       d,u       use the allocated node
 CaseLinkNode        ldd       GlbVar0059 any existing case chain
                     beq       CaseFirstNode none, set as head
-                    stu       [GlbVar005B,y] link onto the chain tail
+                    stu       [>GlbVar005B,y] link onto the chain tail
                     bra       CaseStoreNode update the tail
 
 CaseFirstNode       stu       GlbVar0059 set the case chain head
@@ -6147,7 +6147,7 @@ LinkNode2           ldd       $0C,s     load data pointer
                     ldd       GlbVar0005 load list tail
                     beq       SetListHead branch if list empty
                     ldd       $06,s     load node pointer
-                    std       [GlbVar0007,y] link node onto tail
+                    std       [>GlbVar0007,y] link node onto tail
                     bra       SetListTail continue
 
 SetListHead         ldd       $06,s     load node pointer
@@ -6507,7 +6507,7 @@ FreeLocalLoop       ldd       GlbVar0005 load the local list head
                     ldd       [$04,s]   load the next list link
                     std       $04,s     save it in a local
                     ldd       GlbVar0009 load a global value
-                    std       [GlbVar0005,y] store it into the entry
+                    std       [>GlbVar0005,y] store it into the entry
                     ldd       GlbVar0005 load the list head
                     std       GlbVar0009 save it in the global
                     ldd       $04,s     reload the next link
@@ -8940,7 +8940,7 @@ Sprintf             pshs      u         save the caller frame
                     leas      4,s        drop the arguments
                     clra                high byte zero
                     clrb                form null byte
-                    stb       [GlbVar000F,y] null-terminate the output buffer
+                    stb       [>GlbVar000F,y] null-terminate the output buffer
                     puls      pc,u      restore and return
 
 doprnt              pshs      u         save the caller frame
@@ -11096,7 +11096,7 @@ RefillNotFirst      clra                clear the high byte
 ReadLineLoop        lbsr      GetSourceLine read the next source line
                     std       GlbVar006A save the line pointer
                     lbeq      LineEof   end of file
-                    ldb       [GlbVar006A,y] load the first character
+                    ldb       [>GlbVar006A,y] load the first character
                     cmpb      #$23      is it a '#' directive
                     lbne      BumpLineNum not a directive, count line
                     ldx       GlbVar006A reload line pointer

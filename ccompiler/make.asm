@@ -423,7 +423,7 @@ SkipEmptyArg        ldx       GlbVar000D argv cursor
                     stx       GlbVar000D save the cursor
                     ldd       ,x        load the argument pointer
                     beq       SkipEmptyArg skip empty slots
-                    ldd       [GlbVar000D,y] load the target name
+                    ldd       [>GlbVar000D,y] load the target name
                     puls      pc,u      return from previous routine
 
 OpenSourceFile      ldd       ZFlagCounter,y   load makefile-name flag
@@ -696,7 +696,7 @@ SetDefaultGoal      ldd       GlbVar0011 already saw first rule
 AllocDepNode        ldd       #$0004    node size four bytes
                     lbsr      Malloc    allocate a list node
                     std       $10,s     save the new node
-                    std       [GlbVar001B,y] link into the append slot
+                    std       [>GlbVar001B,y] link into the append slot
                     beq       NextTargetNode allocation failed, skip
                     ldd       $10,s     load the new node
                     addd      #$0002    point to its link field
@@ -744,7 +744,7 @@ OpenPrimaryFile     pshs      u         save frame pointer
                     tfr       x,d       name as argument
                     bra       OpenAndStore open it
 
-CheckDashArg        ldb       [GlbVar0009,y] load first char of name
+CheckDashArg        ldb       [>GlbVar0009,y] load first char of name
                     cmpb      #$2d      is it a dash
                     bne       OpenArgFile no, open the named file
                     leax      DefaultInputHandle,y   point to standard input handle
@@ -1492,7 +1492,7 @@ AddUnresolvedSource pshs      u,d       save the frame and node
                     ldd       #$0004    node size four bytes
                     lbsr      AllocOrDie allocate the node
                     tfr       d,u       u points at the node
-                    stu       [GlbVar001F,y] link it onto the list tail
+                    stu       [>GlbVar001F,y] link it onto the list tail
                     ldd       ,s        load the source pointer
                     std       ,u        store it in the node
                     leax      $02,u     point past the link field
@@ -1565,7 +1565,7 @@ ReadDirLoop         ldd       ,s        load the file handle
                     bne       MatchDirEntry process the entry
 CheckUnresolved     ldd       GlbVar0021 load the unresolved count
                     beq       CloseSourceDir all resolved, done
-                    ldu       [GlbVar001D,y] load the unresolved list head
+                    ldu       [>GlbVar001D,y] load the unresolved list head
                     ldx       ,u        load the record
                     ldd       $02,x     load its name
                     pshs      d         push it
@@ -3074,7 +3074,7 @@ AllocNamedNode      pshs      u         save the caller frame
                     lbsr      InitNamedNode initialize the node with the name
                     leas      2,s        pop the argument
                     ldd       ,s        node pointer
-                    std       [GlbVar0005,y] link into the list head
+                    std       [>GlbVar0005,y] link into the list head
                     addd      #$000B    advance to the value field
                     std       GlbVar0005 update the list tail global
                     bra       MacroReturn return the new node
@@ -3597,7 +3597,7 @@ ChkLc               leax      StrLC,pcr point at 'LC'
                     addd      #$0001    increment
                     std       AlreadyHaveLc,y   save it
 LinkVarNode         ldd       $06,s     node pointer
-                    std       [GlbVar0007,y] link into the variable list
+                    std       [>GlbVar0007,y] link into the variable list
                     addd      #$0002    advance the list tail
                     std       GlbVar0007 update the list head
 MacroDefDone        leas      8,s        discard locals
@@ -4172,7 +4172,7 @@ SprintfFmtB         pshs      u,d       save registers and args
                     leas      4,s        drop pushed arguments
                     clra                clear high byte
                     clrb                clear low byte
-                    stb       [OutputPointer,y] null terminate the buffer
+                    stb       [>OutputPointer,y] null terminate the buffer
                     ldd       ,s        load return value
 SprintfRet          leas      2,s        drop local
                     puls      pc,u      return to caller
@@ -6159,7 +6159,7 @@ SetIntercept        pshs      u         save u
 
 InterceptEntry      tfr       u,y       recover the globals pointer
                     clra                clear the high byte
-                    jsr       [UserHandlerAddress,y] call the user signal handler
+                    jsr       [>UserHandlerAddress,y] call the user signal handler
                     rti                 return from the intercept
 
 GetStatOpt          tfr       b,a       path number into a

@@ -672,17 +672,17 @@ MsgCantOpenOut      fcc       /can't open %s/
                     fcb       C$NULL
 MsgStatistics       fcc       /statistics:/
                     fcb       C$CR,C$NULL
-MsgTotalInsns       rol       $0074     total-instructions message data
-                    fcc       /otal instructions : %d/
+MsgTotalInsns       fcb       $09        tab (statistics line indent)
+                    fcc       /total instructions : %d/
                     fcb       C$CR,C$NULL
-MsgLongBranches     rol       $006C     long-branches message data
-                    fcc       /ong branches :  %5d, %5d, %3d%%/
+MsgLongBranches     fcb       $09        tab (statistics line indent)
+                    fcc       /long branches :  %5d, %5d, %3d%%/
                     fcb       C$CR,C$NULL
-MsgRemoved          rol       $0072     removed message data
-                    fcc       /emoved       :         %5d, %3d%%/
+MsgRemoved          fcb       $09        tab (statistics line indent)
+                    fcc       /removed       :         %5d, %3d%%/
                     fcb       C$CR,C$NULL
-MsgTotalBytes       rol       $0074     total-bytes message data
-                    fcc       /otal bytes   :  %5d, %5d, %3d%%/
+MsgTotalBytes       fcb       $09        tab (statistics line indent)
+                    fcc       /total bytes   :  %5d, %5d, %3d%%/
                     fcb       C$CR,C$NULL
 OpEndsect           fcc       /endsect/
                     fcb       C$NULL

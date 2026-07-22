@@ -4998,7 +4998,7 @@ AllocCaseNode       ldd       #$0006    node size six bytes
                     tfr       d,u       U = new node
 LinkCaseNode        ldd       $0039     get case-list head
                     beq       SetCaseListHead empty list, set head
-                    stu       [F003bYLink,y] link node onto previous tail
+                    stu       [>F003bYLink,y] link node onto previous tail
                     bra       FillCaseNode skip head assignment
 
 SetCaseListHead     stu       $0039     set case-list head
@@ -7281,7 +7281,7 @@ ReadDirectiveLine   clra                zero high byte
 DirectiveLoop       lbsr      ReadLine  get next word
                     std       $004A     save word pointer
                     lbeq      DirectiveEof none, return end of input
-                    ldb       [F004aYFirst,y] first char of word
+                    ldb       [>F004aYFirst,y] first char of word
                     cmpb      #$23      is it a hash
                     lbne      CountLine not a directive
                     ldx       $004A     word pointer
@@ -14722,7 +14722,7 @@ LinkInitNode        ldd       $0C,s     load slot value
                     ldd       GlbNodePtr load list head
                     beq       SetInitListHead empty, set head
                     ldd       $06,s     load node
-                    std       [GlbListTail,y] append after tail
+                    std       [>GlbListTail,y] append after tail
                     bra       SetInitListTail update tail
 
 SetInitListHead     ldd       $06,s     load node
@@ -15082,7 +15082,7 @@ ReverseListLoop     ldd       GlbNodePtr D = declaration list head
                     ldd       [$04,s]   D = node next pointer
                     std       $04,s     save next node
                     ldd       $006E     D = reversed list head
-                    std       [GlbNodePtr,y] link node into reversed list
+                    std       [>GlbNodePtr,y] link node into reversed list
                     ldd       GlbNodePtr D = current node
                     std       $006E     advance reversed head
                     ldd       $04,s     D = next node
@@ -16809,7 +16809,7 @@ Sprintf             pshs      u         save caller U
                     leas      4,s        drop pushed args
                     clra                clear high byte
                     clrb                clear low byte
-                    stb       [GlbOutPtr,y] null-terminate the output string
+                    stb       [>GlbOutPtr,y] null-terminate the output string
                     puls      pc,u      restore U and return
 
 doprnt              pshs      u         save caller U

@@ -4989,7 +4989,7 @@ PrintfTail          pshs      d         push format string pointer
                     leas      4,s        drop the pushed arguments
                     clra                zero high byte
                     clrb                zero terminator
-                    stb       [GlbVar001B,y]   null-terminate the buffer via output pointer global
+                    stb       [>GlbVar001B,y]   null-terminate the buffer via output pointer global
                     puls      pc,u      restore and return
 
 doprnt              pshs      u         save u register
