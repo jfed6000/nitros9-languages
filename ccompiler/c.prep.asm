@@ -242,7 +242,7 @@ ProcessFileArg      leax      >ModeRead,pcr X -> open mode "r"
                     pshs      b,a       push it
                     leax      >XSourceName,y  X -> source-name buffer
                     pshs      x         push the destination
-                    lbsr      StrCopy   copy filename into the buffer
+                    lbsr      strcpy    copy filename into the buffer
                     leas      4,s        drop the args
                     leax      >XSourceName,y  X -> source-name buffer
                     pshs      x         push it
@@ -250,7 +250,7 @@ ProcessFileArg      leax      >ModeRead,pcr X -> open mode "r"
                     std       ,s        save the basename pointer
                     leax      >XOutputName,y  X -> output-name buffer
                     pshs      x         push the destination
-                    lbsr      StrCopy   copy basename into the buffer
+                    lbsr      strcpy    copy basename into the buffer
                     leas      4,s        drop the args
                     leax      >XOutputName,y  X -> output-name buffer
                     pshs      x         push it
@@ -365,7 +365,7 @@ GetNextLine         pshs      u         save U
                     pshs      x         push source ptr
                     leax      >XBackupBuffer,y  X -> backup buffer
                     pshs      x         push dest ptr
-                    lbsr      StrCopy   save current line (strcpy)
+                    lbsr      strcpy    save current line (strcpy)
                     leas      4,s        drop args
                     bra       ReadRawLine enter the read loop
 
@@ -406,7 +406,7 @@ SkipDirTab          lbeq      SkipDirWsLoop skip leading tabs
                     pshs      x         push keyword
                     leax      >DefineStr,pcr "define"
                     pshs      x         push literal
-                    lbsr      StrCmp    compare (strcmp)
+                    lbsr      strcmp    compare (strcmp)
                     leas      4,s        drop args
                     std       -$02,s    save result
                     bne       ChkInclude not define -> try include
@@ -419,7 +419,7 @@ ChkInclude          leax      >$0100,s  X -> keyword
                     pshs      x         push keyword
                     leax      >IncludeStr,pcr "include"
                     pshs      x         push literal
-                    lbsr      StrCmp    compare
+                    lbsr      strcmp    compare
                     leas      4,s        drop args
                     std       -$02,s    save result
                     bne       ChkIfdef  not include -> try ifdef
@@ -430,7 +430,7 @@ ChkIfdef            leax      >$0100,s  X -> keyword
                     pshs      x         push keyword
                     leax      >IfdefStr,pcr "ifdef"
                     pshs      x         push literal
-                    lbsr      StrCmp    compare
+                    lbsr      strcmp    compare
                     leas      4,s        drop args
                     std       -$02,s    save result
                     bne       ChkIfndef not ifdef -> try ifndef
@@ -443,7 +443,7 @@ ChkIfndef           leax      >$0100,s  X -> keyword
                     pshs      x         push keyword
                     leax      >IfndefStr,pcr "ifndef"
                     pshs      x         push literal
-                    lbsr      StrCmp    compare
+                    lbsr      strcmp    compare
                     leas      4,s        drop args
                     std       -$02,s    save result
                     bne       ChkEndif  not ifndef -> try endif
@@ -457,7 +457,7 @@ ChkEndif            leax      >$0100,s  X -> keyword
                     pshs      x         push keyword
                     leax      >EndifStr,pcr "endif"
                     pshs      x         push literal
-                    lbsr      StrCmp    compare
+                    lbsr      strcmp    compare
                     leas      4,s        drop args
                     std       -$02,s    save result
                     bne       ChkElse   not endif -> try else
@@ -468,7 +468,7 @@ ChkElse             leax      >$0100,s  X -> keyword
                     pshs      x         push keyword
                     leax      >ElseStr,pcr "else"
                     pshs      x         push literal
-                    lbsr      StrCmp    compare
+                    lbsr      strcmp    compare
                     leas      4,s        drop args
                     std       -$02,s    save result
                     bne       ChkUndef  not else -> try undef
@@ -479,7 +479,7 @@ ChkUndef            leax      >$0100,s  X -> keyword
                     pshs      x         push keyword
                     leax      >UndefStr,pcr "undef"
                     pshs      x         push literal
-                    lbsr      StrCmp    compare
+                    lbsr      strcmp    compare
                     leas      4,s        drop args
                     std       -$02,s    save result
                     bne       ChkAsm    not undef -> try asm
@@ -491,7 +491,7 @@ ChkAsm              leax      >$0100,s  X -> keyword
                     pshs      x         push keyword
                     leax      >AsmStr,pcr "asm"
                     pshs      x         push literal
-                    lbsr      StrCmp    compare
+                    lbsr      strcmp    compare
                     leas      4,s        drop args
                     std       -$02,s    save result
                     bne       ChkEndAsm not asm -> try endasm
@@ -505,7 +505,7 @@ ChkEndAsm           leax      >$0100,s  X -> keyword
                     pshs      x         push keyword
                     leax      >EndasmStr,pcr "endasm"
                     pshs      x         push literal
-                    lbsr      StrCmp    compare
+                    lbsr      strcmp    compare
                     leas      4,s        drop args
                     std       -$02,s    save result
                     bne       ChkLineDir not endasm -> try line
@@ -519,7 +519,7 @@ ChkLineDir          leax      >$0100,s  X -> keyword
                     pshs      x         push keyword
                     leax      >LineStr,pcr "line"
                     pshs      x         push literal
-                    lbsr      StrCmp    compare
+                    lbsr      strcmp    compare
                     leas      4,s        drop args
                     std       -$02,s    save result
                     bne       BadDirFixup unknown directive
@@ -575,7 +575,7 @@ ExpandAndEmit       leax      ,s        X -> output buffer
                     pshs      x         push source
                     leax      >BaseLineBuffer,y  X -> line buffer
                     pshs      x         push dest
-                    lbsr      StrCopy   copy expansion back (strcpy)
+                    lbsr      strcpy    copy expansion back (strcpy)
                     leas      4,s        drop args
                     ldd       #$0020    return space (non-EOF)
                     bra       GetLineDone return the line
@@ -993,7 +993,7 @@ MacroCmpLoop        ldd       ,s        this entry pointer
                     pshs      b,a       pass the entry name
                     ldd       $08,s     the search name
                     pshs      b,a       pass the search name
-                    lbsr      StrCmp    compare the two names
+                    lbsr      strcmp    compare the two names
                     leas      4,s        drop the arguments
                     std       -$02,s    save compare result
                     beq       MacroFound zero means match found
@@ -1238,7 +1238,7 @@ MatchParamLoop      ldd       >$0123,s  d = param index
                     pshs      b,a       push param name
                     leax      <$18,s    x -> word buffer
                     pshs      x         push word
-                    lbsr      StrCmp    compare word to param
+                    lbsr      strcmp    compare word to param
                     leas      4,s        drop args
                     std       -$02,s    matched?
                     bne       ParamNoMatch no, try next param
@@ -1384,13 +1384,13 @@ IncDelimOk          clra                no-skip mode
                     pshs      x         push source
                     leax      >SystemIncludePath,y  destination buffer
                     pshs      x         push dest
-                    lbsr      StrCopy   copy prefix into buffer
+                    lbsr      strcpy    copy prefix into buffer
                     leas      4,s        drop args
                     leax      >DefsPathStr,pcr path suffix string
                     pshs      x         push source
                     leax      >SystemIncludePath,y  same buffer
                     pshs      x         push dest
-                    lbsr      StrCat    append the suffix
+                    lbsr      strcat    append the suffix
                     leas      4,s        drop args
 SysPathBuf          leax      >SystemIncludePath,y  system path buffer
                     pshs      x         push it
@@ -1448,13 +1448,13 @@ IncNameDone         clra                D = 0
                     ldd       $04,s     record pointer
                     addd      #$0008    offset to name field
                     pshs      b,a       push source
-                    lbsr      StrCopy   copy the saved name
+                    lbsr      strcpy    copy the saved name
                     leas      4,s        drop args
                     leax      $04,s     new filename buffer
                     pshs      x         push source
                     leax      >XSourceName,y  main name buffer
                     pshs      x         push dest
-                    lbsr      StrCopy   install new current filename
+                    lbsr      strcpy    install new current filename
                     leas      4,s        drop args
                     leax      $04,s     new filename
                     pshs      x         push it
@@ -1462,7 +1462,7 @@ IncNameDone         clra                D = 0
                     std       ,s        save the pointer
                     leax      >XOutputName,y  base-name dest buffer
                     pshs      x         push dest
-                    lbsr      StrCopy   copy base name
+                    lbsr      strcpy    copy base name
                     leas      4,s        drop args
                     leax      >XOutputName,y  base name
                     pshs      x         push arg
@@ -1536,7 +1536,7 @@ LineReadName        lbsr      SkipWsComment advance to next line
                     pshs      x         push source
                     leax      >XSourceName,y  current name buffer
                     pshs      x         push dest
-                    lbsr      StrCopy   install new filename
+                    lbsr      strcpy    install new filename
                     leas      4,s        drop args
                     leax      >XSourceName,y  name buffer
                     pshs      x         push it
@@ -1544,7 +1544,7 @@ LineReadName        lbsr      SkipWsComment advance to next line
                     std       ,s        save the pointer
                     leax      >XOutputName,y  base-name dest buffer
                     pshs      x         push dest
-                    lbsr      StrCopy   copy base name
+                    lbsr      strcpy    copy base name
                     leas      4,s        drop args
 LineEmitDir         leax      >XOutputName,y  base name
                     pshs      x         push arg
@@ -1873,14 +1873,14 @@ PopInclude          ldd       <CurFile  current file handle
                     pshs      b,a       push it
                     leax      >XSourceName,y  filename scratch
                     pshs      x         push pointer
-                    lbsr      StrCopy   copy filename string
+                    lbsr      strcpy    copy filename string
                     leas      4,s        drop arguments
                     ldd       <IncludeStack node pointer
                     addd      #$0008    node's stored name field
                     pshs      b,a       push it
                     leax      >XOutputName,y  second name scratch
                     pshs      x         push pointer
-                    lbsr      StrCopy   copy it
+                    lbsr      strcpy    copy it
                     leas      4,s        drop arguments
                     ldd       [>IncludeStack,y] unlink the popped node
                     std       <IncludeStack update include head
@@ -2416,7 +2416,7 @@ CcDevEnvFound       pshs      u         save handle
                     pshs      b,a       push source pointer
                     leax      >XY54c,y  X = Y+$54C dest buffer
                     pshs      x         push dest pointer
-                    lbsr      StrCopy   copy the string
+                    lbsr      strcpy    copy the string
                     leas      4,s        drop copy args
                     pshs      u         push env handle
                     lbsr      UnlinkModule release the env handle
@@ -2628,7 +2628,7 @@ ModeAppend          ldd       ,s        append access base
                     orb       #$02      set write bit
                     pshs      b,a       push access mode
                     pshs      u         push filename
-                    lbsr      OpenFile  try open existing file
+                    lbsr      open      try open existing file
                     leas      4,s        drop args
                     std       $02,s     save the fd
                     cmpd      #$FFFF    does not exist?
@@ -2649,14 +2649,14 @@ ModeCreate          ldd       ,s        create access base
                     orb       #$02      set write bit
                     pshs      b,a       push access mode
                     pshs      u         push filename
-                    lbsr      CreateFile create the file
+                    lbsr      creat     create the file
                     bra       OpenStoreFd store the new fd
 
 ModeDevice          ldd       ,s        device access base
                     orb       #$81      set device flag $81
 OpenPath            pshs      b,a       push access mode
                     pshs      u         push filename
-                    lbsr      OpenFile  open the file
+                    lbsr      open      open the file
 OpenStoreFd         leas      4,s        drop args
                     std       $02,s     save the fd
                     bra       OpenRetFd return the fd
@@ -3063,7 +3063,7 @@ IntToDec            pshs      u,b,a     save U and the int value
                     pshs      x         pass the source string
                     leax      >XConversionBuffer,y  X -> conversion buffer
                     pshs      x         pass the destination
-                    lbsr      StrCopy   copy the literal
+                    lbsr      strcpy    copy the literal
                     leas      4,s        drop the arguments
                     puls      pc,u,x    return the buffer pointer
 
@@ -3284,7 +3284,7 @@ OutputPadStr        pshs      u         save U
                     ldd       $08,s     field width
                     pshs      b,a       save width
                     pshs      u         pass string
-                    lbsr      StrLen    measure string length
+                    lbsr      strlen    measure string length
                     leas      2,s        drop arg
                     nega                negate the length
                     negb                negate low byte
@@ -3377,10 +3377,10 @@ PutcUnbufWrite      pshs      b,a       push length
                     clra                clear high byte
                     andb      #$40      translation enabled?
                     beq       PutcRawWrite no use raw write
-                    leax      >WriteLine,pcr cooked write routine
+                    leax      >writeln,pcr cooked write routine
                     bra       PutcCallWrite call it
 
-PutcRawWrite        leax      >WriteFile,pcr raw write routine
+PutcRawWrite        leax      >write,pcr raw write routine
 PutcCallWrite       tfr       x,d       move routine address
                     tfr       d,x       into X for call
                     jsr       ,x        perform the write
@@ -3485,7 +3485,7 @@ FcloseNoFlush       clra                no flush needed
 FcloseDoClose       std       ,s        save flush result
                     ldd       InPtr,u   load file descriptor
                     pshs      b,a       push it
-                    lbsr      CloseFile close the path
+                    lbsr      close     close the path
                     leas      2,s        drop argument
                     clra
                     clrb
@@ -3564,7 +3564,7 @@ WriteLineLoop       ldd       $02,s     remaining byte count
                     pshs      b,a       push it
                     ldd       InPtr,u   file descriptor
                     pshs      b,a       push it
-                    lbsr      WriteLine write one line to file
+                    lbsr      writeln   write one line to file
                     leas      6,s        drop arguments
                     std       ,s        save bytes written
                     cmpd      #$FFFF    write error?
@@ -3588,7 +3588,7 @@ WriteBlock          ldd       $02,s     byte count
                     pshs      b,a       push it
                     ldd       InPtr,u   file descriptor
                     pshs      b,a       push it
-                    lbsr      WriteFile write whole block to file
+                    lbsr      write     write whole block to file
                     leas      6,s        drop arguments
                     cmpd      $02,s     all bytes written?
                     beq       WriteBufReset yes, reset buffer
@@ -3739,10 +3739,10 @@ FillBufSelect       ldd       ExpandPtr,u load flags
                     clra
                     andb      #$40      text mode?
                     beq       FillBufBlock no, use block read
-                    leax      >ReadLine2,pcr X -> line-read routine
+                    leax      >readln,pcr X -> line-read routine
                     bra       FillBufCall call it
 
-FillBufBlock        leax      >ReadFile,pcr X -> block-read routine
+FillBufBlock        leax      >read,pcr X -> block-read routine
 FillBufCall         tfr       x,d
                     tfr       d,x
                     jsr       ,x        read into buffer
@@ -3755,7 +3755,7 @@ FillBufOne          ldd       #$0001    read count of one
                     pshs      x         push it
                     ldd       InPtr,u   file descriptor
                     pshs      b,a       push it
-                    lbsr      ReadFile  read one byte
+                    lbsr      read      read one byte
 FillBufResult       leas      6,s        drop arguments
                     std       ,s        save byte count
                     ldd       ,s        reload count
@@ -3895,7 +3895,7 @@ FloatFmtStub        pshs      u         save caller U
 
 EmptyFloatStr       fcb       $00
 
-StrLen              pshs      u         save caller U
+strlen              pshs      u         save caller U
                     ldu       $04,s     U = _start of the string
 StrLenLoop2         ldb       ,u+       scan forward one byte
                     bne       StrLenLoop2 until the terminator
@@ -3904,43 +3904,11 @@ StrLenLoop2         ldb       ,u+       scan forward one byte
                     addd      #$FFFF    drop the NUL from the count
                     puls      pc,u      return the length
 
-StrCopy             pshs      u         save caller U
-                    ldu       $06,s     U = source string
-                    leas      -2,s
-                    ldd       $06,s     D = destination pointer
-                    std       ,s        keep it as running dest
-StrCopyLoop         ldb       ,u+       read next source byte
-                    ldx       ,s        current dest pointer
-                    leax      $01,x
-                    stx       ,s
-                    stb       -$01,x    store the byte
-                    bne       StrCopyLoop loop until NUL copied
-                    ldd       $06,s     return the destination
-                    puls      pc,u,x
+                    use       lib/strcpy.asm
 
-StrCat              pshs      u         save caller U
-                    ldu       $06,s     U = source to append
-                    leas      -2,s
-                    ldd       $06,s     D = destination pointer
-                    std       ,s        keep it as running dest
-StrCatFindEnd       ldx       ,s        walk destination string
-                    leax      $01,x
-                    stx       ,s
-                    ldb       -$01,x    look for the terminator
-                    bne       StrCatFindEnd keep scanning
-                    ldd       ,s        pointer past the NUL
-                    addd      #$FFFF    back up onto the NUL
-                    std       ,s        resume writing there
-StrCatCopyLoop      ldb       ,u+       read next source byte
-                    ldx       ,s        current dest pointer
-                    leax      $01,x
-                    stx       ,s
-                    stb       -$01,x    store the byte
-                    bne       StrCatCopyLoop loop until NUL copied
-                    ldd       $06,s     return the destination
-                    puls      pc,u,x
+                    use       lib/strcat.asm
 
-StrCmp              pshs      u         save caller U
+strcmp              pshs      u         save caller U
                     ldu       $04,s     U = first string
                     bra       StrCmpLoop enter the compare loop
 
@@ -4046,13 +4014,13 @@ GetDevStat          lda       $05,s     A = path number
                     cmpb      #$05      code 5?
                     beq       GetStatXU GetStt returning X and U
                     ldb       #E$UnkSvc unknown code error
-                    lbra      ReturnErr report the error
+                    lbra      SyscallErr report the error
 
 GetStatXU           pshs      u         save caller U
                     os9       I$GetStt
                     bcc       GetStatOk call succeeded
                     puls      u         restore U
-                    lbra      ReturnErr propagate the error
+                    lbra      SyscallErr propagate the error
 
 GetStatOk           stx       [<$08,s]  return the X result word
                     ldx       $08,s     caller result pointer
@@ -4064,136 +4032,46 @@ GetStatOk           stx       [<$08,s]  return the X result word
 
 GetSttCode0         ldx       $06,s     code 0: X = getstt parameter
 DoGetStt            os9       I$GetStt
-                    lbra      CheckErrRet return getstt status
+                    lbra      SyscallRet return getstt status
 
                     lda       $05,s     setstt entry: A = path number
                     ldb       $03,s     B = setstt function code
                     beq       DoSetStt  code 0 -> plain setstt
                     cmpb      #$02      code 2?
-                    beq       SetSttWithU code 2 -> setstt with U param
+                    beq       SetStatXU code 2 -> setstt with U param
                     ldb       #E$UnkSvc bad code -> error $D0
-                    lbra      ReturnErr return error
+                    lbra      SyscallErr return error
 
 DoSetStt            ldx       $06,s     X = status parameter
                     os9       I$SetStt
-                    lbra      CheckErrRet return setstt status
+                    lbra      SyscallRet return setstt status
 
-SetSttWithU         pshs      u         save U
-                    ldx       $08,s     X = status parameter
-                    ldu       $0A,s     U = extra parameter
-                    os9       I$SetStt
-                    puls      u         restore U
-                    lbra      CheckErrRet return setstt status
+                    use       lib/setstat.asm
 
-                    ldx       $02,s     access probe: X = pathname
-                    lda       $05,s     A = access mode
-                    os9       I$Open
-                    bcs       AccessDone open failed -> return error
-                    os9       I$Close
-AccessDone          lbra      CheckErrRet return access status
+                    use       lib/access.asm
 
-OpenFile            ldx       $02,s     open: X = pathname
-                    lda       $05,s     A = access mode
-                    os9       I$Open
-                    lbcs      ReturnErr open failed -> errno
-                    tfr       a,b       B = path number
-                    clra                D = path number
-                    rts                 return path number
-CloseFile           lda       $03,s     close: A = path number
-                    os9       I$Close
-                    lbra      CheckErrRet return close status
+                    use       lib/openpath.asm
+                    use       lib/closepath.asm
 
                     ldx       $02,s     makdir: X = pathname
                     ldb       $05,s     B = directory attributes
                     os9       I$MakDir
-                    lbra      CheckErrRet return makdir status
+                    lbra      SyscallRet return makdir status
 
-CreateFile          ldx       $02,s     create: X = pathname
-                    lda       $05,s     A = access mode
-                    ldb       #$0B      B = file attributes
-                    os9       I$Create
-                    bcs       CreateExisting create failed -> check reason
-ReturnPathNum       tfr       a,b       B = path number
-                    clra                D = path number
-                    rts                 return path number
-CreateExisting      cmpb      #E$CEF    already exists (E$CEF)?
-                    lbne      ReturnErr other error -> errno
-                    lda       $05,s     A = access mode
-                    bita      #$80      exclusive create requested?
-                    lbne      ReturnErr yes -> fail with errno
-                    anda      #$07      keep read/write bits only
-                    ldx       $02,s     X = pathname
-                    os9       I$Open
-                    lbcs      ReturnErr open failed -> errno
-                    pshs      u,a       save path number and U
-                    ldx       #$0000    new size = 0
-                    leau      ,x        U = 0
-                    ldb       #$02      SS.Size setstt code
-                    os9       I$SetStt
-                    puls      u,a       restore path number and U
-                    bcc       ReturnPathNum truncated ok -> return path number
-                    pshs      b         save error code
-                    os9       I$Close
-                    puls      b         restore error code
-                    lbra      ReturnErr return errno
+                    use       lib/createheada.asm
+                    use       lib/createtail.asm
 
-                    ldx       $02,s     delete: X = pathname
-                    os9       I$Delete
-                    lbra      CheckErrRet return delete status
+                    use       lib/deletepath.asm
 
                     lda       $03,s     dup: A = path number
                     os9       I$Dup
-                    lbcs      ReturnErr dup failed -> errno
+                    lbcs      SyscallErr dup failed -> errno
                     tfr       a,b       B = new path number
                     clra                D = new path number
                     rts                 return new path number
-ReadFile            pshs      y         save Y
-                    ldx       $06,s     X = buffer
-                    lda       $05,s     A = path number
-                    ldy       $08,s     Y = byte count
-                    pshs      y         save count for result
-                    os9       I$Read
-ReadResult          bcc       ReadDone  read ok -> return bytes read
-                    cmpb      #E$EOF    end of file (E$EOF)?
-                    bne       ReadErr   real error -> fail
-                    clra                end of file -> D = 0
-                    clrb                clear low byte
-                    puls      pc,y,x    return zero bytes
+                    use       lib/readpath.asm
 
-ReadErr             puls      y,x       restore registers
-                    lbra      ReturnErr return read errno
-
-ReadDone            tfr       y,d       D = bytes read
-                    puls      pc,y,x    return byte count
-
-ReadLine2           pshs      y         save Y
-                    lda       $05,s     A = path number
-                    ldx       $06,s     X = buffer
-                    ldy       $08,s     Y = max length
-                    pshs      y         save count for result
-                    os9       I$ReadLn
-                    bra       ReadResult share read result handling
-
-WriteFile           pshs      y         save Y
-                    ldy       $08,s     Y = byte count
-                    beq       WriteDone zero length -> done
-                    lda       $05,s     A = path number
-                    ldx       $06,s     X = buffer
-                    os9       I$Write
-WriteResult         bcc       WriteDone write ok -> bytes written
-                    puls      y         restore Y
-                    lbra      ReturnErr return write errno
-
-WriteDone           tfr       y,d       D = bytes written
-                    puls      pc,y      return byte count
-
-WriteLine           pshs      y         save Y
-                    ldy       $08,s     Y = byte count
-                    beq       WriteDone zero length -> done
-                    lda       $05,s     A = path number
-                    ldx       $06,s     X = buffer
-                    os9       I$WritLn
-                    bra       WriteResult share write result handling
+                    use       lib/writepath.asm
 
 SeekFile            pshs      u         save U
                     ldd       $0A,s     D = whence
@@ -4252,7 +4130,7 @@ LinkModule          pshs      u,y       save U and Y
                     os9       F$Link
 LinkResult          tfr       u,d       D = module entry point
                     puls      u,y       restore registers
-                    lbcs      ReturnErr link failed -> errno
+                    lbcs      SyscallErr link failed -> errno
                     rts                 return entry point
 
                     pshs      u,y       load: save U and Y
@@ -4270,7 +4148,7 @@ UnlinkModule        pshs      u         save U
                     ldu       $04,s     U = module pointer
                     os9       F$UnLink
                     puls      u         restore U
-                    lbra      CheckErrRet return unlink status
+                    lbra      SyscallRet return unlink status
 
 AllocMem            ldd       >WorkArea,y  D = current heap top
                     pshs      b,a       save heap top
@@ -4333,7 +4211,7 @@ SetIntercept        pshs      u         save U
                     leax      >InterceptHandler,pcr X -> intercept trampoline
                     os9       F$Icpt
                     puls      u         restore U
-                    lbra      CheckErrRet return status
+                    lbra      SyscallRet return status
 
 InterceptHandler    tfr       u,y       Y = static base
                     clra                A = 0
@@ -4342,14 +4220,7 @@ InterceptHandler    tfr       u,y       Y = static base
                     leas      2,s        drop signal code
                     rti                 return from intercept
 
-ReturnErr           clra                A = 0 so D = errno
-                    std       >Errno,y  save errno
-                    ldd       #$FFFF    result = -1
-                    rts                 return failure
-CheckErrRet         bcs       ReturnErr carry set -> errno
-                    clra                D = 0 success
-                    clrb                clear low byte
-                    rts                 return success
+                    use       lib/syscallerr.asm
 
 exit                lbsr      ReturnStub no-op stub call
                     lbsr      CloseAllFiles flush all open files

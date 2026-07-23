@@ -689,7 +689,7 @@ SetDefaultGoal      ldd       GlbVar0011 already saw first rule
                     pshs      d         push the name
                     leax      PendingPushbackFlag,y   point to default-goal buffer
                     tfr       x,d       destination as argument
-                    lbsr      StrCopy   copy name as default goal
+                    lbsr      strcpy    copy name as default goal
                     leas      2,s        drop the argument
                     ldd       #$0001    flag value
                     std       GlbVar0011 mark default goal recorded
@@ -731,7 +731,7 @@ ReadLineLoop        lbsr      ReadLine  read next makefile line
                     std       $06,s     save the line pointer
                     lbne      ProcessLine got a line, process it
                     ldd       GlbVar000B load the file handle
-                    lbsr      CloseStream close the makefile
+                    lbsr      fclose    close the makefile
                     leas      24,s       release the frame
                     puls      pc,u      return
 
@@ -1250,7 +1250,7 @@ DupString           pshs      u         save u
                     std       ,s        save the buffer
                     pshs      u         push the source
                     ldd       $02,s     load the buffer
-                    lbsr      StrCopy   copy the string
+                    lbsr      strcpy    copy the string
                     leas      2,s        drop the source
                     ldd       ,s        buffer pointer
                     lbra      FrameRet2 restore u and return
@@ -1353,9 +1353,9 @@ BuildImplicitR      ldd       $02,s     load the local found flag
                     ldd       $08,s     load the base name
                     pshs      d         push it
                     ldd       $08,s     load the destination buffer
-                    lbsr      StrCopy   copy the base name in
+                    lbsr      strcpy    copy the base name in
                     leas      2,s        drop the argument
-                    lbsr      StrCat    append the ".r" suffix
+                    lbsr      strcat    append the ".r" suffix
                     leas      2,s        drop the argument
                     ldd       $04,s     load the built filename
                     pshs      d         push it as argument
@@ -1576,7 +1576,7 @@ CheckUnresolved     ldd       GlbVar0021 load the unresolved count
                     leas      4,s        drop the arguments
                     lbsr      exit      flush the error output
 CloseSourceDir      ldd       ,s        load the file handle
-                    lbsr      CloseStream close the directory
+                    lbsr      fclose    close the directory
                     leas      34,s       release the locals
                     puls      pc,u      return
 
@@ -1926,13 +1926,13 @@ CheckRule1          clra                clear high byte
                     pshs      d         push as argument
                     leax      $08,s     address of candidate buffer
                     tfr       x,d       buffer pointer to accumulator
-                    lbsr      StrCopy   copy prefix into buffer
+                    lbsr      strcpy    copy prefix into buffer
                     leas      2,s        drop argument
                     leax      SlashConstA,pcr load first suffix literal
 AppendSuffix        pshs      x         push suffix string
                     leax      $08,s     address of candidate buffer
                     tfr       x,d       buffer pointer to accumulator
-                    lbsr      StrCat    append suffix to buffer
+                    lbsr      strcat    append suffix to buffer
                     leas      2,s        drop argument
                     lbra      BuildCandidate continue to build candidate
 
@@ -1951,7 +1951,7 @@ CheckRule2          ldd       $6a,s     load name pointer
                     pshs      d         push as argument
                     leax      $08,s     address of candidate buffer
                     tfr       x,d       buffer pointer to accumulator
-                    lbsr      StrCopy   copy prefix into buffer
+                    lbsr      strcpy    copy prefix into buffer
                     leas      2,s        drop argument
                     leax      SlashConstB,pcr load second suffix literal
                     bra       AppendSuffix append and continue
@@ -1968,7 +1968,7 @@ CheckRule3          ldd       $6a,s     load name pointer
                     pshs      d         push as argument
                     leax      $08,s     address of candidate buffer
                     tfr       x,d       buffer pointer to accumulator
-                    lbsr      StrCopy   copy prefix into buffer
+                    lbsr      strcpy    copy prefix into buffer
                     leas      2,s        drop argument
                     leax      SlashConstC,pcr load third suffix literal
                     lbra      AppendSuffix append and continue
@@ -1980,7 +1980,7 @@ BuildCandidate      ldd       $6a,s     load name pointer
                     pshs      d         push as argument
                     leax      $08,s     address of candidate buffer
                     tfr       x,d       buffer pointer to accumulator
-                    lbsr      StrCat    append name to buffer
+                    lbsr      strcat    append name to buffer
                     leas      2,s        drop argument
                     ldx       ,u        load target structure
                     ldb       $06,x     load target flag
@@ -2479,13 +2479,13 @@ JoinNameList        pshs      u         save the frame pointer
                     ldd       [$04,s]   the first list node
                     pshs      d         push it
                     tfr       u,d       output buffer
-                    lbsr      StrCopy   copy the first name
+                    lbsr      strcpy    copy the first name
                     bra       JoinNameNext advance to the next node
 
 JoinNameLoop        leax      >SpaceSeparator,y  the space separator
                     pshs      x         push it
                     tfr       u,d       output buffer
-                    lbsr      StrCat    append a separating space
+                    lbsr      strcat    append a separating space
                     leas      2,s        drop the argument
                     ldd       [$04,s]   current node name
                     pshs      d         push it
@@ -2607,22 +2607,22 @@ BuildCStage         ldd       $28,s     the C-compile count
                     ldd       Install,y   the C compiler command
                     pshs      d         push it
                     ldd       GlbVar0003 the command build buffer
-                    lbsr      StrCopy   start building the command
+                    lbsr      strcpy    start building the command
                     leas      2,s        drop the argument
-                    lbsr      StrCat    append the compiler name
+                    lbsr      strcat    append the compiler name
                     leas      2,s        drop the argument
                     ldd       ExtraCFlags,y   extra C flags
                     beq       BuildRelEq none to add
                     pshs      d         push the flags
                     ldd       GlbVar0003 the command buffer
-                    lbsr      StrCat    append the flags
+                    lbsr      strcat    append the flags
                     leas      2,s        drop the argument
 BuildRelEq          ldd       FirstSuffixOption,y   rel-output option flag
                     beq       BuildRelPlain use the plain -r form
                     leax      OptREqual,pcr the ' -r=' option
                     pshs      x         push it
                     ldd       GlbVar0003 the command buffer
-                    lbsr      StrCat    append ' -r='
+                    lbsr      strcat    append ' -r='
                     leas      2,s        drop the argument
                     ldd       GlbVar0003 the command buffer
                     lbsr      AppendTargetPath append the output directory
@@ -2638,7 +2638,7 @@ BuildRelEq          ldd       FirstSuffixOption,y   rel-output option flag
 BuildRelPlain       leax      OptRSpace,pcr the ' -r ' option
                     pshs      x         push it
                     ldd       GlbVar0003 the command buffer
-                    lbsr      StrCat    append ' -r '
+                    lbsr      strcat    append ' -r '
                     leas      2,s        drop the argument
 BuildCAppendSrc     ldd       $2a,s     source file name
                     pshs      d         push it
@@ -2655,7 +2655,7 @@ BuildAStage         ldd       $26,s     the assemble count
                     leax      StrR68,pcr the default assembler name
                     pshs      x         push it
                     ldd       GlbVar0003 the command buffer
-                    lbsr      StrCopy   start the assemble command
+                    lbsr      strcpy    start the assemble command
                     bra       BuildAFlags continue with options
 
 BuildAExplicit      leax      >SpaceSeparator,y  the assemble command buffer
@@ -2663,23 +2663,23 @@ BuildAExplicit      leax      >SpaceSeparator,y  the assemble command buffer
                     ldd       Install2,y   the assembler command string
                     pshs      d         push it
                     ldd       GlbVar0003 the command buffer
-                    lbsr      StrCopy   start the assemble command
+                    lbsr      strcpy    start the assemble command
                     leas      2,s        drop the argument
-                    lbsr      StrCat    append the assembler name
+                    lbsr      strcat    append the assembler name
 BuildAFlags         leas      2,s        drop the argument
                     ldd       ExtraAssemblerFlags,y   extra assembler flags
                     beq       BuildObjSuffix none to add
                     leax      >SpaceSeparator,y  the assembler flags buffer
                     pshs      x,d       push destination and flags
                     ldd       GlbVar0003 the command buffer
-                    lbsr      StrCat    append the flags
+                    lbsr      strcat    append the flags
                     leas      2,s        drop the argument
-                    lbsr      StrCat    append the remaining flags
+                    lbsr      strcat    append the remaining flags
                     leas      2,s        drop the argument
 BuildObjSuffix      leax      StrDot,pcr the suffix '.' string
                     pshs      x         push it
                     ldd       DirectoryName,y   object-suffix option flag
-                    lbsr      StrCmp    check whether the option is set
+                    lbsr      strcmp    check whether the option is set
                     std       ,s++      pop the argument
                     beq       BuildOutOption not set, skip
                     ldd       $1e,s     source base name length
@@ -2689,18 +2689,18 @@ BuildObjSuffix      leax      StrDot,pcr the suffix '.' string
                     ldd       DirectoryName,y   object-suffix option
                     pshs      d         push it
                     ldd       GlbVar0003 the command buffer
-                    lbsr      StrCat    append the path separator
+                    lbsr      strcat    append the path separator
                     leas      2,s        drop the argument
-                    lbsr      StrCat    append the object suffix
+                    lbsr      strcat    append the object suffix
                     leas      2,s        drop the argument
 BuildOutOption      leax      OptOEqual,pcr the ' -o=' option
                     pshs      x         push it
                     ldd       $2C,s     target name
                     pshs      d         push it
                     ldd       GlbVar0003 the command buffer
-                    lbsr      StrCat    append ' -o='
+                    lbsr      strcat    append ' -o='
                     leas      2,s        pop the pushed argument
-                    lbsr      StrCat    append string to the command buffer
+                    lbsr      strcat    append string to the command buffer
                     leas      2,s        pop the argument
                     ldd       FirstSuffixOption,y   load the suffix directory field
                     lbeq      AppendFinalArg skip appending if none
@@ -2717,18 +2717,18 @@ AppendObjOpt        ldd       $24,s     test the object-option local flag
                     ldd       Install3,y   load the object directory string
                     pshs      d         push the directory name
                     ldd       GlbVar0003 load the command buffer pointer
-                    lbsr      StrCopy   copy the directory into the buffer
+                    lbsr      strcpy    copy the directory into the buffer
                     leas      2,s        pop the argument
-                    lbsr      StrCat    append the remaining string
+                    lbsr      strcat    append the remaining string
                     leas      2,s        pop the argument
                     ldd       ObjectFileName,y   load the object-file name field
                     beq       CheckTargetSlash skip if there is none
                     leax      >SpaceSeparator,y  point to the name buffer
                     pshs      x,d       push the buffer and name
                     ldd       GlbVar0003 load the command buffer pointer
-                    lbsr      StrCat    append the object name
+                    lbsr      strcat    append the object name
                     leas      2,s        pop the argument
-                    lbsr      StrCat    append the buffered name
+                    lbsr      strcat    append the buffered name
                     leas      2,s        pop the argument
 CheckTargetSlash    ldd       $1e,s     test another local flag
                     bne       AppendFOpt skip if set
@@ -2739,18 +2739,18 @@ CheckTargetSlash    ldd       $1e,s     test another local flag
                     ldd       TargetName,y   load the target name
                     pshs      d         push the target name
                     ldd       GlbVar0003 load the command buffer pointer
-                    lbsr      StrCat    append the target name
+                    lbsr      strcat    append the target name
                     leas      2,s        pop the argument
-                    lbsr      StrCat    append the '/' separator
+                    lbsr      strcat    append the '/' separator
                     leas      2,s        pop the argument
 AppendFOpt          leax      OptFEqual,pcr point to the ' -f=' option
                     pshs      x         push it
                     ldd       $2C,s     load the argument value
                     pshs      d         push the argument
                     ldd       GlbVar0003 load the command buffer pointer
-                    lbsr      StrCat    append the ' -f=' option
+                    lbsr      strcat    append the ' -f=' option
                     leas      2,s        pop the argument
-                    lbsr      StrCat    append the option value
+                    lbsr      strcat    append the option value
                     leas      2,s        pop the argument
                     ldd       $20,s     test the mode flag local
                     bne       AppendFinalArg skip if set
@@ -2759,19 +2759,19 @@ AppendFOpt          leax      OptFEqual,pcr point to the ' -f=' option
                     leax      SlashConstF,pcr point to the '/' literal
                     pshs      x,d       push the '/' and value
                     ldd       GlbVar0003 load the command buffer pointer
-                    lbsr      StrCat    append the value
+                    lbsr      strcat    append the value
                     leas      2,s        pop the argument
-                    lbsr      StrCat    append the '/' separator
+                    lbsr      strcat    append the '/' separator
                     leas      2,s        pop the argument
 AppendFinalArg      ldd       $2C,s     load the final argument value
                     pshs      d         push the argument
                     ldd       GlbVar0003 load the command buffer pointer
-                    lbsr      StrCat    append the final argument
+                    lbsr      strcat    append the final argument
 PopFinalArg         leas      2,s        pop the argument
 EmitCommandCR       leax      StrCR,pcr point to the carriage return string
                     pshs      x         push it
                     ldd       GlbVar0003 load the command buffer pointer
-                    lbsr      StrCat    append the carriage return
+                    lbsr      strcat    append the carriage return
                     leas      2,s        pop the argument
                     ldd       GlbVar0003 return the command buffer pointer
                     leas      46,s       release the local frame
@@ -2847,7 +2847,7 @@ FormatFullPath      pshs      x         push the format string
 CopyDirectName      pshs      u         push the filename
                     leax      $04,s     point to the path buffer
                     tfr       x,d       pass the buffer pointer
-                    lbsr      StrCopy   copy the filename into the buffer
+                    lbsr      strcpy    copy the filename into the buffer
                     leas      2,s        pop the argument
 OpenAndStat         ldd       #$0002    read-access mode
                     pshs      d         push the mode
@@ -3002,7 +3002,7 @@ AppendTargetPath    pshs      u         save the caller frame
                     leax      SlashConstG,pcr '/' literal
                     pshs      x         push it
                     tfr       u,d       command buffer pointer
-                    lbsr      StrCat    append the '/' separator
+                    lbsr      strcat    append the '/' separator
                     leas      2,s        pop the argument
                     puls      pc,u      return
 
@@ -3090,7 +3090,7 @@ FindOrAddMacro      pshs      u         save the caller frame
 SearchLoop          pshs      u         push the search name
                     ldx       $02,s     load the current node
                     ldd       $02,x     load the node name pointer
-                    lbsr      StrCmp    compare the names
+                    lbsr      strcmp    compare the names
                     std       ,s++      save the result and pop
                     beq       MacroNodeFound match, node found
                     ldx       ,s        load the current node
@@ -3133,7 +3133,7 @@ InitNamedNode       pshs      u         save the caller frame
                     ldd       $04,s     load the name argument
                     pshs      d         push it
                     ldd       $02,u     name field pointer
-                    lbsr      StrCopy   copy the name into the node
+                    lbsr      strcpy    copy the name into the node
 NodeReturnTail      leas      2,s        pop the argument
                     puls      pc,u      return
 
@@ -3149,7 +3149,7 @@ MacroSearchLoop     ldd       $02,s     search name
                     pshs      d         push it
                     ldx       $02,s     load the current node
                     ldd       $02,x     load the node name pointer
-                    lbsr      StrCmp    compare the names
+                    lbsr      strcmp    compare the names
                     std       ,s++      save the result and pop
                     bne       MacroNextLink no match, advance
                     ldd       [,s]      load the node value
@@ -3461,7 +3461,7 @@ BuildVarNode        tfr       u,d       name pointer
                     pshs      u         push the name pointer
                     ldd       $08,s     node pointer
                     addd      #$0004    name field offset
-                    lbsr      StrCopy   copy the name
+                    lbsr      strcpy    copy the name
                     leas      2,s        drop the argument
                     ldd       $0C,s     value pointer
                     pshs      d         push it
@@ -3470,12 +3470,12 @@ BuildVarNode        tfr       u,d       name pointer
                     addd      $02,s     plus the name length
                     addd      #$0001    value field offset
                     std       [$08,s]   store the value pointer
-                    lbsr      StrCopy   copy the value
+                    lbsr      strcpy    copy the value
                     leas      2,s        drop the argument
                     leax      StrSDIR,pcr point at 'SDIR'
                     pshs      x         compare argument
                     tfr       u,d       name pointer
-                    lbsr      StrCmp    strcmp
+                    lbsr      strcmp    strcmp
                     std       ,s++      drop argument, test result
                     bne       ChkRdir   not SDIR
                     ldd       DirectoryName,y   already have an SDIR
@@ -3490,7 +3490,7 @@ BuildVarNode        tfr       u,d       name pointer
 ChkRdir             leax      StrRDIR,pcr point at 'RDIR'
                     pshs      x         compare argument
                     tfr       u,d       name pointer
-                    lbsr      StrCmp    strcmp
+                    lbsr      strcmp    strcmp
                     std       ,s++      test result
                     bne       ChkOdir   not RDIR
                     ldd       TargetName,y   already have an RDIR
@@ -3505,7 +3505,7 @@ ChkRdir             leax      StrRDIR,pcr point at 'RDIR'
 ChkOdir             leax      StrODIR,pcr point at 'ODIR'
                     pshs      x         compare argument
                     tfr       u,d       name pointer
-                    lbsr      StrCmp    strcmp
+                    lbsr      strcmp    strcmp
                     std       ,s++      test result
                     bne       ChkCflags not ODIR
                     ldd       SecondPrefixString,y   already have an ODIR
@@ -3520,7 +3520,7 @@ ChkOdir             leax      StrODIR,pcr point at 'ODIR'
 ChkCflags           leax      StrCFLAGS,pcr point at 'CFLAGS'
                     pshs      x         compare argument
                     tfr       u,d       name pointer
-                    lbsr      StrCmp    strcmp
+                    lbsr      strcmp    strcmp
                     std       ,s++      test result
                     bne       ChkRflags not CFLAGS
                     ldd       ExtraCFlags,y   already have CFLAGS
@@ -3532,7 +3532,7 @@ ChkCflags           leax      StrCFLAGS,pcr point at 'CFLAGS'
 ChkRflags           leax      StrRFLAGS,pcr point at 'RFLAGS'
                     pshs      x         compare argument
                     tfr       u,d       name pointer
-                    lbsr      StrCmp    strcmp
+                    lbsr      strcmp    strcmp
                     std       ,s++      test result
                     bne       ChkLflags not RFLAGS
                     ldd       ExtraAssemblerFlags,y   already have RFLAGS
@@ -3544,7 +3544,7 @@ ChkRflags           leax      StrRFLAGS,pcr point at 'RFLAGS'
 ChkLflags           leax      StrLFLAGS,pcr point at 'LFLAGS'
                     pshs      x         compare argument
                     tfr       u,d       name pointer
-                    lbsr      StrCmp    strcmp
+                    lbsr      strcmp    strcmp
                     std       ,s++      test result
                     bne       ChkCc     not LFLAGS
                     ldd       ObjectFileName,y   already have LFLAGS
@@ -3556,7 +3556,7 @@ ChkLflags           leax      StrLFLAGS,pcr point at 'LFLAGS'
 ChkCc               leax      StrCC,pcr point at 'CC'
                     pshs      x         compare argument
                     tfr       u,d       name pointer
-                    lbsr      StrCmp    strcmp
+                    lbsr      strcmp    strcmp
                     std       ,s++      test result
                     bne       ChkRc     not CC
                     ldd       AlreadyHaveCc,y   already have CC
@@ -3571,7 +3571,7 @@ ChkCc               leax      StrCC,pcr point at 'CC'
 ChkRc               leax      StrRC,pcr point at 'RC'
                     pshs      x         compare argument
                     tfr       u,d       name pointer
-                    lbsr      StrCmp    strcmp
+                    lbsr      strcmp    strcmp
                     std       ,s++      test result
                     bne       ChkLc     not RC
                     ldd       ExplicitAssemblerFlag,y   already have RC
@@ -3586,7 +3586,7 @@ ChkRc               leax      StrRC,pcr point at 'RC'
 ChkLc               leax      StrLC,pcr point at 'LC'
                     pshs      x         compare argument
                     tfr       u,d       name pointer
-                    lbsr      StrCmp    strcmp
+                    lbsr      strcmp    strcmp
                     std       ,s++      test result
                     bne       LinkVarNode not LC either
                     ldd       AlreadyHaveLc,y   already have LC
@@ -3742,7 +3742,7 @@ CompareEntryLoop    ldd       $06,s     load target name length
                     pshs      u         push name pointer
                     ldd       $04,s     load entry name pointer
                     addd      #$0004    skip to entry name field
-                    lbsr      StrNCmp   compare the two names
+                    lbsr      strncmp   compare the two names
                     leas      4,s        drop arguments
                     std       -$02,s    save compare result
                     bne       NextEntry mismatch, try next entry
@@ -3921,7 +3921,7 @@ OptWrite            ldd       ,s        load flags
                     orb       #$02      set write bit
                     pshs      d         save flags
                     tfr       u,d       move string pointer
-                    lbsr      CreateFile install macro variant
+                    lbsr      creat     install macro variant
                     bra       VariantDone go save result
 
 OptDelete           ldd       ,s        load flags
@@ -3982,7 +3982,7 @@ AddWithEntry        clra                clear high byte
 
                     pshs      u,d       save arguments
                     ldd       $08,s     load pointer argument
-                    lbsr      CloseStream call helper
+                    lbsr      fclose    call helper
                     ldd       $06,s     load option pointer
                     pshs      d         push it
                     ldd       $02,s     load name pointer
@@ -4453,7 +4453,7 @@ FormatSignedDec     pshs      u,d       save registers and value
                     pshs      x         pass the string
                     leax      ConversionBuffer,y   conversion buffer
                     tfr       x,d       pass the buffer
-                    lbsr      StrCopy   copy the constant
+                    lbsr      strcpy    copy the constant
                     leas      2,s        drop the argument
                     lbra      OctalFmtExit return the buffer
 
@@ -5031,7 +5031,7 @@ FlushAllStreams     pshs      u,d       save registers
 
 FlushEntryLoop      tfr       u,d       current stream into the argument
                     leau      $0d,u     advance to the next FILE entry
-                    bsr       CloseStream flush and close this stream
+                    bsr       fclose    flush and close this stream
 FlushCountTest      ldd       ,s        load the loop counter
                     addd      #$0001    increment it
                     std       ,s        store it back
@@ -5040,7 +5040,7 @@ FlushCountTest      ldd       ,s        load the loop counter
                     blt       FlushEntryLoop loop for the next stream
                     bra       StreamRet return via shared epilogue
 
-CloseStream         pshs      u         save the stream pointer
+fclose              pshs      u         save the stream pointer
                     tfr       d,u       FILE pointer into u
                     leas      -2,s       reserve a local
                     cmpu      #$0000    is the stream null
@@ -5473,11 +5473,11 @@ ConvExit            leas      2,s        drop the locals
 
 StrLenThunk         neg       $0034     pointer thunk fragment byte
                     nega                pointer thunk fragment byte
-                    leax      >StrLen,pcr point at the strlen routine
+                    leax      >strlen,pcr point at the strlen routine
                     tfr       x,d       return that pointer
                     puls      pc,u      return to caller
 
-StrLen              neg       $0034     entry fragment byte
+strlen              neg       $0034     entry fragment byte
                     rora                entry fragment byte
                     ldu       ,s        load the string pointer
 StrLenLoop2         ldb       ,u+       read the next byte
@@ -5488,7 +5488,7 @@ StrLenLoop2         ldb       ,u+       read the next byte
                     leas      2,s        drop the locals
                     puls      pc,u      return the length
 
-StrCopy             pshs      u,d       save args for strcpy
+strcpy              pshs      u,d       save args for strcpy
                     ldu       $06,s     load the source pointer
                     leas      -2,s       make a local for the cursor
                     ldd       $02,s     load the destination pointer
@@ -5501,7 +5501,7 @@ StrCopyLoop         ldb       ,u+       read a source byte
                     bne       StrCopyLoop loop until the nul is copied
                     bra       StrCopyDone return the destination
 
-StrCat              pshs      u,d       save args for strcat
+strcat              pshs      u,d       save args for strcat
                     ldu       $06,s     load the source pointer
                     leas      -2,s       make a local for the cursor
                     ldd       $02,s     load the destination pointer
@@ -5524,7 +5524,7 @@ StrCopyDone         ldd       $02,s     return the destination pointer
                     leas      4,s        drop the locals
                     puls      pc,u      return to caller
 
-StrCmp              pshs      u         save u for strcmp
+strcmp              pshs      u         save u for strcmp
                     tfr       d,u       set u to the first string
                     bra       StrCmpLoop enter the compare loop
 
@@ -5583,7 +5583,7 @@ StrNCpyPadLoop      ldd       $0a,s     decrement the count
                     bgt       StrNCpyPad return the destination
                     lbra      StrNCatDone
 
-StrNCmp             pshs      u         save u for strncmp
+strncmp             pshs      u         save u for strncmp
                     tfr       d,u       set u to the first string
                     bra       StrNCmpLoop enter the compare loop
 
@@ -5895,7 +5895,7 @@ IoReturn            lbra      CheckStatus jump to the shared io return
                     os9       I$MakDir  make the directory
                     bra       IoReturn  return the status
 
-CreateFile          pshs      d         save the name pointer
+creat               pshs      d         save the name pointer
                     ldx       ,s        path name pointer
                     lda       $05,s     load the mode byte
                     tfr       a,b       copy the mode

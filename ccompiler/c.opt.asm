@@ -62,7 +62,7 @@ SeekBuffer          rmb       $2
 ResultLowWord       rmb       $6
 OldRegionPointer    rmb       $2
 RegionLimit         rmb       $2
-ErrorFlag           rmb       $2
+Errno           rmb       $2
 InputFilePointer    rmb       $2
 OutputFilePointer   rmb       $2
 InputStream         rmb       $2
@@ -326,7 +326,7 @@ ScalePercent        pshs      u         save frame pointer
                     lbsr      MulEntry  multiply
                     pshs      d         save product
                     ldd       #$0005    divisor five
-                    lbsr      SDivMod   divide
+                    lbsr      SDivEntry divide
                     addd      ,s++      add saved offset
                     puls      pc,u      restore frame and return
 
@@ -339,8 +339,8 @@ ComputeRatio        pshs      u         save frame pointer
                     addd      #$0032    add rounding half
                     pshs      d         push value
                     ldd       #$0064    hundred
-                    lbsr      UDivMod   scale by hundred
-                    lbsr      UDivMod   continue scaling
+                    lbsr      UDivEntry scale by hundred
+                    lbsr      UDivEntry continue scaling
                     bra       RetExit   return computed ratio
 
 RetZero             clra                clear high byte of zero return
@@ -419,7 +419,7 @@ MatchEndsect        leax      OpEndsect,pcr point at endsect keyword
                     pshs      x         push keyword arg
                     leax      $6b,s     point at opcode buffer
                     pshs      x         push buffer arg
-                    lbsr      StrCmp    compare the two strings
+                    lbsr      strcmp    compare the two strings
                     leas      4,s        drop call arguments
                     std       -$02,s    save compare result
                     lbne      DefaultLine not endsect, handle as instruction
@@ -432,7 +432,7 @@ MatchInfo           leax      OpInfo,pcr point at info keyword
                     pshs      x         push keyword arg
                     leax      $6b,s     point at opcode buffer
                     pshs      x         push buffer arg
-                    lbsr      StrCmp    compare the two strings
+                    lbsr      strcmp    compare the two strings
                     leas      4,s        drop call arguments
                     std       -$02,s    save compare result
                     lbeq      SectPassThru matched info, handle section
@@ -442,7 +442,7 @@ MatchNam            leax      OpNam,pcr point at nam keyword
                     pshs      x         push keyword arg
                     leax      $6b,s     point at opcode buffer
                     pshs      x         push buffer arg
-                    lbsr      StrCmp    compare the two strings
+                    lbsr      strcmp    compare the two strings
                     leas      4,s        drop call arguments
                     std       -$02,s    save compare result
                     lbne      DefaultLine not nam, handle as instruction
@@ -463,7 +463,7 @@ MatchPsect          leax      OpPsect,pcr point at psect keyword
                     pshs      x         push keyword arg
                     leax      $6b,s     point at opcode buffer
                     pshs      x         push buffer arg
-                    lbsr      StrCmp    compare the two strings
+                    lbsr      strcmp    compare the two strings
                     leas      4,s        drop call arguments
                     std       -$02,s    save compare result
                     lbne      DefaultLine not psect, handle as instruction
@@ -474,7 +474,7 @@ MatchTtl            leax      OpTtl,pcr point at ttl keyword
                     pshs      x         push keyword arg
                     leax      $6b,s     point at opcode buffer
                     pshs      x         push buffer arg
-                    lbsr      StrCmp    compare the two strings
+                    lbsr      strcmp    compare the two strings
                     leas      4,s        drop call arguments
                     std       -$02,s    save compare result
                     beq       SectPassThru matched ttl, handle section
@@ -484,7 +484,7 @@ MatchVsect          leax      OpVsect,pcr point at vsect keyword
                     pshs      x         push keyword arg
                     leax      $6b,s     point at opcode buffer
                     pshs      x         push buffer arg
-                    lbsr      StrCmp    compare the two strings
+                    lbsr      strcmp    compare the two strings
                     leas      4,s        drop call arguments
                     std       -$02,s    save compare result
                     lbne      DefaultLine not vsect, handle as instruction
@@ -907,7 +907,7 @@ HashInsert          pshs      u,d       save regs and reserve a local
                     ldd       $02,s     load the node pointer
                     addd      #$000C    offset to the node key field
                     pshs      d         push the destination
-                    lbsr      StrCopy   copy the key string in
+                    lbsr      strcpy    copy the key string in
                     leas      4,s        clean up the arguments
                     stu       [,s]      store node into bucket slot
                     ldd       $02,u     load the bucket forward link
@@ -940,7 +940,7 @@ LookupLoop          ldd       $02,s     load the node pointer
                     pshs      d         push the key pointer
                     ldd       $0a,s     load the search key
                     pshs      d         push the search key
-                    lbsr      StrCmp    compare the strings
+                    lbsr      strcmp    compare the strings
                     leas      4,s        clean up the arguments
                     std       -$02,s    save the compare result
                     bne       LoadNextNode no match so advance
@@ -1039,7 +1039,7 @@ SearchLoop          ldd       ,u        load the array string
                     pshs      d         push it
                     ldd       $06,s     load the target string
                     pshs      d         push it
-                    lbsr      StrCmp    compare the strings
+                    lbsr      strcmp    compare the strings
                     leas      4,s        clean up the arguments
                     std       -$02,s    save the compare result
                     lbeq      AllocDone match found
@@ -1094,7 +1094,7 @@ CopyLineText        ldd       $10,s     load the source string
                     ldd       #$0008    offset to the node text
                     addd      ,s++      add the node base
                     pshs      d         push the destination
-                    lbsr      StrCopy   copy text into the node
+                    lbsr      strcpy    copy text into the node
                     leas      4,s        clean up the arguments
                     ldd       $12,s     load the text pointer
                     std       $04,s     save the working pointer
@@ -1153,7 +1153,7 @@ MatchBranchOp       leax      >StringArgument2,y  point to a string argument
                     subd      ,s++      compute the difference
                     pshs      d         push the difference
                     ldd       #$0002    set the argument count
-                    lbsr      SDivMod   call the helper routine
+                    lbsr      SDivEntry call the helper routine
                     orb       #$60      set operand-mode bits in low byte
                     ora       ,s+       merge high flag byte from stack
                     orb       ,s+       merge low flag byte from stack
@@ -1164,7 +1164,7 @@ MatchBranchOp       leax      >StringArgument2,y  point to a string argument
                     ldd       #$0008    offset eight
                     addd      ,s++      compute node plus eight address
                     pshs      d         push that address
-                    lbsr      StrCopy   call copy helper
+                    lbsr      strcpy    call copy helper
                     leas      4,s        drop the arguments
                     leax      ,s        point at local buffer
                     pshs      x         push buffer pointer
@@ -1244,7 +1244,7 @@ MatchPuls           leax      StrPuls,pcr load 'puls' string
                     pshs      x         push string pointer
                     ldd       $08,s     load mnemonic pointer
                     pshs      d         push it
-                    lbsr      StrCmp    compare the strings
+                    lbsr      strcmp    compare the strings
                     leas      4,s        drop the arguments
                     std       -$02,s    save comparison result
                     bne       EmitInsnTail not puls, go to tail
@@ -1259,7 +1259,7 @@ MatchRts            leax      StrRts,pcr load 'rts' string
                     pshs      x         push string pointer
                     ldd       $08,s     load mnemonic pointer
 CmpMnemonic         pshs      d         push it
-                    lbsr      StrCmp    compare the strings
+                    lbsr      strcmp    compare the strings
                     leas      4,s        drop the arguments
                     std       -$02,s    save comparison result
                     bne       EmitInsnTail no match, go to tail
@@ -1288,7 +1288,7 @@ EmitInsnTail        ldd       Flags,u     load node flags
                     leas      2,s        drop argument
                     std       $13,u     store operand pointer in node
                     pshs      d         push returned value
-                    lbsr      StrCopy   free the temporary
+                    lbsr      strcpy    free the temporary
                     leas      4,s        drop the arguments
 ReturnNode          tfr       u,d       return the node pointer
 OptExit             leas      10,s       drop local frame
@@ -1995,7 +1995,7 @@ EmitOperand         pshs      d         push operand argument
                     ldd       #$0008    offset constant
                     addd      ,s++      compute the operand address
                     pshs      d         push computed address
-                    lbsr      StrCopy   emit or copy the operand
+                    lbsr      strcpy    emit or copy the operand
                     leas      4,s        drop the call arguments
                     bra       HandleDest go handle the destination
 
@@ -2023,7 +2023,7 @@ DestDefault         ldx       $08,s     load the node
 EmitDest            pshs      d         push destination argument
                     ldd       $13,u     push the node's field
                     pshs      d         push it
-                    lbsr      StrCopy   emit or copy the destination
+                    lbsr      strcpy    emit or copy the destination
                     leas      4,s        drop the arguments
                     bra       DisposeAndCount finish the emit
 
@@ -2083,7 +2083,7 @@ InvertBranchNode    pshs      u         save the frame register
                     ldd       #$0008    field offset
                     addd      ,s++      compute the target address
                     pshs      d         push it
-                    lbsr      StrCopy   emit the rewritten operand
+                    lbsr      strcpy    emit the rewritten operand
                     leas      4,s        drop the arguments
                     ldd       $13,u     take the node field
                     pshs      d         push it
@@ -2390,7 +2390,7 @@ ScanPairLoop        ldx       $08,s     load current instruction pointer
                     ldd       #$0008    prepare operand field offset
                     addd      ,s++      compute u plus offset
                     pshs      d         push second strcmp argument
-                    lbsr      StrCmp    compare the two operand strings
+                    lbsr      strcmp    compare the two operand strings
                     leas      4,s        pop the arguments
                     std       -$02,s    save comparison result
                     bne       AdvanceInsn skip if operands differ
@@ -2399,7 +2399,7 @@ ScanPairLoop        ldx       $08,s     load current instruction pointer
                     pshs      d         push first argument
                     ldd       $13,u     load u secondary field
                     pshs      d         push second argument
-                    lbsr      StrCmp    compare the secondary fields
+                    lbsr      strcmp    compare the secondary fields
                     leas      4,s        pop arguments
                     std       -$02,s    save result
                     bne       AdvanceInsn skip if fields differ
@@ -2498,7 +2498,7 @@ CompareOperandText  ldd       $1a,s     load other operand pointer
                     ldd       #$0008    prepare operand offset
                     addd      ,s++      compute u operand address
                     pshs      d         push second argument
-                    lbsr      StrCmp    compare operand text
+                    lbsr      strcmp    compare operand text
                     leas      4,s        pop arguments
                     std       -$02,s    save result
                     bne       MarkNotEqual differ so not equal
@@ -2507,7 +2507,7 @@ CompareOperandText  ldd       $1a,s     load other operand pointer
                     pshs      d         push argument
                     ldd       $13,u     load u secondary field
                     pshs      d         push argument
-                    lbsr      StrCmp    compare secondary fields
+                    lbsr      strcmp    compare secondary fields
                     leas      4,s        pop arguments
                     std       -$02,s    save result
 CheckEqual          beq       MarkEqual equal marks a match
@@ -2724,7 +2724,7 @@ AllocScanLoop       ldd       Flags,u     load entry flags
                     cmpx      ,s++      compare against end
                     bhi       AllocScanLoop loop while within table
                     ldd       #$00C8    prepare overflow error code
-                    std       ErrorFlag,y   set the error flag
+                    std       Errno,y   set the error flag
                     lbra      ReturnNull return null on overflow
 
                     puls      pc,u      return
@@ -2826,7 +2826,7 @@ OperRegA            ldd       ,s        load mode flags
                     orb       #$02      set 'a' register bit
                     pshs      d         push flags argument
                     pshs      u         push node argument
-                    lbsr      OpenFile  build operand entry
+                    lbsr      open      build operand entry
                     leas      4,s        drop call arguments
                     std       $02,s     save result pointer
                     cmpd      #$FFFF    allocation failed
@@ -2841,7 +2841,7 @@ OperRegA            ldd       ,s        load mode flags
                     pshs      d         push zero field
                     ldd       $08,s     reload operand pointer
                     pshs      d         push it
-                    lbsr      LseekFile append operand fields
+                    lbsr      lseek     append operand fields
                     leas      8,s        drop arguments
                     bra       OperReturnEntry return built entry
 
@@ -2849,21 +2849,21 @@ OperRegW            ldd       ,s        load mode flags
                     orb       #$02      set 'a' register bit
                     pshs      d         push flags argument
                     pshs      u         push node argument
-                    lbsr      CreateFile build alternate operand entry
+                    lbsr      creat     build alternate operand entry
                     bra       OperStoreEntry store result
 
 OperRegD            ldd       ,s        load mode flags
                     orb       #$81      set 'd' double register bits
 OperEmitReg         pshs      d         push flags argument
                     pshs      u         push node argument
-                    lbsr      OpenFile  build operand entry
+                    lbsr      open      build operand entry
 OperStoreEntry      leas      4,s        drop arguments
                     std       $02,s     save result pointer
                     bra       OperReturnEntry return built entry
 
 OperUnwindErr       leas      -$04,x    restore stack pointer for error
 OperSetError        ldd       #$00CB    error code 203
-                    std       ErrorFlag,y   set compiler error
+                    std       Errno,y   set compiler error
                     clra                clear
                     clrb                clear
                     bra       OperExit  return null
@@ -3327,7 +3327,7 @@ SignedToStr         pshs      u,d       save regs on entry
                     pshs      x         push string pointer
                     leax      OutputBuffer,y   point to output buffer
                     pshs      x         push destination
-                    lbsr      StrCopy   copy literal string
+                    lbsr      strcpy    copy literal string
                     leas      4,s        clean arguments
                     puls      pc,u,x    return
 
@@ -3550,7 +3550,7 @@ EmitStrField        pshs      u         entry: emit string field
                     ldd       $08,s     load field width
                     pshs      d         push width
                     pshs      u         push string pointer
-                    lbsr      StrLen+1  compute string length
+                    lbsr      strlen+1  compute string length
                     leas      2,s        clean argument
                     nega                negate high byte
                     negb                negate low byte
@@ -3642,10 +3642,10 @@ PutcModeCheck       ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$40      test the text-translation bit
                     beq       PutcSelectBin choose the binary writer
-                    leax      WriteLnBytes,pcr select the text-mode write routine
+                    leax      writeln,pcr select the text-mode write routine
                     bra       PutcInvokeWrite go invoke it
 
-PutcSelectBin       leax      WriteBytes,pcr select the binary write routine
+PutcSelectBin       leax      write,pcr select the binary write routine
 PutcInvokeWrite     tfr       x,d       move the routine address
                     tfr       d,x       back into the pointer register
                     jsr       ,x        call the write routine
@@ -3740,7 +3740,7 @@ FcloseFlush         ldd       Flags,u     load the flags
                     andb      #$02      test the write-mode bit
                     beq       FcloseNoFlush skip flush if not writing
                     pshs      u         pass the stream
-                    bsr       Fflush    flush pending output
+                    bsr       fflush    flush pending output
                     leas      2,s        drop the argument
                     bra       FcloseCallClose continue to the close
 
@@ -3749,7 +3749,7 @@ FcloseNoFlush       clra                no flush result
 FcloseCallClose     std       ,s        save the flush result
                     ldd       $08,u     load the file descriptor
                     pshs      d         pass the descriptor
-                    lbsr      CloseFile close the file
+                    lbsr      close     close the file
                     leas      2,s        drop the argument
                     clra                clear the flags
                     clrb                clear the flags
@@ -3757,28 +3757,8 @@ FcloseCallClose     std       ,s        save the flush result
                     ldd       ,s        return the flush result
                     puls      pc,u,x    restore and return
 
-Fflush              pshs      u         save frame register for fflush
-                    ldu       $04,s     load the stream pointer
-                    beq       IoErr     fail if null stream
-                    ldd       Flags,u     load the flags
-                    clra                keep the low byte
-                    andb      #$22      isolate write and error bits
-                    cmpd      #$0002    check the stream is writable
-                    beq       FflushWrite flush if writable
-IoErr               ldd       #$FFFF    return the error code
-                    puls      pc,u      restore and return
-
-FflushWrite         ldd       Flags,u     load the flags
-                    anda      #$80      isolate the high flag bit
-                    clrb                clear the low byte
-                    std       -$02,s    save the test result
-                    bne       FflushTail skip alloc if already set
-                    pshs      u         pass the stream
-                    lbsr      FillBuf   allocate the buffer if needed
-                    leas      2,s        drop the argument
-FflushTail          pshs      u         pass the stream
-                    bsr       FlushBuf  perform the buffer flush
-                    puls      pc,u,x    restore and return
+                    use       lib/fflush.asm
+GetBuf              equ       FillBuf this module's helper name
 
 FlushBuf            pshs      u         save frame register for flush
                     ldu       $04,s     load the stream pointer
@@ -3803,7 +3783,7 @@ FlushBuf            pshs      u         save frame register for flush
                     pshs      d         push the start pointer
                     ldd       $08,u     load the file descriptor
                     pshs      d         push the descriptor
-                    lbsr      LseekFile seek to the file position
+                    lbsr      lseek     seek to the file position
                     leas      8,s        drop the arguments
 FlushBufCount       ldd       ,u        load the write pointer
                     subd      $02,u     compute the bytes buffered
@@ -3828,7 +3808,7 @@ FlushWriteLoop      std       ,u        reset write pointer to base
                     pshs      d         push the buffer pointer
                     ldd       $08,u     load the descriptor
                     pshs      d         push the descriptor
-                    lbsr      WriteLnBytes write chunk in text mode
+                    lbsr      writeln   write chunk in text mode
                     leas      6,s        drop the arguments
                     std       ,s        save the bytes written
                     cmpd      #$FFFF    check for a write error
@@ -3849,7 +3829,7 @@ FlushWriteBlock     ldd       $02,s     load the byte count
                     pshs      d         push the buffer pointer
                     ldd       $08,u     load the descriptor
                     pshs      d         push the descriptor
-                    lbsr      WriteBytes write the whole buffer binary
+                    lbsr      write     write the whole buffer binary
                     leas      6,s        drop the arguments
                     cmpd      $02,s     check all bytes written
                     beq       FlushResetPtr reset on a full write
@@ -3984,7 +3964,7 @@ FilbufSyncStdin     leax      InputPathBuffer,y   point at the standard input en
                     beq       FilbufSeek skip if not line buffered
                     leax      OutputPathBuffer,y   point at the standard output entry
                     pshs      x         push stdout
-                    lbsr      Fflush    flush stdout before reading
+                    lbsr      fflush    flush stdout before reading
                     leas      2,s        drop the argument
 FilbufSeek          ldd       Flags,u     load the flags
                     clra                keep the low byte
@@ -4000,10 +3980,10 @@ FilbufSeek          ldd       Flags,u     load the flags
                     clra                keep the low byte
                     andb      #$40      test the text-mode bit
                     beq       FilbufSelectBin choose the binary reader
-                    leax      ReadLnBytes,pcr select the text-mode read routine
+                    leax      readln,pcr select the text-mode read routine
                     bra       FilbufInvokeRead go invoke it
 
-FilbufSelectBin     leax      ReadBytes,pcr select the binary read routine
+FilbufSelectBin     leax      read,pcr  select the binary read routine
 FilbufInvokeRead    tfr       x,d       move the routine address
                     tfr       d,x       into the pointer register
                     jsr       ,x        call the read routine
@@ -4016,7 +3996,7 @@ GetcReadOne         ldd       #$0001    request a single byte
                     pshs      x         push the buffer argument
                     ldd       $08,u     load the file descriptor
                     pshs      d         push the path argument
-                    lbsr      ReadBytes call the low-level read helper
+                    lbsr      read      call the low-level read helper
 GetcCheckRead       leas      6,s        drop the three arguments
                     std       ,s        save the bytes-read count
                     ldd       ,s        reload the count
@@ -4159,58 +4139,18 @@ ConvSwitch          cmpx      #$0064    is it the d conversion
 * ------------------------------------------------------------------
 StrlenThunk         neg       $0034     thunk prologue decoded from data
                     nega                thunk prologue continued
-                    leax      >StrLen,pcr point at the strlen routine
+                    leax      >strlen,pcr point at the strlen routine
                     tfr       x,d       return its address
                     puls      pc,u      return
 
 * StrLen - strlen routine (entered via the &StrLen pointer returned above):
-StrLen              neg       $0034     thunk prologue decoded from data
-                    nega                thunk prologue continued
-                    ldu       $04,s     load the string pointer
-StrLenLoop3         ldb       ,u+       scan the bytes
-                    bne       StrLenLoop3 until the NUL
-                    tfr       u,d       end pointer
-                    subd      $04,s     minus the start
-                    addd      #$FFFF    minus one for the NUL
-                    puls      pc,u      return the length
+                    use       lib/strlen.asm
 
-StrCopy             pshs      u         save the frame
-                    ldu       $06,s     load the source pointer
-                    leas      -2,s       local for the dest cursor
-                    ldd       $06,s     load the dest pointer
-                    std       ,s        initialise the cursor
-StrCopyLoop         ldb       ,u+       read a source byte
-                    ldx       ,s        load the dest cursor
-                    leax      $01,x     advance the cursor
-                    stx       ,s        store the cursor
-                    stb       -$01,x    write the byte
-                    bne       StrCopyLoop loop until NUL copied
-                    ldd       $06,s     return the dest pointer
-                    puls      pc,u,x    return
+                    use       lib/strcpy.asm
 
-                    pshs      u         save the frame
-                    ldu       $06,s     load the source pointer
-                    leas      -2,s       local for the cursor
-                    ldd       $06,s     load the dest pointer
-                    std       ,s        initialise the cursor
-StrCatScanLoop      ldx       ,s        load the cursor
-                    leax      $01,x     advance it
-                    stx       ,s        store it
-                    ldb       -$01,x    read a dest byte
-                    bne       StrCatScanLoop scan to the terminator
-                    ldd       ,s        cursor at the terminator
-                    addd      #$FFFF    back up onto the NUL
-                    std       ,s        store the cursor
-StrCatCopyLoop      ldb       ,u+       read a source byte
-                    ldx       ,s        load the cursor
-                    leax      $01,x     advance it
-                    stx       ,s        store it
-                    stb       -$01,x    append the byte
-                    bne       StrCatCopyLoop loop until NUL copied
-                    ldd       $06,s     return the dest pointer
-                    puls      pc,u,x    return
+                    use       lib/strcat.asm
 
-StrCmp              pshs      u         save the frame
+strcmp              pshs      u         save the frame
                     ldu       $04,s     load the first string pointer
 StrCmpLoop          ldb       ,u        byte of the first string
                     sex                 sign-extend
@@ -4241,80 +4181,11 @@ StrCmpDiff          ldb       [$06,s]   second byte
 
                     use       lib/imul.asm
 
-UDivMod             subd      #$0000    test the divisor
-                    beq       DivZeroErr zero divisor, raise the trap
-                    pshs      d         save the divisor
-                    leas      -2,s       local for the sign flags
-                    clr       ,s        no sign fixup needed
-                    clr       $01,s     clear the other sign flag
-                    bra       DivNormalize do the division
-
-DivZeroErr          puls      d         restore the divisor
-                    std       ,s        store it
-                    ldd       #$002D    arithmetic-trap signal code
-                    lbra      RaiseSignal raise the signal
-
-SDivMod             subd      #$0000    test the divisor
-                    beq       DivZeroErr zero divisor, raise the trap
-                    pshs      d         save the divisor
-                    leas      -2,s       local for the sign flags
-                    clr       ,s        clear a sign flag
-                    clr       $01,s     clear the other sign flag
-                    tsta                is the dividend negative
-                    bpl       DivChkDivisorSign no, leave it
-                    nega                negate the dividend
-                    negb                negate the low byte
-                    sbca      #$00      propagate the borrow
-                    inc       $01,s     record the sign
-                    std       $02,s     store the negated dividend
-DivChkDivisorSign   ldd       $06,s     load the divisor
-                    bpl       DivNormalize positive, proceed
-                    nega                negate the divisor
-                    negb                negate the low byte
-                    sbca      #$00      propagate the borrow
-                    com       $01,s     flip the result sign
-                    std       $06,s     store the negated divisor
-DivNormalize        lda       #$01      start the shift count
-DivNormLoop         inca                count a leading bit
-                    asl       $03,s     shift the divisor left
-                    rol       $02,s     through the high half
-                    bpl       DivNormLoop until aligned
-                    sta       ,s        save the shift count
-                    ldd       $06,s     load the dividend
-                    clr       $06,s     clear the remainder
-                    clr       $07,s     clear the remainder high
-DivLoop             subd      $02,s     trial subtract the divisor
-                    bcc       DivQuotBit it fits, set the bit
-                    addd      $02,s     restore the dividend
-                    andcc     #$FE      clear the quotient bit
-                    bra       DivShiftStep go shift
-
-DivQuotBit          orcc      #$01      set the quotient bit
-DivShiftStep        rol       $07,s     shift the bit into the quotient
-                    rol       $06,s     through the high half
-                    lsr       $02,s     shift the divisor down
-                    ror       $03,s     through the low half
-                    dec       ,s        decrement the counter
-                    bne       DivLoop   loop
-                    std       $02,s     store the remainder
-                    tst       $01,s     is a sign fixup needed
-                    beq       DivFinish no, done
-                    ldd       $06,s     load the quotient
-                    nega                negate it
-                    negb                negate the low byte
-                    sbca      #$00      propagate the borrow
-                    std       $06,s     store the negated quotient
-DivFinish           ldx       $04,s     grab the saved return slot
-                    ldd       $06,s     load the quotient
-                    std       $04,s     store it
-                    stx       $06,s     restore the slot
-                    ldx       $02,s     take the remainder
-                    ldd       $04,s     result into D
-                    leas      6,s        drop the locals
-                    rts                 return the quotient
+                    use       lib/divide.asm
+SendSignal          equ       RaiseSignal module signal raiser for divide by zero
                     use       lib/shift.asm
 
-RaiseSignal         std       ErrorFlag,y   save the signal code
+RaiseSignal         std       Errno,y   save the signal code
                     pshs      y,b       preserve registers
                     os9       F$ID      get our process id
                     puls      y,b       restore registers
@@ -4329,209 +4200,62 @@ QueryOperand        lda       $05,s     load the path number
                     cmpb      #$06      type 6
                     beq       SsGetStt  handle it
                     cmpb      #$02      type 2
-                    beq       QueryViaGetStt handle it
+                    beq       GetStatXU handle it
                     cmpb      #$05      type 5
-                    beq       QueryViaGetStt handle it
+                    beq       GetStatXU handle it
                     ldb       #$D0      bad-type error code
-                    lbra      SetErrnoRet report the error
+                    lbra      SyscallErr report the error
 
-QueryViaGetStt      pshs      u         save the frame
-                    os9       I$GetStt  query the file status
-                    bcc       QueryGetSttOk succeeded
-                    puls      u         restore the frame
-                    lbra      SetErrnoRet report the error
-
-QueryGetSttOk       stx       [$08,s]   store the status result
-                    ldx       $08,s     reload the result slot
-                    stu       $02,x     store the pointer
-                    puls      u         restore the frame
-                    clra                success
-                    clrb                return zero
-                    rts                 return
+                    use       lib/getstat.asm
 
 QueryCaseZero       ldx       $06,s     load the type-0 operand pointer
 SsGetStt            os9       I$GetStt  get file status
-                    lbra      RetZeroOrErr return status
+                    lbra      SyscallRet return status
 
                     lda       $05,s     load status code argument
                     ldb       $03,s     select set-status function
                     beq       SsSetStt  function 0 does plain setstat
                     cmpb      #$02      check for function 2
-                    beq       SsSetSttU function 2 setstat with parameters
+                    beq       SetStatXU function 2 setstat with parameters
                     ldb       #$D0      unknown function error
-                    lbra      SetErrnoRet return error
+                    lbra      SyscallErr return error
 
 SsSetStt            ldx       $06,s     load parameter pointer
                     os9       I$SetStt  set file status
-                    lbra      RetZeroOrErr return status
+                    lbra      SyscallRet return status
 
-SsSetSttU           pshs      u         save u
-                    ldx       $08,s     load x parameter
-                    ldu       $0a,s     load u parameter
-                    os9       I$SetStt  set file status
-                    puls      u         restore u
-                    lbra      RetZeroOrErr return status
+                    use       lib/setstat.asm
 
-                    ldx       $02,s     load path name pointer
-                    lda       $05,s     load access mode
-                    os9       I$Open    open the file
-                    bcs       AccessDone skip close on error
-                    os9       I$Close   close immediately for access test
-AccessDone          lbra      RetZeroOrErr return status
+                    use       lib/access.asm
 
-OpenFile            ldx       $02,s     load path name pointer
-                    lda       $05,s     load access mode
-                    os9       I$Open    open the file
-                    lbcs      SetErrnoRet error returns -1
-                    tfr       a,b       move path number to b
-                    clra                clear high byte
-                    rts                 return path number
+                    use       lib/openpath.asm
 
-CloseFile           lda       $03,s     load path number
-                    os9       I$Close   close the path
-                    lbra      RetZeroOrErr return status
+                    use       lib/closepath.asm
 
                     ldx       $02,s     load directory name pointer
                     ldb       $05,s     load access mode
                     os9       I$MakDir  make the directory
-                    lbra      RetZeroOrErr return status
+                    lbra      SyscallRet return status
 
-CreateFile          ldx       $02,s     load path name pointer
-                    lda       $05,s     load mode
-                    tfr       a,b       copy mode
-                    andb      #$24      mask permission bits
-                    orb       #$0b      force create attributes
-                    os9       I$Create  create the file
-                    bcs       CreateExisting handle create error
-RetPathNum          tfr       a,b       move path number to b
-                    clra                clear high byte
-                    rts                 return path number
+                    use       lib/createheadb.asm
+                    use       lib/createtail.asm
 
-CreateExisting      cmpb      #E$CEF    file-already-exists error
-                    lbne      SetErrnoRet other errors return -1
-                    lda       $05,s     reload mode
-                    bita      #$80      test exclusive-create bit
-                    lbne      SetErrnoRet fail if exclusive requested
-                    anda      #$07      keep access bits only
-                    ldx       $02,s     load path name pointer
-                    os9       I$Open    open the existing file
-                    lbcs      SetErrnoRet error returns -1
-                    pshs      u,a       save path number
-                    ldx       #$0000    new size is zero
-                    leau      ,x        clear u
-                    ldb       #$02      setstat size code
-                    os9       I$SetStt  truncate file to zero
-                    puls      u,a       restore path number
-                    bcc       RetPathNum success returns path number
-                    pshs      b         save error code
-                    os9       I$Close   close on failure
-                    puls      b         restore error code
-                    lbra      SetErrnoRet return error
-
-                    ldx       $02,s     load path name pointer
-                    os9       I$Delete  delete the file
-                    lbra      RetZeroOrErr return status
+                    use       lib/deletepath.asm
 
                     lda       $03,s     load path number
                     os9       I$Dup     duplicate the path
-                    lbcs      SetErrnoRet error returns -1
+                    lbcs      SyscallErr error returns -1
                     tfr       a,b       move new path number
                     clra                clear high byte
                     rts                 return new path number
 
-ReadBytes           pshs      y         save y
-                    ldx       $06,s     load buffer pointer
-                    lda       $05,s     load path number
-                    ldy       $08,s     load byte count
-                    pshs      y         save count for return
-                    os9       I$Read    read the bytes
-IoDone              bcc       IoRetCount success handles count
-                    cmpb      #E$EOF    end-of-file error
-                    bne       IoErr2    other error path
-                    clra                zero count at eof
-                    clrb                zero count at eof
-                    puls      pc,y,x    return zero at eof
+                    use       lib/readpath.asm
 
-IoErr2              puls      y,x       clean stack
-                    lbra      SetErrnoRet return error
+                    use       lib/writepath.asm
 
-IoRetCount          tfr       y,d       actual count returned
-                    puls      pc,y,x    return count
-
-ReadLnBytes         pshs      y         save y
-                    lda       $05,s     load path number
-                    ldx       $06,s     load buffer pointer
-                    ldy       $08,s     load byte count
-                    pshs      y         save count for return
-                    os9       I$ReadLn  read a line
-                    bra       IoDone    share read completion
-
-WriteBytes          pshs      y         save y
-                    ldy       $08,s     load byte count
-                    beq       WriteRetCount zero count returns zero
-                    lda       $05,s     load path number
-                    ldx       $06,s     load buffer pointer
-                    os9       I$Write   write the bytes
-WriteDone           bcc       WriteRetCount success returns count
-                    puls      y         clean stack
-                    lbra      SetErrnoRet return error
-
-WriteRetCount       tfr       y,d       count written
-                    puls      pc,y      return count
-
-WriteLnBytes        pshs      y         save y
-                    ldy       $08,s     load byte count
-                    beq       WriteRetCount zero count returns zero
-                    lda       $05,s     load path number
-                    ldx       $06,s     load buffer pointer
-                    os9       I$WritLn  write a line
-                    bra       WriteDone share write completion
-
-LseekFile           pshs      u         save u
-                    ldd       $0a,s     load whence argument
-                    bne       SeekWhence nonzero whence
-                    ldu       #$0000    base zero for seek-set
-                    ldx       #$0000    base zero for seek-set
-                    bra       SeekCompute compute seek position
-
-SeekWhence          cmpd      #$0001    whence 1 is seek-current
-                    beq       SeekCur   seek from current position
-                    cmpd      #$0002    whence 2 is seek-end
-                    beq       SeekEnd   seek from end
-                    ldb       #$F7      bad-whence error
-SeekErr             clra                clear high byte
-                    std       ErrorFlag,y   store errno
-                    ldd       #$FFFF    return -1
-                    leax      SeekBuffer,y   point at seek buffer
-                    std       ,x        clear seek buffer
-                    std       $02,x     clear seek buffer
-                    puls      pc,u      return error
-
-SeekEnd             lda       $05,s     load path number
-                    ldb       #$02      get file size code
-                    os9       I$GetStt  query end position
-                    bcs       SeekErr   error path
-                    bra       SeekCompute compute seek position
-
-SeekCur             lda       $05,s     load path number
-                    ldb       #$05      get current position code
-                    os9       I$GetStt  query current position
-                    bcs       SeekErr   error path
-SeekCompute         tfr       u,d       base low word
-                    addd      $08,s     add offset low word
-                    std       ResultLowWord,y   store result low word
-                    tfr       d,u       keep low word in u
-                    tfr       x,d       base high word
-                    adcb      $07,s     add offset high with carry
-                    adca      $06,s     add offset high byte
-                    bmi       SeekErr   negative position is error
-                    tfr       d,x       keep high word in x
-                    std       SeekBuffer,y   store result high word
-                    lda       $05,s     load path number
-                    os9       I$Seek    seek to new position
-                    bcs       SeekErr   error path
-                    leax      SeekBuffer,y   point at new position
-                    puls      pc,u      return position
+                    use       lib/seek.asm
+HighResultWord      equ       SeekBuffer this module's long-value high cell
+LowResultWord       equ       ResultLowWord this module's long-value low cell
 
 Sbrk                ldd       BreakPointer,y   load current break pointer
                     pshs      d         save current break
@@ -4589,15 +4313,7 @@ ExtendOk            ldd       OldRegionPointer,y   old region pointer
 ExtendFail          ldd       #$FFFF    return failure
                     rts                 return failure
 
-SetErrnoRet         clra                clear high byte
-                    std       ErrorFlag,y   store error in errno
-                    ldd       #$FFFF    return -1
-                    rts                 return -1
-
-RetZeroOrErr        bcs       SetErrnoRet error sets errno
-                    clra                return zero
-                    clrb                return zero
-                    rts                 return success
+                    use       lib/syscallerr.asm
 
 exit                lbsr      RtsStub   call termination stub
                     lbsr      FlushAll  flush and clean up

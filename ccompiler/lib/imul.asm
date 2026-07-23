@@ -14,12 +14,14 @@
 *
 * Entry:  the two 16-bit operands sit in the caller's frame (d and
 *         $02,s); returns the 32-bit product in x:d.
+*
+* Runtime:      compiler runtime: 16 x 16 -> 16 multiply (emitted for *)
 * ====================================================================
 
 MulEntry            tsta                is the first operand's high byte zero
-                    bne       MulFull   no, take the full multiply
+                    bne       @MulFull  no, take the full multiply
                     tst       $02,s     is the second operand's high byte zero
-                    bne       MulFull   no, take the full multiply
+                    bne       @MulFull  no, take the full multiply
                     lda       $03,s     both fit in eight bits: load one
                     mul                 eight-by-eight multiply
                     ldx       ,s        zero for the high result word
@@ -27,8 +29,7 @@ MulEntry            tsta                is the first operand's high byte zero
                     ldx       #$0000    the product high word is zero
                     std       ,s        store the product low word
                     puls      pc,d      return the 32-bit product
-
-MulFull             pshs      d         save the operands
+@MulFull             pshs      d         save the operands
                     ldd       #$0000    zero accumulator
                     pshs      d         push zero high word
                     pshs      d         push zero low word
@@ -41,16 +42,16 @@ MulFull             pshs      d         save the operands
                     mul                 partial product
                     addd      $01,s     add running total
                     std       $01,s     store it
-                    bcc       MulAcc1   skip carry
+                    bcc       @MulAcc1  skip carry
                     inc       ,s        propagate the carry
-MulAcc1             lda       $04,s     first high byte
+@MulAcc1             lda       $04,s     first high byte
                     ldb       $09,s     second low byte
                     mul                 partial product
                     addd      $01,s     add running total
                     std       $01,s     store it
-                    bcc       MulAcc2   skip carry
+                    bcc       @MulAcc2  skip carry
                     inc       ,s        propagate the carry
-MulAcc2             lda       $04,s     first high byte
+@MulAcc2             lda       $04,s     first high byte
                     ldb       $08,s     second high byte
                     mul                 partial product
                     addd      ,s        add running total
@@ -61,3 +62,4 @@ MulAcc2             lda       $04,s     first high byte
                     ldd       $02,s     load low result
                     leas      $08,s     drop the temporaries
                     rts                 return the product
+
