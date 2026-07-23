@@ -11,15 +11,15 @@
 * Convention:   getstat helper: A=path, B=status code, returns X,U through caller pointer
 ********************************************************************
 
-GetStatXU           pshs      u         save frame register
+GetStatXU           pshs      u         save the caller u register
                     os9       I$GetStt  get file status
                     bcc       @GetStatStore success
-                    puls      u         restore frame register
+                    puls      u         restore the caller u register
                     lbra      SyscallErr report the error
-@GetStatStore        stx       [$08,s]   store the returned x through caller
-                    ldx       $08,s     reload caller pointer
-                    stu       $02,x     store the returned u
-                    puls      u         restore frame register
+@GetStatStore        stx       [8,s]     store the returned x through caller
+                    ldx       8,s       reload caller pointer
+                    stu       2,x       store the returned u
+                    puls      u         restore the caller u register
                     clra                clear high result
                     clrb                clear low result
                     rts                 return success

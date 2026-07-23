@@ -25,72 +25,72 @@
 * Runtime:      compiler runtime: unsigned & signed 16-bit divide (emitted for / and %)
 * ====================================================================
 
-UDivEntry           subd      #$0000    test dividend value
+UDivEntry           subd      #0        test dividend value
                     beq       @DivZeroErr zero dividend is error
                     pshs      d         save dividend
                     leas      -2,s       reserve remainder space
                     clr       ,s        clear remainder
-                    clr       $01,s     clear remainder
+                    clr       1,s       clear remainder
                     bra       @DivNorm  enter normalization
 @DivZeroErr          puls      d         restore dividend
                     std       ,s        place operand
-                    ldd       #$002D    division error code
+                    ldd       #45       division error code
                     lbra      SendSignal raise division error
-SDivEntry           subd      #$0000    test dividend value
+SDivEntry           subd      #0        test dividend value
                     beq       @DivZeroErr zero dividend is error
                     pshs      d         save dividend
                     leas      -2,s       reserve remainder space
                     clr       ,s        clear remainder
-                    clr       $01,s     clear remainder
+                    clr       1,s       clear remainder
                     tsta                test dividend sign
                     bpl       @DivDivisorSign dividend already positive
                     nega                negate dividend
                     negb                negate dividend
-                    sbca      #$00      negate dividend
-                    inc       $01,s     mark result sign flip
-                    std       $02,s     store absolute dividend
-@DivDivisorSign      ldd       $06,s     load divisor
+                    sbca      #0        negate dividend
+                    inc       1,s       mark result sign flip
+                    std       2,s       store absolute dividend
+@DivDivisorSign      ldd       6,s       load divisor
                     bpl       @DivNorm  divisor already positive
                     nega                negate divisor
                     negb                negate divisor
-                    sbca      #$00      negate divisor
-                    com       $01,s     flip result sign
-                    std       $06,s     store absolute divisor
-@DivNorm             lda       #$01      init shift counter
+                    sbca      #0        negate divisor
+                    com       1,s       flip result sign
+                    std       6,s       store absolute divisor
+@DivNorm             lda       #1        init shift counter
 @DivNormLoop         inca                count normalization shifts
-                    asl       $03,s     shift divisor left
-                    rol       $02,s     shift divisor left
+                    asl       3,s       shift divisor left
+                    rol       2,s       shift divisor left
                     bpl       @DivNormLoop until top bit set
                     sta       ,s        save shift count
-                    ldd       $06,s     load dividend
-                    clr       $06,s     clear quotient
-                    clr       $07,s     clear quotient
-@DivTrialLoop          subd      $02,s     trial subtract divisor
+                    ldd       6,s       load dividend
+                    clr       6,s       clear quotient
+                    clr       7,s       clear quotient
+@DivTrialLoop          subd      2,s       trial subtract divisor
                     bcc       @DivBitSet subtract succeeded
-                    addd      $02,s     restore dividend
+                    addd      2,s       restore dividend
                     andcc     #$FE      clear quotient bit
                     bra       @DivBitShift finish this iteration
 @DivBitSet           orcc      #$01      set quotient bit
-@DivBitShift         rol       $07,s     shift bit into quotient
-                    rol       $06,s     shift bit into quotient
-                    lsr       $02,s     shift divisor right
-                    ror       $03,s     shift divisor right
+@DivBitShift         rol       7,s       shift bit into quotient
+                    rol       6,s       shift bit into quotient
+                    lsr       2,s       shift divisor right
+                    ror       3,s       shift divisor right
                     dec       ,s        decrement shift count
                     bne       @DivTrialLoop loop over all bits
-                    std       $02,s     store remainder
-                    tst       $01,s     test result sign flag
+                    std       2,s       store remainder
+                    tst       1,s       test result sign flag
                     beq       @DivFinish quotient stays positive
-                    ldd       $06,s     load quotient
+                    ldd       6,s       load quotient
                     nega                negate quotient
                     negb                negate quotient
-                    sbca      #$00      negate quotient
-                    std       $06,s     store negated quotient
-@DivFinish           ldx       $04,s     save remainder pointer
-                    ldd       $06,s     load quotient
-                    std       $04,s     place quotient for return
-                    stx       $06,s     place remainder
-                    ldx       $02,s     load remainder
-                    ldd       $04,s     load quotient result
+                    sbca      #0        negate quotient
+                    std       6,s       store negated quotient
+@DivFinish           ldx       4,s       save remainder pointer
+                    ldd       6,s       load quotient
+                    std       4,s       place quotient for return
+                    stx       6,s       place remainder
+                    ldx       2,s       load remainder
+                    ldd       4,s       load quotient result
                     leas      6,s        clean local stack
                     rts                 return to caller
 

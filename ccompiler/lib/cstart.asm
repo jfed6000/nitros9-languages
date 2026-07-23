@@ -26,7 +26,7 @@
 * copybytes - block move (y = source, u = destination, x = count)
 copybytes           lda       ,y+       get a byte
                     sta       ,u+       put a byte
-                    leax      -$01,x    decrement the count
+                    leax      -1,x      decrement the count
                     bne       copybytes and round again
                     rts                 return from the block move
 _start              pshs      y         save the top of memory
@@ -44,7 +44,7 @@ _start              pshs      y         save the top of memory
                     ldx       ,y++      get the count of dp data to move
                     beq       @cs.AfterFirstInit skip the copy when empty
                     bsr       copybytes move the dp data into position
-                    ldu       $02,s     get the data base again
+                    ldu       2,s       get the data base again
 @cs.AfterFirstInit   leau      >HDRADV,u point to where non-dp data starts
                     ldx       ,y++      get the count of non-dp data to move
                     beq       @cs.PadLoop skip the copy when empty
@@ -57,69 +57,69 @@ _start              pshs      y         save the top of memory
                     bra       @cs.PadLoop continue clearing the bss
 * replace the compiled pointer references: first the data-to-text refs,
 * then the data-to-data refs
-@cs.RelocateData     ldu       $02,s     point back at the data base
+@cs.RelocateData     ldu       2,s       point back at the data base
                     ldd       ,y++      get the text-reference count
                     beq       @cs.CheckSecondReloc skip when no text references
-                    leax      >$0000,pcr point x at the module (text) base
+                    leax      >0,pcr     point x at the module (text) base
                     lbsr      @cs.RelocatePointers patch the text references
 @cs.CheckSecondReloc ldd       ,y++      get the data-reference count
                     beq       @cs.InitComplete skip when no data references
                     leax      ,u        u already points at the data base
                     lbsr      @cs.RelocatePointers patch the data references
-@cs.InitComplete     leas      $04,s     drop the saved pointers
+@cs.InitComplete     leas      4,s       drop the saved pointers
                     puls      x         restore the end-of-data pointer
                     stx       RTBASE+$40,u save it as the parameter pointer
 * process the params: insert a null at the end of each argument and fill
 * the argv[] vector with pointers to them.  the program-name address is
 * stored first (an extra name slot is reserved for it).
                     sty       RTBASE,u  save the argument-vector base
-                    ldd       #$0001    there is always at least one arg
+                    ldd       #1        there is always at least one arg
                     std       RTBASE+$3C,u set the argument count to one
                     leay      RTBASE+$02,u point y at the second argv slot
                     leax      ,s        point x at the raw parameters
                     lda       ,x+       prime the first character
 @cs.ParseArgLoop     ldb       RTBASE+$3D,u load the current argument count
-                    cmpb      #$1d      about to overflow the vector?
+                    cmpb      #29       about to overflow the vector?
                     beq       @cs.ArgsParsed stop when the vector is full
-@cs.SkipSepLoop      cmpa      #$0d      end of the command line?
+@cs.SkipSepLoop      cmpa      #13       end of the command line?
                     beq       @cs.ArgsParsed finish at carriage return
-                    cmpa      #$20      a space separator?
+                    cmpa      #'        a space separator?
                     beq       @cs.NextSepChar skip it
-                    cmpa      #$2C      a comma separator?
+                    cmpa      #',       a comma separator?
                     bne       @cs.CheckQuote no, a word has started
 @cs.NextSepChar      lda       ,x+       get the next character
                     bra       @cs.SkipSepLoop keep skipping separators
-@cs.CheckQuote       cmpa      #$22      a double-quoted string?
+@cs.CheckQuote       cmpa      #34       a double-quoted string?
                     beq       @cs.StartQuoted yes
-                    cmpa      #$27      a single-quoted string?
+                    cmpa      #39       a single-quoted string?
                     bne       @cs.StartWord no, an ordinary word
 @cs.StartQuoted      stx       ,y++      record the token start in argv
                     inc       RTBASE+$3D,u bump the argument count
                     pshs      a         save the quote delimiter
 @cs.QuoteScanLoop    lda       ,x+       scan a character inside the quotes
-                    cmpa      #$0d      end of line inside the quote?
+                    cmpa      #13       end of line inside the quote?
                     beq       @cs.QuoteEnd stop at the line end
                     cmpa      ,s        the matching close quote?
                     bne       @cs.QuoteScanLoop keep scanning quoted text
 @cs.QuoteEnd         puls      b         discard the saved delimiter
-                    clr       -$01,x    terminate the token with a null
-                    cmpa      #$0d      was it the end of the line?
+                    clr       -1,x      terminate the token with a null
+                    cmpa      #13       was it the end of the line?
                     beq       @cs.ArgsParsed finish if the line ended
                     lda       ,x+       get the character after the quote
                     bra       @cs.ParseArgLoop process the next token
-@cs.StartWord        leax      -$01,x    back up to the token start
+@cs.StartWord        leax      -1,x      back up to the token start
                     stx       ,y++      record the token start in argv
-                    leax      $01,x     step past the first character
+                    leax      1,x       step past the first character
                     inc       RTBASE+$3D,u bump the argument count
-@cs.WordScanLoop     cmpa      #$0d      end of the line?
+@cs.WordScanLoop     cmpa      #13       end of the line?
                     beq       @cs.WordEnd end the word
-                    cmpa      #$20      a space?
+                    cmpa      #'        a space?
                     beq       @cs.WordEnd end the word
-                    cmpa      #$2C      a comma?
+                    cmpa      #',       a comma?
                     beq       @cs.WordEnd end the word
                     lda       ,x+       scan the next word character
                     bra       @cs.WordScanLoop keep scanning the word
-@cs.WordEnd          clr       -$01,x    terminate the word with a null
+@cs.WordEnd          clr       -1,x      terminate the word with a null
                     bra       @cs.ParseArgLoop process the next token
 * put argv and argc on the stack, then call the program's main()
 @cs.ArgsParsed       leax      RTBASE,u  get the address of the argv vector
@@ -149,10 +149,10 @@ stkcheck            leax      d,s       compute the requested stack top
 @cs.MsgStackOverflow fcc       /**** STACK OVERFLOW ****/
                     fcb       $0d       carriage-return terminator
 @cs.StackOverflow    leax      @cs.MsgStackOverflow,pcr point at the error string
-                    ldb       #$CF      E$MemFul (memory full) exit code
+                    ldb       #207      E$MemFul (memory full) exit code
                     pshs      b         stack the error number
-                    lda       #$02      standard error output
-                    ldy       #$0064    more than the message length
+                    lda       #2        standard error output
+                    ldy       #100      more than the message length
                     os9       I$WritLn  write the message
                     clr       ,-s       clear the high byte of the status
                     lbsr      _exit     abort (no return)
@@ -174,10 +174,10 @@ stkcheck            leax      d,s       compute the requested stack top
 @cs.RelocLoop        ldd       ,y++      get an offset
                     leax      d,u       point at the location to fix
                     ldd       ,x        get the relative reference
-                    addd      $02,s     add in the base
+                    addd      2,s       add in the base
                     std       ,x        store the absolute reference
                     cmpy      ,s        reached the top of the list?
                     bne       @cs.RelocLoop no, round again
-                    leas      $04,s     drop the saved values
+                    leas      4,s       drop the saved values
                     rts                 return from relocation
 

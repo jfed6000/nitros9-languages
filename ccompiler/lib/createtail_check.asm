@@ -15,8 +15,8 @@
 
 tylg                set       Prgrm+Objct
 atrv                set       ReEnt+rev
-rev                 set       $01
-edition             set       $01
+rev                 set       1
+edition             set       1
 
                     mod       eom,name,tylg,atrv,_start,size
 

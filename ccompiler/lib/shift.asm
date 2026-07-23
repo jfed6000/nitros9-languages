@@ -24,28 +24,28 @@
 
 AsrEntry            tstb                is the shift count zero
                     beq       @ShiftTail nothing to shift
-@AsrLoop             asr       $02,s     arithmetic shift right high byte
-                    ror       $03,s     rotate low byte
+@AsrLoop             asr       2,s       arithmetic shift right high byte
+                    ror       3,s       rotate low byte
                     decb                decrement the count
                     bne       @AsrLoop  loop for the count
                     bra       @ShiftTail go return the result
 LsrEntry            tstb                is the shift count zero
                     beq       @ShiftTail nothing to shift
-@LsrLoop             lsr       $02,s     logical shift right high byte
-                    ror       $03,s     rotate low byte
+@LsrLoop             lsr       2,s       logical shift right high byte
+                    ror       3,s       rotate low byte
                     decb                decrement the count
                     bne       @LsrLoop  loop for the count
-@ShiftTail           ldd       $02,s     load the shifted result
+@ShiftTail           ldd       2,s       load the shifted result
                     pshs      d         save it
-                    ldd       $02,s     load result again
-                    std       $04,s     place it
+                    ldd       2,s       load result again
+                    std       4,s       place it
                     ldd       ,s        load return value
-                    leas      $04,s     drop the temporary
+                    leas      4,s       drop the temporary
                     rts                 return
 AslEntry            tstb                is the shift count zero
                     beq       @ShiftTail nothing to shift
-@AslLoop             asl       $03,s     shift left low byte
-                    rol       $02,s     rotate high byte
+@AslLoop             asl       3,s       shift left low byte
+                    rol       2,s       rotate high byte
                     decb                decrement the count
                     bne       @AslLoop  loop for the count
                     bra       @ShiftTail go return the result

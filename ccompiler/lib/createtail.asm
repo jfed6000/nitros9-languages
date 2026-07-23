@@ -20,17 +20,17 @@
                     rts                 return path number
 CreateExists        cmpb      #E$CEF    file already exists error
                     lbne      SyscallErr other error returns
-                    lda       $05,s     reload create mode
+                    lda       5,s       reload create mode
                     bita      #$80      test exclusive flag
                     lbne      SyscallErr exclusive create fails
                     anda      #$07      keep permission bits
-                    ldx       $02,s     load pathname pointer
+                    ldx       2,s       load pathname pointer
                     os9       I$Open    open existing file
                     lbcs      SyscallErr return error
                     pshs      u,a       save path and u
-                    ldx       #$0000    zero length
+                    ldx       #0        zero length
                     leau      ,x        clear u pointer
-                    ldb       #$02      setstt size code
+                    ldb       #2        setstt size code
                     os9       I$SetStt  truncate to zero length
                     puls      u,a       restore path and u
                     bcc       @CreateOk return path on success

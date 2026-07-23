@@ -12,10 +12,10 @@
 * ====================================================================
 
 write               pshs      y         save y
-                    ldy       $08,s     load byte count
+                    ldy       8,s       load byte count
                     beq       @WriteOk  nothing to write
-                    lda       $05,s     load path number
-                    ldx       $06,s     load buffer pointer
+                    lda       5,s       load path number
+                    ldx       6,s       load buffer pointer
                     os9       I$Write   write to file
 @WriteResult         bcc       @WriteOk return count on success
                     puls      y         clean stack
@@ -23,10 +23,10 @@ write               pshs      y         save y
 @WriteOk             tfr       y,d       count to result
                     puls      pc,y      return byte count
 writeln             pshs      y         save y
-                    ldy       $08,s     load byte count
+                    ldy       8,s       load byte count
                     beq       @WriteOk  nothing to write
-                    lda       $05,s     load path number
-                    ldx       $06,s     load buffer pointer
+                    lda       5,s       load path number
+                    ldx       6,s       load buffer pointer
                     os9       I$WritLn  write line to file
                     bra       @WriteResult share write result handling
 

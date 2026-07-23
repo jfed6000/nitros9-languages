@@ -8,7 +8,7 @@
 * C prototype:  char *memcpy(char *dst, char *src, int n)
 * ====================================================================
 
-memcpy              pshs      U         save frame pointer
+memcpy              pshs      U         save the caller u register
                     ldu       4,S       load destination pointer
                     bra       @MemCpyTest enter copy loop
 @MemCpyLoop          ldx       6,S       load source pointer

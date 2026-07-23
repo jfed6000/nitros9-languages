@@ -11,8 +11,8 @@
 * C prototype:  int   access(char *path, int mode)
 ********************************************************************
 
-access              ldx       $02,s     load the pathname
-                    lda       $05,s     load the access mode
+access              ldx       2,s       load the pathname
+                    lda       5,s       load the access mode
                     os9       I$Open    open the file
                     bcs       @AccessDone failed to open
                     os9       I$Close   close it immediately

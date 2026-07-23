@@ -11,6 +11,6 @@
 * C prototype:  int   close(int path)
 ********************************************************************
 
-close               lda       $03,s     load path number
+close               lda       3,s       load path number
                     os9       I$Close   close the file
                     lbra      SyscallRet return result

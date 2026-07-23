@@ -11,20 +11,20 @@
 * C prototype:  int   fflush(FILE *fp)
 ********************************************************************
 
-fflush              pshs      u         save frame register
-                    ldu       $04,s     load the stream pointer
+fflush              pshs      u         save the caller u register
+                    ldu       4,s       load the stream pointer
                     beq       IoErr     fail if null stream
                     ldd       _flag,u   load the flags
                     clra                keep the low byte
                     andb      #$22      isolate write and error bits
-                    cmpd      #$0002    check the stream is writable
+                    cmpd      #2        check the stream is writable
                     beq       @FflushWrite flush if writable
 IoErr               ldd       #$FFFF    return the error code
                     puls      pc,u      restore and return
 @FflushWrite         ldd       _flag,u   load the flags
                     anda      #$80      isolate the high flag bit
                     clrb                clear the low byte
-                    std       -$02,s    save the test result
+                    std       -2,s      save the test result
                     bne       @FflushTail skip alloc if already set
                     pshs      u         pass the stream
                     lbsr      GetBuf    allocate the buffer if needed

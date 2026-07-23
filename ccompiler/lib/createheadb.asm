@@ -13,8 +13,8 @@
 * C prototype:  int   creat(char *path, int mode)   [mode-derived-attribute prologue]
 ********************************************************************
 
-creat               ldx       $02,s     load pathname pointer
-                    lda       $05,s     load requested mode
+creat               ldx       2,s       load pathname pointer
+                    lda       5,s       load requested mode
                     tfr       a,b       copy mode to attribute byte
                     andb      #$24      mask attribute bits
                     orb       #$0b      set base access permissions

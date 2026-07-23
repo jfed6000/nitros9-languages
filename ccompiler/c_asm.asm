@@ -25,7 +25,7 @@
 
 tylg                set       Prgrm+Objct
 atrv                set       ReEnt+rev
-rev                 set       $01
+rev                 set       1
 
                     mod       eom,name,tylg,atrv,_start,size
 
@@ -238,7 +238,7 @@ DATAEND             equ       end       end of static data / heap start / stack 
 HDRADV              equ       dpsiz     advance to where the non-DP data starts
                     use       lib/cstart.asm
 
-main                pshs      U,D       save frame pointer and arguments
+main                pshs      U,D       save u and arguments
                     ldd       8,S       load an argument word
                     pshs      D         push it as a parameter
                     ldd       8,S       load the next argument word
@@ -274,7 +274,7 @@ InitFileLoop        leax      >ArgBuffer,Y point at the argument buffer
 
 FileLoop            leax      >ModeRead,PC point at the format string
                     pshs      X         push the string pointer
-                    ldd       [<$02,S]  load the argument via pointer
+                    ldd       [<2,S]    load the argument via pointer
                     pshs      D         push it as an argument
                     lbsr      OpenFile  call the conversion routine
                     leas      4,S       drop the arguments
@@ -332,7 +332,7 @@ DoExit              pshs      D         push the exit code
                     leas      2,S       drop the argument
                     puls      PC,U,X    restore registers and return
 
-AssemblePass        pshs      U         save the frame pointer
+AssemblePass        pshs      U         save the caller u register
                     leas      -1,S      reserve a local byte
                     lbsr      InitSectionDefaults call the routine
                     clra                clear high byte
@@ -379,7 +379,7 @@ NextLine            lbsr      ReadInputLine fetch the next line
                     leas      1,S       release the local
                     puls      PC,U      restore registers and return
 
-ParseLine           pshs      U         save the frame pointer
+ParseLine           pshs      U         save the caller u register
                     leas      -3,S      reserve local bytes
                     clra                clear high byte
                     clrb                clear low byte
@@ -744,7 +744,7 @@ EmitErrorMsg        pshs      X         push the format string
 AsmLineExit         leas      3,S       discard the local frame
                     puls      PC,U      return
 
-EmitListingLine     pshs      U         save the frame pointer
+EmitListingLine     pshs      U         save the caller u register
                     ldd       <ListFlag load the pending-line flag
                     lbeq      EmitLineRet return if nothing pending
                     ldd       <U0003    load the current address
@@ -899,25 +899,25 @@ EmitNewline         leax      >OutBuffer,Y point to the output buffer
                     std       <LineAddr save the line count
                     puls      PC,U      return
 
-EmitFixedMsg1       pshs      U         save the frame pointer
+EmitFixedMsg1       pshs      U         save the caller u register
                     leax      >MsgBadRegList,PC point to the message string
                     pshs      X         push the message
                     bsr       EmitMessageLine emit the message line
                     puls      PC,U,X    return
 
-EmitFixedMsg2       pshs      U         save the frame pointer
+EmitFixedMsg2       pshs      U         save the caller u register
                     leax      >MsgBadRegName,PC point to the message string
                     pshs      X         push the message
                     bsr       EmitMessageLine emit the message line
                     puls      PC,U,X    return
 
-EmitFixedMsg3       pshs      U         save the frame pointer
+EmitFixedMsg3       pshs      U         save the caller u register
                     leax      >MsgNestedMacro,PC point to the message string
                     pshs      X         push the message
                     bsr       EmitMessageLine emit the message line
                     puls      PC,U,X    return
 
-EmitMessageLine     pshs      U         save the frame pointer
+EmitMessageLine     pshs      U         save the caller u register
                     ldb       <PassFlag load the listing-enabled flag
                     beq       IncLineCounter skip output if disabled
                     ldd       #1        set the pending flag
@@ -945,7 +945,7 @@ EmitLineRet         clra                clear the high byte
                     clrb                clear the low byte
                     puls      PC,U      return
 
-FatalError          pshs      U         save the frame pointer
+FatalError          pshs      U         save the caller u register
                     ldd       4,S       load the message argument
                     pshs      D         push the message
                     leax      >FmtAsmError,PC point to the format string
@@ -1008,7 +1008,7 @@ FindKeyword         pshs      U,D       save registers and frame
                     leau      >Y06B7,Y  point at the output buffer
                     bra       CopyLoopTest enter the copy loop test
 
-CopyCharLoop        ldb       [<$06,S]  load current source char via pointer
+CopyCharLoop        ldb       [<6,S]    load current source char via pointer
                     sex                 sign extend char to word
                     leax      >CharClassTbl,Y point at character-class table
                     leax      D,X       index the table by the char
@@ -1016,11 +1016,11 @@ CopyCharLoop        ldb       [<$06,S]  load current source char via pointer
                     clra                clear the high byte for indexing
                     andb      #4        test the uppercase-letter flag
                     beq       ForceLower not a letter, force lowercase
-                    ldb       [<$06,S]  reload the source char
+                    ldb       [<6,S]    reload the source char
                     sex                 sign-extend the reloaded char
                     bra       StoreCopyChar store the char unchanged
 
-ForceLower          ldb       [<$06,S]  reload the source char
+ForceLower          ldb       [<6,S]    reload the source char
                     sex                 sign-extend the reloaded char
                     orb       #32       convert letter to lowercase
 StoreCopyChar       stb       ,U        store char into output buffer
@@ -1028,7 +1028,7 @@ StoreCopyChar       stb       ,U        store char into output buffer
                     ldd       6,S       load the source pointer
                     addd      #1        advance past this char
                     std       6,S       save the source pointer
-CopyLoopTest        ldb       [<$06,S]  load the next source char
+CopyLoopTest        ldb       [<6,S]    load the next source char
                     bne       CopyCharLoop loop while char is nonzero
                     clra                clear the high byte
                     clrb                form the null terminator
@@ -1342,12 +1342,12 @@ Lt_0B39             fcc       "bgt"
 Lt_0B3D             fcc       "ble"
                     fcb       C$NULL
 
-Lt_0B41             pshs      U         save the frame pointer
+Lt_0B41             pshs      U         save the caller u register
                     ldd       #3        three bytes for this directive
                     std       <PassType set location-counter increment to three
                     lbra      DispatchMnemonic jump to emit the bytes
 
-Lt_0B4B             pshs      U         save the frame pointer
+Lt_0B4B             pshs      U         save the caller u register
                     ldd       #2        two bytes for this operand
                     std       <PassType set size to two bytes
                     lbsr      ParseHashOperand evaluate the operand expression
@@ -1362,7 +1362,7 @@ Lt_0B4B             pshs      U         save the frame pointer
                     stb       <PostByte store the low byte
                     lbra      RetTrue   jump to continue
 
-Lt_0B6C             pshs      U         save the frame pointer
+Lt_0B6C             pshs      U         save the caller u register
                     lbsr      ParseHashOperand evaluate the operand expression
                     std       -2,S      save the result
                     beq       EmitByteErr branch on error
@@ -1374,7 +1374,7 @@ Lt_0B6C             pshs      U         save the frame pointer
                     std       <PostByte store it
                     bra       EmitByteDone finish the directive
 
-Lt_0B85             pshs      U         save the frame pointer
+Lt_0B85             pshs      U         save the caller u register
                     ldb       [>SearchStrPtr,Y] load the suffix char via pointer
                     sex                 sign-extend the suffix char
                     tfr       D,X       move it into X
@@ -1409,7 +1409,7 @@ CheckByteSuffix     cmpx      #98       is the suffix char 'b'
                     beq       EmitOneByte handle the a suffix
                     bra       BadRegErr take the default path
 
-Lt_0BC9             pshs      U         save the frame pointer
+Lt_0BC9             pshs      U         save the caller u register
                     ldb       <OpcodeClass load the flag byte
                     cmpb      #14       compare against fourteen
                     beq       ParseRegNum branch if matched
@@ -1942,7 +1942,7 @@ BranchFitsByte      clra                mark byte-sized offset
 StoreBranchSize     std       <OffSizeFlag store offset-size flag
                     lbra      ReturnTrue return success
 
-MatchRegToken       pshs      U         save frame pointer
+MatchRegToken       pshs      U         save the caller u register
                     leas      -3,S      allocate loop locals
                     clra                start index at zero
                     clrb                clear low byte
@@ -2021,7 +2021,7 @@ MatchRegCheck       std       1,S       store updated index
 MatchRegDone        leas      3,S       release loop locals
                     puls      PC,U      return to caller
 
-ParseIndexMode      pshs      U         save frame pointer
+ParseIndexMode      pshs      U         save the caller u register
                     leas      -1,S      allocate local
                     lbsr      SkipSpaces read next character
                     stb       ,S        save character
@@ -2104,7 +2104,7 @@ EmitByteOffset      lbsr      EmitByteOffsetMode emit byte-offset indexed
 EmitWordOffset      bsr       EmitWordOffsetMode emit word-offset indexed
                     lbra      ParseRegDone return
 
-ParseSizePrefix     pshs      U         save frame pointer
+ParseSizePrefix     pshs      U         save the caller u register
                     ldb       5,S       load passed character
                     cmpb      #'>       compare to greater-than
                     bne       CheckBytePrefix not word prefix
@@ -2134,7 +2134,7 @@ SexReturn           sex                 sign extend result
 
                     fcb       $35
                     fcb       $C0
-FinishAccOffset     pshs      U         save frame pointer
+FinishAccOffset     pshs      U         save the caller u register
                     ldd       <SrcPtr   load source pointer
                     addd      #2        skip register and comma
                     std       <SrcPtr   store source pointer
@@ -2144,7 +2144,7 @@ FinishAccOffset     pshs      U         save frame pointer
                     lbsr      FinishIndexPostbyte finish index postbyte
                     lbra      AutoModeDone return
 
-EmitWordOffsetMode  pshs      U         save frame pointer
+EmitWordOffsetMode  pshs      U         save the caller u register
                     ldd       <PassType load instruction length
                     addd      #2        add two offset bytes
                     std       <PassType store instruction length
@@ -2165,7 +2165,7 @@ DirectWordOffset    lbsr      CompactModeList evaluate register
                     orb       #48       set word-offset bits
                     bra       StoreModeByte go store mode byte
 
-EmitByteOffsetMode  pshs      U         save frame pointer
+EmitByteOffsetMode  pshs      U         save the caller u register
                     ldd       <PassType load instruction length
                     addd      #1        add one offset byte
                     std       <PassType store instruction length
@@ -2187,7 +2187,7 @@ EmitByteOffsetMode  pshs      U         save frame pointer
 StoreModeByte       stb       <OpcodeClass store mode byte
                     lbra      ReturnTrue return success
 
-ParseAutoMode       pshs      U         save frame pointer
+ParseAutoMode       pshs      U         save the caller u register
                     ldd       <SrcPtr   load source pointer
                     addd      #1        advance past comma
                     std       <SrcPtr   store source pointer
@@ -2255,18 +2255,18 @@ FinishAutoMode      lbsr      FinishIndexPostbyte finish index postbyte
 EmitZeroOffset      lbsr      EmitOffsetPostbyte emit zero-offset indexed
                     puls      PC,U      return
 
-RequireNonIndirect  pshs      U         save frame pointer
+RequireNonIndirect  pshs      U         save the caller u register
                     ldd       <IndirFlag load indirect flag
                     lbeq      ReturnTrue allowed when not indirect
                     lbra      ReturnModeError else illegal mode error
 
-IllegalModeErr      pshs      U         save frame pointer
+IllegalModeErr      pshs      U         save the caller u register
                     leax      >MsgIllegalMode,PC point to error message
                     pshs      X         push message pointer
                     lbsr      EmitMessageLine print error message
                     puls      PC,U,X    return
 
-ParseBaseReg        pshs      U         save frame pointer
+ParseBaseReg        pshs      U         save the caller u register
                     leas      -1,S      allocate local
                     ldd       #255      sentinel no-match value
                     stb       ,S        store sentinel
@@ -2320,13 +2320,13 @@ NoRegMatch          clra                return not found
 ParseRegDone        leas      1,S       release local
                     puls      PC,U      return to caller
 
-IllegalIndexRegErr  pshs      U         save frame pointer
+IllegalIndexRegErr  pshs      U         save the caller u register
                     leax      >MsgIllegalIndexReg,PC point to error message
                     pshs      X         push message pointer
                     lbsr      EmitMessageLine print error message
                     puls      PC,U,X    return
 
-FinishIndexPostbyte pshs      U         save frame pointer
+FinishIndexPostbyte pshs      U         save the caller u register
                     ldb       <OpcodeClass load mode byte
                     sex                 sign extend
                     orb       #32       set indexed flag bit
@@ -2500,7 +2500,7 @@ CompactDone         clra                clear the result high
 FindMatchEntry      pshs      U         save u
                     ldu       4,S       load the entry pointer argument
                     leas      -4,S      make local space
-                    ldb       [<$01,U]  load a byte via the indirect field
+                    ldb       [<1,U]    load a byte via the indirect field
                     sex                 sign extend
                     pshs      D         push it
                     ldb       <ModeFlags load the mode byte
@@ -2517,7 +2517,7 @@ FindMatchEntry      pshs      U         save u
                     lbra      NextMatchEntry enter the scan
 
 MatchScanLoop       ldx       2,S       load the entry pointer
-                    ldb       [<$01,X]  load a byte via the indirect field
+                    ldb       [<1,X]    load a byte via the indirect field
                     sex                 sign extend
                     pshs      D         push it
                     ldb       <ModeFlags load the mode byte
@@ -2525,7 +2525,7 @@ MatchScanLoop       ldx       2,S       load the entry pointer
                     ora       ,S+       combine the bits
                     orb       ,S+       combine the bits
                     pshs      D         push the combined value
-                    ldb       [<$04,S]  load a byte via the saved pointer
+                    ldb       [<4,S]    load a byte via the saved pointer
                     sex                 sign extend
                     ora       ,S+       combine the bits
                     orb       ,S+       combine the bits
@@ -2547,7 +2547,7 @@ RemoveEntryStep     pshs      U         save the pointer
                     bcs       RemoveEntryLoop loop while below
                     bra       CopyDownStep go to the outer step
 
-CopyDownLoop        ldb       [<$02,S]  load a byte via the pointer
+CopyDownLoop        ldb       [<2,S]    load a byte via the pointer
                     stb       ,U        store it into the destination
                     ldx       2,S       load the source pointer
                     ldd       1,X       load the source word
@@ -2959,13 +2959,13 @@ EmitNumericArg      ldd       2,S       load the source pointer
 EmitSingleArg       bsr       ReportOperandErr emit a single numeric operand
                     bra       OperandCleanup finish the operand
 
-ReportOperandErr    pshs      U         save the frame pointer
+ReportOperandErr    pshs      U         save the caller u register
                     leax      >MsgConstantDef,PC point at the error message
                     pshs      X         pass the message pointer
                     lbsr      EmitMessageLine report the error
                     puls      PC,U,X    return to caller
 
-Lt_18C3             pshs      U         save the frame pointer
+Lt_18C3             pshs      U         save the caller u register
                     leax      >U0032,Y  point at the byte value
                     stx       >EmitBufPtr,Y set the emit buffer pointer
                     ldd       #1        one byte per operand
@@ -2973,7 +2973,7 @@ Lt_18C3             pshs      U         save the frame pointer
                     leax      >ParseReloc,PC point at the fcb handler
                     bra       ProcessOperands process the operand list
 
-Lt_18D8             pshs      U         save the frame pointer
+Lt_18D8             pshs      U         save the caller u register
                     leax      >OperandVal,Y point at the word value
                     stx       >EmitBufPtr,Y set the emit buffer pointer
                     ldd       #2        two bytes per operand
@@ -2984,7 +2984,7 @@ ProcessOperands     pshs      X         pass the handler pointer
 OperandCleanup      leas      4,S       drop the arguments
                     puls      PC,U      return to caller
 
-EmitOperandList     pshs      U         save the frame pointer
+EmitOperandList     pshs      U         save the caller u register
                     bra       OperandLoop enter the operand loop
 
 NextOperand         bsr       FlushObjBuf flush the object buffer
@@ -2993,13 +2993,13 @@ NextOperand         bsr       FlushObjBuf flush the object buffer
                     std       <SrcPtr   save the input pointer
 OperandLoop         ldd       6,S       load the operand size
                     std       <PassType set the byte count
-                    jsr       [<$04,S]  call the operand handler
+                    jsr       [<4,S]    call the operand handler
                     ldb       [>SrcPtr,Y] fetch the next character
                     cmpb      #',       is it a comma
                     beq       NextOperand loop for another operand
                     lbra      ReturnOne finish the directive
 
-EmitByte            pshs      U         save the frame pointer
+EmitByte            pshs      U         save the caller u register
                     ldd       <PassType load the buffer index
                     cmpd      #4        is the buffer full
                     blt       StoreBufByte skip flush if room remains
@@ -3014,7 +3014,7 @@ StoreBufByte        ldd       <PassType load the buffer index
                     stb       ,X        store the byte in the buffer
                     puls      PC,U      return to caller
 
-FlushObjBuf         pshs      U         save the frame pointer
+FlushObjBuf         pshs      U         save the caller u register
                     ldd       <PassType load the byte count
                     pshs      D         pass the byte count
                     ldd       >EmitBufPtr,Y load the buffer pointer
@@ -3053,7 +3053,7 @@ ClearBufIndex       clra                clear accumulator
                     std       <PassType reset the buffer index
                     puls      PC,U      return to caller
 
-Lt_197F             pshs      U         save the frame pointer
+Lt_197F             pshs      U         save the caller u register
                     ldd       #3        three bytes to emit
                     std       <PassType set the byte count
                     lbsr      ParseReloc emit the fcb bytes
@@ -3065,7 +3065,7 @@ Lt_197F             pshs      U         save the frame pointer
                     stb       <OperandLow store the low byte
                     lbra      ReturnOne finish the directive
 
-SetValueHandler     pshs      U         save the frame pointer
+SetValueHandler     pshs      U         save the caller u register
                     ldb       [>SrcPtr,Y] fetch the current character
                     cmpb      #',       is it a comma
                     bne       ParseSetExpr branch if not a comma
@@ -3078,7 +3078,7 @@ ParseSetExpr        leax      >MsgCommaExpected,PC point at the error message
                     lbsr      EmitMessageLine report the error
                     puls      PC,U,X    restore and continue
 
-Lt_19B6             pshs      U         save the frame pointer
+Lt_19B6             pshs      U         save the caller u register
                     lbsr      GetOperandToken parse the value expression
                     ldd       <RelocPtr load the reloc pointer
                     beq       SetHandlerRet skip if none
@@ -3086,16 +3086,16 @@ Lt_19B6             pshs      U         save the frame pointer
                     std       [>RelocPtr,Y] store into the relocation slot
 SetHandlerRet       puls      PC,U      return to caller
 
-Lt_19C7             pshs      U         save the frame pointer
+Lt_19C7             pshs      U         save the caller u register
                     puls      PC,U      return to caller
 
-Lt_19CB             pshs      U         save the frame pointer
+Lt_19CB             pshs      U         save the caller u register
                     leax      >Y05C7,Y  point at the name buffer
                     pshs      X         pass the buffer pointer
                     bsr       CopyOperandStr copy the operand string
                     puls      PC,U,X    restore and return
 
-CopyOperandStr      pshs      U         save the frame pointer
+CopyOperandStr      pshs      U         save the caller u register
                     ldu       4,S       load the destination pointer
                     ldb       <PassFlag load the pass flag
                     bne       CopyStrLoop skip the check on the second pass
@@ -3112,17 +3112,17 @@ CopyStrLoop         ldx       <SrcPtr   load the input pointer
 StoreInputPtr       std       <SrcPtr   save the input pointer
                     lbra      ReturnOne finish the directive
 
-Lt_19FB             pshs      U         save the frame pointer
+Lt_19FB             pshs      U         save the caller u register
                     leax      >Y063F,Y  point at the name buffer
                     pshs      X         pass the buffer pointer
                     bsr       CopyOperandStr copy the operand string
                     puls      PC,U,X    restore and return
 
-Lt_1A07             pshs      U         save the frame pointer
+Lt_1A07             pshs      U         save the caller u register
                     lbsr      SyncLineNumbers process the directive
                     bra       ClearRelocDone clear reloc flag and finish
 
-Lt_1A0E             pshs      U         save the frame pointer
+Lt_1A0E             pshs      U         save the caller u register
                     bsr       EvalCountExpr evaluate the count expression
                     std       -2,S      save the result flag
                     beq       RepeatRet skip if evaluation failed
@@ -3139,7 +3139,7 @@ ClearRelocDone      clra                clear the relocation flag
                     std       <ListFlag save the flag
 RepeatRet           puls      PC,U      return to caller
 
-EvalCountExpr       pshs      U         save the frame pointer
+EvalCountExpr       pshs      U         save the caller u register
                     lbsr      ParseNumber evaluate the expression
                     std       -2,S      save the result flag
                     beq       EvalExprErr branch if evaluation failed
@@ -3152,7 +3152,7 @@ EvalExprErr         leax      >MsgBadNumber,PC point at the error message
                     leas      2,S       drop the argument
 EvalExprRet         puls      PC,U      return to caller
 
-ParseOptionList     pshs      U         save the frame pointer
+ParseOptionList     pshs      U         save the caller u register
                     leas      -3,S      reserve local storage
                     lbsr      SkipSpaces fetch the next token
 OptionCharLoop      stb       ,S        store the current character
@@ -3187,10 +3187,10 @@ OptTableLoop        ldb       ,S        load the character
                     sex                 sign extend to a word
                     cmpd      ,S++      compare against the character
                     bne       NextOptEntry advance if no match
-                    ldb       [<$01,U]  load the count field
+                    ldb       [<1,U]    load the count field
                     sex                 sign extend to a word
                     addd      1,S       add the sign value
-                    stb       [<$01,U]  store the updated count
+                    stb       [<1,U]    store the updated count
                     bra       OptEntryFound continue after the match
 
 NextOptEntry        leau      3,U       advance to the next entry
@@ -3246,13 +3246,13 @@ OptionListDone      ldd       #1        return success
 OptionListRet       leas      3,S       release local storage
                     puls      PC,U      return to caller
 
-ParseOptExpr        pshs      U         save the frame pointer
+ParseOptExpr        pshs      U         save the caller u register
                     leax      >MsgBadOption,PC point at the error message
                     pshs      X         pass the message pointer
                     lbsr      EmitMessageLine report the error
                     puls      PC,U,X    restore and continue
 
-Lt_1B0A             pshs      U         save the frame pointer
+Lt_1B0A             pshs      U         save the caller u register
                     lbsr      EvalLineExpr evaluate the expression
                     std       -2,S      save the result flag
                     beq       StoreLabelRef skip if evaluation failed
@@ -3266,7 +3266,7 @@ StoreLabelRef       leax      >ListStart,Y point at the label buffer
                     stx       <WorkPtr  set the value pointer
                     lbra      ReturnOne finish the directive
 
-Lt_1B2F             pshs      U         save the frame pointer
+Lt_1B2F             pshs      U         save the caller u register
                     leas      -1,S      reserve local storage
                     ldd       <CurFileHand load the current pointer
                     ldx       >SavedStkPtr,Y load the stack pointer
@@ -3293,49 +3293,49 @@ ScanLineChar        ldx       <SrcPtr   load the input pointer
                     bne       LineSpaceCheck loop until end of line
                     lbra      DPKeywordFound finish the directive
 
-Lt_1B6B             pshs      U         save the frame pointer
+Lt_1B6B             pshs      U         save the caller u register
                     ldd       <OperandVal load the operand value
                     lbne      ReptReturnZero branch if nonzero
                     ldd       #1        set the true result
                     lbra      ReptExit  store the condition result
 
-Lt_1B79             pshs      U         save the frame pointer
+Lt_1B79             pshs      U         save the caller u register
                     ldd       <OperandVal load the operand value
                     lbeq      ReptReturnZero branch if zero
                     ldd       #1        set the true result
                     lbra      ReptExit  store the condition result
 
-Lt_1B87             pshs      U         save the frame pointer
+Lt_1B87             pshs      U         save the caller u register
                     ldd       <OperandVal load the operand value
                     lbge      ReptReturnZero branch if greater or equal
                     ldd       #1        set the true result
                     lbra      ReptExit  store the condition result
 
-Lt_1B95             pshs      U         save the frame pointer
+Lt_1B95             pshs      U         save the caller u register
                     ldd       <OperandVal load the operand value
                     lbgt      ReptReturnZero branch if greater than
                     ldd       #1        set the true result
                     lbra      ReptExit  store the condition result
 
-Lt_1BA3             pshs      U         save the frame pointer
+Lt_1BA3             pshs      U         save the caller u register
                     ldd       <OperandVal load the operand value
                     lblt      ReptReturnZero branch if less than
                     ldd       #1        set the true result
                     lbra      ReptExit  store the condition result
 
-Lt_1BB1             pshs      U         save the frame pointer
+Lt_1BB1             pshs      U         save the caller u register
                     ldd       <OperandVal load the operand value
                     lble      ReptReturnZero branch if less or equal
                     ldd       #1        set the true result
                     lbra      ReptExit  store the condition result
 
-IfPass2Handler      pshs      U         save the frame pointer
+IfPass2Handler      pshs      U         save the caller u register
                     ldb       <PassFlag load the pass flag
                     lbne      ReptReturnZero branch on the second pass
                     ldd       #1        set the true result
                     lbra      ReptExit  store the condition result
 
-Lt_1BCD             pshs      U         save the frame pointer
+Lt_1BCD             pshs      U         save the caller u register
                     leax      >Y025E,Y  point at a table
                     stx       <SectBasePtr set the pointer
                     ldd       >Y000D,Y  load a value
@@ -3370,7 +3370,7 @@ StoreSectReloc      ldd       [>RelocPtr,Y] load the relocation data
                     std       <reldt    save the relocation data
                     lbra      ReturnOne finish the directive
 
-ParseDPKeyword      pshs      U         save the frame pointer
+ParseDPKeyword      pshs      U         save the caller u register
                     leas      -1,S      reserve local storage
                     ldb       [>SrcPtr,Y] fetch the current character
                     clra                clear the high byte
@@ -3404,9 +3404,9 @@ DPKeywordErr        leax      >MsgDpSection,PC point at the error message
                     lbsr      EmitMessageLine print the error message
                     leas      2,S       discard the argument
 PrintAndReturn      leas      1,S       discard one more saved byte
-                    puls      PC,U      restore frame and return
+                    puls      PC,U      restore u and return
 
-InitSectionDefaults pshs      U         save the frame pointer
+InitSectionDefaults pshs      U         save the caller u register
                     clra                form zero in d
                     clrb                form zero in d
                     std       <PassType clear the pass type
@@ -3432,7 +3432,7 @@ InitSectionDefaults pshs      U         save the frame pointer
                     std       <RelocPtr clear current value pointer
                     lbra      ReturnOne return one
 
-Lt_1CA5             pshs      U         save the frame pointer
+Lt_1CA5             pshs      U         save the caller u register
                     ldd       <OperandPtr load the fail message pointer
                     beq       UseDefaultFailMsg use default text if none
                     ldd       <OperandPtr load the user message
@@ -3444,7 +3444,7 @@ PrintFailMsg        pshs      D         push the message pointer
                     lbsr      EmitMessageLine print the message
                     puls      PC,U,X    discard argument and return
 
-Lt_1CBC             pshs      U         save the frame pointer
+Lt_1CBC             pshs      U         save the caller u register
                     leax      >ReptBuffer,Y point to the rept counter
                     lda       ,X        load first counter byte
                     ora       1,X       or in second byte
@@ -3489,7 +3489,7 @@ ReptCallHandler     pshs      D         push the argument
 ReptZeroCount       ldd       #1        load one
                     bra       StoreEndrFlag store it and return
 
-EndrDirective       pshs      U         save the frame pointer
+EndrDirective       pshs      U         save the caller u register
                     ldd       <CondActive load the endr flag
                     beq       DoEndr    not set, process the endr
                     clra                zero value
@@ -3547,7 +3547,7 @@ FinishRept          leax      >ReptBuffer,Y point to the rept buffer
 FinishReptTail      puls      X         discard the return address
 ReleaseReptBuf      lbsr      StoreLong release the rept capture buffer
 ReturnOne           ldd       #1        return value one
-                    puls      PC,U      restore frame and return
+                    puls      PC,U      restore u and return
 
 MsgLabelMissing2    fcc       "label missing"
                     fcb       C$NULL
@@ -3569,7 +3569,7 @@ MsgNestedRept       fcc       "nested REPT"
                     fcb       C$NULL
 MsgEndrNoRept       fcc       "ENDR without REPT"
                     fcb       C$NULL
-ScanName            pshs      U,D       save frame and reserve a local
+ScanName            pshs      U,D       save u and reserve a local
                     ldb       [>SrcPtr,Y] load the current input character
                     sex                 sign-extend to d
                     leax      >CharClassTbl,Y point to the character class table
@@ -3605,7 +3605,7 @@ NameCopyLoop        ldd       ,S        load the remaining count
                     bne       CopyNameChar still a name character
 TerminateName       clra                zero value
                     clrb                zero value
-                    stb       [<$06,S]  null-terminate the name
+                    stb       [<6,S]    null-terminate the name
                     bra       SkipNameLoop skip any remaining characters
 
 SkipNameStep        ldd       <SrcPtr   load the source pointer
@@ -3626,7 +3626,7 @@ NotAName            clra                zero result
                     clrb                zero result
                     puls      PC,U,X    restore and return
 
-ParseLabel          pshs      U,D       save frame and reserve a local
+ParseLabel          pshs      U,D       save u and reserve a local
                     clra                zero value
                     clrb                zero value
                     std       <InputPtr clear the symbol pointer
@@ -3816,7 +3816,7 @@ PatchForwardRefs    ldb       1,U       load the symbol flags
 LoadRefChain        ldd       8,U       load the reference chain head
                     bra       RefChainNext enter the chain loop
 
-PatchRefLoop        ldb       [<$02,S]  load byte via the chain pointer
+PatchRefLoop        ldb       [<2,S]    load byte via the chain pointer
                     stb       [>ListEnd,Y] store at the output pointer
                     ldx       2,S       load the chain pointer
                     ldd       1,X       load the next chain link
@@ -3865,7 +3865,7 @@ SymbolDone          ldd       2,U       load the symbol value
                     ldd       #1        return value one
                     lbra      ResolveSymDone return
 
-SetSectionDir       pshs      U         save the frame pointer
+SetSectionDir       pshs      U         save the caller u register
                     ldu       4,S       load the symbol record pointer
                     ldd       <OffsetFlag load the section direction
                     bne       SectionDirDone already set
@@ -3881,7 +3881,7 @@ NegDirection        ldd       #-1       negative direction
 StoreDirection      std       <OffsetFlag save the section direction
 SectionDirDone      puls      PC,U      restore and return
 
-MergeSymFlags       pshs      U         save frame pointer
+MergeSymFlags       pshs      U         save the caller u register
                     ldx       <InputPtr point to current symbol
                     ldb       1,X       load symbol flags byte
                     clra                clear high byte
@@ -4043,13 +4043,13 @@ StoreSymValue       ldd       8,S       load caller value
 ResolveSymDone      leas      4,S       drop locals
                     puls      PC,U      return
 
-PhaseError          pshs      U         save frame pointer
+PhaseError          pshs      U         save the caller u register
                     leax      >MsgPhasingErr,PC point to phasing message
                     pshs      X         push message pointer
                     lbsr      EmitMessageLine report the error
                     puls      PC,U,X    return
 
-AppendFixup         pshs      U         save frame pointer
+AppendFixup         pshs      U         save the caller u register
                     ldd       #5        request five bytes
                     pshs      D         push size argument
                     lbsr      AllocMem  allocate record
@@ -4074,7 +4074,7 @@ SkipSpaceLoop       ldb       ,X+       fetch next character
                     leax      -1,X      back up over character
                     stx       <SrcPtr   save input pointer
                     rts                 return
-FindListTail        pshs      U         save frame pointer
+FindListTail        pshs      U         save the caller u register
                     ldx       4,S       load argument pointer
                     ldu       6,X       load list head
                     ldx       4,S       load argument pointer
@@ -4113,7 +4113,7 @@ AllocNodeFresh      ldd       #20       request twenty bytes
                     lbsr      AllocMem  allocate node
                     leas      2,S       drop size argument
                     tfr       D,U       point to new node
-LinkTreeNode        ldd       [<$08,S]  load caller pointer
+LinkTreeNode        ldd       [<8,S]    load caller pointer
                     std       ,S        save into local
                     beq       SetTreeRoot null, insert at root
                     ldd       10,S      load comparison result
@@ -4177,11 +4177,11 @@ HashLoop            ldd       ,S        load hash accumulator
                     std       >TreeRoot,Y save bucket pointer
                     leas      2,S       drop local
                     ldd       [>TreeRoot,Y] load bucket root
-                    std       [<$08,S]  store into caller
+                    std       [<8,S]    store into caller
                     tfr       D,U       point to node
                     stu       -2,S      save node pointer
                     beq       LookupDone empty bucket, return
-SearchLoop          stu       [<$08,S]  store node into caller
+SearchLoop          stu       [<8,S]    store node into caller
                     pshs      U         push node pointer
                     ldd       #10       offset to name field
                     addd      ,S++      add to node pointer
@@ -4236,7 +4236,7 @@ MsgPhasingErr       fcc       "phasing error"
                     fcb       C$NULL
 MsgSymTabOvf        fcc       "symbol table overflow"
                     fcb       C$NULL
-ParseValue          pshs      U         save frame pointer
+ParseValue          pshs      U         save the caller u register
                     ldd       #-68      request stack space for locals
                     lbsr      stkcheck  check stack space
                     lbsr      EvalLineExpr parse the expression
@@ -4249,7 +4249,7 @@ ParseValue          pshs      U         save frame pointer
                     andb      #127      clear high bit
                     bra       StoreStatusFlags store and return
 
-ParseReloc          pshs      U         save frame pointer
+ParseReloc          pshs      U         save the caller u register
                     ldd       #-70      request stack space for locals
                     lbsr      stkcheck  check stack space
                     bsr       EvalLineExpr parse the expression
@@ -4288,7 +4288,7 @@ StoreStatusFlags    stb       <ModeFlags store status flags
                     ldd       #1        return success
                     puls      PC,U      return
 
-EvalLineExpr        pshs      U         save frame pointer
+EvalLineExpr        pshs      U         save the caller u register
                     ldd       #-68      request stack space for locals
                     lbsr      stkcheck  check stack space
                     lbsr      SkipSpaces skip leading spaces
@@ -4297,7 +4297,7 @@ EvalLineExpr        pshs      U         save frame pointer
                     bsr       EvalAddSub evaluate expression
                     puls      PC,U      return
 
-EvalConstTerm       pshs      U         save frame pointer
+EvalConstTerm       pshs      U         save the caller u register
                     ldd       #-68      request stack space for locals
                     lbsr      stkcheck  check stack space
                     lbsr      ExtRefErr evaluate the term
@@ -4305,7 +4305,7 @@ EvalConstTerm       pshs      U         save frame pointer
                     std       <RelocFlags save relocation flags
                     puls      PC,U      return
 
-EvalAddSub          pshs      U         save frame pointer
+EvalAddSub          pshs      U         save the caller u register
                     ldd       #-77      request stack space for locals
                     lbsr      stkcheck  check stack space
                     leas      -7,S      reserve locals
@@ -4398,7 +4398,7 @@ TermValid           ldd       #1        return success flag
 TermScanDone        leas      7,S       discard local frame
                     puls      PC,U      return
 
-ParseMulDiv         pshs      U         save frame pointer
+ParseMulDiv         pshs      U         save the caller u register
                     ldd       #-73      stack check size
                     lbsr      stkcheck  verify stack space
                     leas      -3,S      allocate locals
@@ -4452,7 +4452,7 @@ MulDivNext          ldb       [>SrcPtr,Y] get current char
                     lbeq      MulDivLoop loop for another factor
                     lbra      AddSubOk  done, return success
 
-ParseAndOr          pshs      U         save frame pointer
+ParseAndOr          pshs      U         save the caller u register
                     ldd       #-71      stack check size
                     lbsr      stkcheck  verify stack space
                     leas      -3,S      allocate locals
@@ -4496,7 +4496,7 @@ AndOrNext           ldb       [>SrcPtr,Y] get current char
                     lbeq      AndOrLoop loop for another operand
                     lbra      AddSubOk  done, return success
 
-ParseAddSub         pshs      U         save frame pointer
+ParseAddSub         pshs      U         save the caller u register
                     ldd       #-71      stack check size
                     lbsr      stkcheck  verify stack space
                     leas      -3,S      allocate locals
@@ -4563,7 +4563,7 @@ ParseOperand        bsr       ParsePrimary parse the operand
 AddSubDone          leas      3,S       discard locals
                     puls      PC,U      return
 
-ParsePrimary        pshs      U         save frame pointer
+ParsePrimary        pshs      U         save the caller u register
                     ldd       #-72      stack check size
                     lbsr      stkcheck  verify stack space
                     leas      -2,S      allocate locals
@@ -4672,7 +4672,7 @@ PrimaryDispatch     cmpx      #40       is char open paren
 PrimaryDone         ldd       #1        return success flag
                     puls      PC,U,X    return
 
-ParseNumber         pshs      U         save frame pointer
+ParseNumber         pshs      U         save the caller u register
                     ldd       #-72      stack check size
                     lbsr      stkcheck  verify stack space
                     leas      -6,S      allocate locals
@@ -4810,7 +4810,7 @@ MsgUndefinedOrg     fcc       "undefined org"
                     fcb       C$NULL
 MsgBadOperand       fcc       "bad operand"
                     fcb       C$NULL
-ParseOrgDirective   pshs      U         save frame pointer
+ParseOrgDirective   pshs      U         save the caller u register
                     leas      -1,S      allocate local
                     clra                clear high byte
                     clrb                clear low byte
@@ -4824,7 +4824,7 @@ ScanLineToken       ldx       7,S       get line pointer argument
                     ldb       [,X]      get first char
                     cmpb      #'-       is it a dash
                     bne       CheckBufferLimit not a comment line
-                    ldd       [<$07,S]  get line pointer
+                    ldd       [<7,S]    get line pointer
                     addd      #1        advance past the dash
                     std       <SrcPtr   set input pointer
                     lbsr      ParseOptionList scan the token
@@ -4863,7 +4863,7 @@ CheckBufferLimit    leax      >BufferEnd,Y point to buffer end
                     pshs      X         push message pointer
                     lbsr      FatalError call the print routine
                     leas      2,S       drop the argument
-StoreArgPtr         ldd       [<$07,S]  load the argument pointer from the stack
+StoreArgPtr         ldd       [<7,S]    load the argument pointer from the stack
                     ldx       >ArgArrayPtr,Y load the argument array pointer
                     leax      2,X       advance the array pointer
                     stx       >ArgArrayPtr,Y save the updated array pointer
@@ -4889,7 +4889,7 @@ CheckOutName        ldd       >Y03F8,Y  load the output name pointer
 ArgsDone            leas      1,S       release the local byte
                     puls      PC,U      restore and return
 
-OpenFile            pshs      U,D       save frame and reserve local
+OpenFile            pshs      U,D       save u and reserve local
                     ldd       8,S       load the filename argument
                     pshs      D         push the filename
                     ldd       8,S       load the mode argument
@@ -4913,7 +4913,7 @@ OpenFile            pshs      U,D       save frame and reserve local
 OpenDone            ldd       ,S        load the file handle result
                     puls      PC,U,X    restore and return
 
-SyncLineNumbers     pshs      U         save the frame pointer
+SyncLineNumbers     pshs      U         save the caller u register
                     ldb       <PassFlag load the listing flag
                     lbeq      LineSyncDone skip if listing disabled
                     ldd       <ListFlag load the line-number option
@@ -4988,7 +4988,7 @@ WriteObjHeader      leax      >Y07F9,Y  point to the name buffer
                     ldd       #3        initial line counter value
                     bra       StoreLineCount store the line counter
 
-AdvanceLine         pshs      U         save the frame pointer
+AdvanceLine         pshs      U         save the caller u register
                     ldb       <PassFlag load the listing flag
                     beq       LineSyncDone skip if listing disabled
                     ldd       <ListFlag load the line-number option
@@ -5009,7 +5009,7 @@ EmitEndLine         ldd       <CurLineNo load the current line number
 StoreLineCount      std       >LineAddr,Y save the line counter
 LineSyncDone        puls      PC,U      restore and return
 
-ReadInputLine       pshs      U         save the frame pointer
+ReadInputLine       pshs      U         save the caller u register
                     leas      -3,S      reserve local space
                     lbsr      ExpandMacroLine get the next input line
                     std       -2,S      save the result pointer
@@ -5034,7 +5034,7 @@ HandleChar          ldb       ,S        load the current character
                     bne       StoreLineChar branch if not end of line
                     clra                clear the high byte
                     clrb                clear the low byte
-                    stb       [<$01,S]  terminate the line buffer
+                    stb       [<1,S]    terminate the line buffer
                     ldd       <LineNumber load the line total
                     addd      #1        increment the total
                     std       <LineNumber save the line total
@@ -5062,7 +5062,7 @@ NextCharLoop        ldd       <CurFileHand load the current file handle
 ReadLineExit        leas      3,S       release the local space
                     puls      PC,U      restore and return
 
-PopIncludeFile      pshs      U         save the frame pointer
+PopIncludeFile      pshs      U         save the caller u register
                     leax      >IncludeStack,Y point to the include stack base
                     cmpx      >SavedStkPtr,Y compare with the stack pointer
                     bne       CloseIncludeFile branch if files remain
@@ -5087,7 +5087,7 @@ PopStackEntry       ldx       >SavedStkPtr,Y load the include stack pointer
                     ldd       #1        return value one
                     puls      PC,U      restore and return
 
-DumpSymbols         pshs      U         save the frame pointer
+DumpSymbols         pshs      U         save the caller u register
                     leax      >MsgSymbolTable,PC point to the header string
                     pshs      X         push the string
                     lbsr      FormatToScratch write the output
@@ -5110,7 +5110,7 @@ WriteTrailer        leax      >MsgNewLineB,PC point to the trailer string
                     lbsr      FormatToScratch write the output
                     puls      PC,U,X    restore and return
 
-PrintSymbolEntry    pshs      U         save the frame pointer
+PrintSymbolEntry    pshs      U         save the caller u register
                     ldu       4,S       load the symbol entry pointer
                     ldd       >ColumnCount,Y load the column counter
                     ble       WriteEntryFields skip if at column start
@@ -5150,7 +5150,7 @@ PageBreak           leax      >MsgNewLineC,PC point to the newline string
                     std       >ColumnCount,Y reset the column counter
 EntryDone           puls      PC,U      restore and return
 
-ParsePsect          pshs      U         save the frame pointer
+ParsePsect          pshs      U         save the caller u register
                     leas      -16,S     reserve the local buffer
                     ldb       [>SrcPtr,Y] load the first operand character
                     lbeq      EmptyOperand branch if operand empty
@@ -5335,10 +5335,10 @@ WritePsectFields    leax      >Y07F5,Y  point to a field
                     lbsr      ZeroExtend32 call the record helper
                     lbsr      Add32     call the emit helper
                     lbsr      StoreLong call the emit helper
-EmitBlockDone       leas      <$10,S    discard the local frame
+EmitBlockDone       leas      <16,S     discard the local frame
                     puls      PC,U      restore and return
 
-CheckNoExternal     pshs      U         save the frame pointer
+CheckNoExternal     pshs      U         save the caller u register
                     ldb       <PassFlag load the pass flag
                     lbeq      SectionsDone skip if not set
                     ldd       <ColumnFlag load the external count
@@ -5348,7 +5348,7 @@ CheckNoExternal     pshs      U         save the frame pointer
                     lbsr      EmitMessageLine report the error
                     lbra      SectionsExit jump to the exit
 
-EmitDataSection     pshs      U,D       save the frame and reserve a local
+EmitDataSection     pshs      U,D       save u and reserve a local
                     leax      >HeaderRec,Y point to the data table start
                     tfr       X,D       copy the start pointer to d
                     leax      >Y03DE,Y  point to the data table end
@@ -5408,7 +5408,7 @@ EmitInlineData      puls      X         pull the inline data pointer
                     lbsr      StoreLong call the emit helper
 EmitDataDone        puls      PC,U,X    restore and return
 
-UpdateSectionSize   pshs      U         save the frame pointer
+UpdateSectionSize   pshs      U         save the caller u register
                     ldd       <RelocPtr load the section pointer
                     lbeq      SectionDone skip if none
                     ldd       6,S       load the size argument
@@ -5488,7 +5488,7 @@ EmitSizeRecord      ldd       <OutFileHand load the output flag
                     lbsr      StoreLong call the emit helper
 SectionDone         puls      PC,U      restore and return
 
-WalkSymbols         pshs      U,D       save the frame and argument
+WalkSymbols         pshs      U,D       save u and argument
                     clra                clear the high byte
                     clrb                clear the low byte
                     bra       WalkLoopTest jump to the loop test
@@ -5507,7 +5507,7 @@ NextChainLink       ldu       4,U       follow the chain link
 ChainTest           ldd       4,U       load the next link
                     bne       NextChainLink loop while non-zero
 CallbackLoop        pshs      U         push the node pointer
-                    jsr       [<$08,S]  call the callback
+                    jsr       [<8,S]    call the callback
                     leas      2,S       drop the argument
                     pshs      U         push the node pointer
                     lbsr      FindListTail get the previous link
@@ -5523,7 +5523,7 @@ WalkLoopTest        std       ,S        store the index
                     blt       WalkBucketLoop loop over all buckets
                     puls      PC,U,X    restore and return
 
-EmitModuleSections  pshs      U         save the frame pointer
+EmitModuleSections  pshs      U         save the caller u register
                     ldd       <OutFileHand load the output flag
                     lbeq      SectionsDone skip if not writing
                     clra                clear the high byte
@@ -5586,7 +5586,7 @@ EmitCommonNames     ldd       <BssListHd load the list head
 SectionsExit        leas      2,S       drop the argument
 SectionsDone        puls      PC,U      restore and return
 
-EmitEquateSym       pshs      U         save the frame pointer
+EmitEquateSym       pshs      U         save the caller u register
                     ldu       4,S       load the node argument
                     leas      -3,S      reserve the local space
                     ldb       1,U       load the flags byte
@@ -5626,7 +5626,7 @@ EmitEquateSym       pshs      U         save the frame pointer
 EquateDone          leas      3,S       discard the local space
                     puls      PC,U      restore and return
 
-EmitLabelSym        pshs      U         save the frame pointer
+EmitLabelSym        pshs      U         save the caller u register
                     ldu       4,S       load the node argument
                     leas      -2,S      reserve the local space
                     ldb       1,U       load the flags byte
@@ -5705,7 +5705,7 @@ ReverseLoop         ldd       3,U       load the next link
                     leas      4,S       discard the locals
                     puls      PC,U      restore and return
 
-EmitNameList        pshs      U         save the frame pointer
+EmitNameList        pshs      U         save the caller u register
                     ldu       4,S       load the list head argument
 NameListLoop        ldd       <OutFileHand load the output flag
                     pshs      D         push the argument
@@ -5766,7 +5766,7 @@ MsgProgram          fcc       "program"
                     fcb       C$NULL
 MsgNoExternal       fcc       "no external allowed"
                     fcb       C$NULL
-OpenObjectFile      pshs      U,D       save the frame and reserve a local
+OpenObjectFile      pshs      U,D       save u and reserve a local
                     ldb       <PassFlag load the pass flag
                     beq       DoOpenFile branch on the first pass
                     ldd       #1        return one
@@ -5852,7 +5852,7 @@ SymDefFinish        leax      6,U       point to the node subfield
                     ldd       #1        return true
                     puls      PC,U,X    restore and return
 
-EmitListLine        pshs      U         save the frame pointer
+EmitListLine        pshs      U         save the caller u register
                     ldb       <PassFlag load the suppress flag
                     lbne      ReturnOne2 skip line when suppressed
                     ldd       #32       space separator character
@@ -5874,7 +5874,7 @@ EmitListLine        pshs      U         save the frame pointer
                     bsr       EmitField write the field and separator
                     bra       EmitLineDone finish the line
 
-EmitField           pshs      U         save the frame pointer
+EmitField           pshs      U         save the caller u register
                     ldu       4,S       load the string argument
                     bra       EmitFieldTest enter the copy loop test
 
@@ -5901,7 +5901,7 @@ EmitFieldTest       ldb       ,U        peek the next character
                     lbsr      MacroFileError flush the stream
 EmitFieldDone       puls      PC,U      restore and return
 
-EmitLineEnd         pshs      U         save the frame pointer
+EmitLineEnd         pshs      U         save the caller u register
                     ldb       <PassFlag load the suppress flag
                     bne       ReturnOne2 skip line when suppressed
                     ldd       <OutStream load the output stream
@@ -5914,11 +5914,11 @@ EmitLineDone        leas      4,S       drop the arguments
 ReturnOne2          ldd       #1        return true
                     puls      PC,U      restore and return
 
-LookupSymbol        pshs      U         save the frame pointer
+LookupSymbol        pshs      U         save the caller u register
                     ldu       <CurListHd load the list head
                     bra       LookupTest enter the search loop test
 
-LookupCompare       ldb       [<$04,S]  load the first key character
+LookupCompare       ldb       [<4,S]    load the first key character
                     sex                 sign extend to a word
                     pshs      D         save the key on the stack
                     ldx       2,U       load the node record pointer
@@ -5945,7 +5945,7 @@ LookupTest          stu       -2,S      test the node pointer
                     clrb                return null low byte
                     puls      PC,U      restore and return
 
-PushContext         pshs      U         save the frame pointer
+PushContext         pshs      U         save the caller u register
                     ldd       <CtxDepth load the context depth
                     addd      #1        increment the depth
                     std       <CtxDepth save the new depth
@@ -6005,7 +6005,7 @@ SkipLineInc         ldd       <LineCounter load the line counter
                     std       <MarkerFlag mark the active state
                     puls      PC,U      restore and return
 
-PopContext          pshs      U         save the frame pointer
+PopContext          pshs      U         save the caller u register
                     ldd       <CtxDepth load the context depth
                     addd      #-1       decrement the depth
                     std       <CtxDepth save the new depth
@@ -6045,7 +6045,7 @@ CtxDepthValid       ldd       ,U        load the saved line pointer
                     std       <SavedColumn restore the column
                     puls      PC,U      restore and return
 
-ExpandMacroLine     pshs      U,D       save the frame and value
+ExpandMacroLine     pshs      U,D       save u and value
                     lbra      ExpandStateLoop enter the state loop
 
 InitLineBuffer      leax      >InLineBuffer,Y point to the line buffer
@@ -6104,7 +6104,7 @@ ExpandDone          clra                return zero high byte
                     clrb                return zero low byte
                     puls      PC,U,X    restore and return
 
-HandleEscape        pshs      U         save the frame pointer
+HandleEscape        pshs      U         save the caller u register
                     ldd       4,S       load the escape character
                     leax      >CharClassTbl,Y point to the class table
                     leax      D,X       index the entry
@@ -6190,7 +6190,7 @@ EscapeSwitch        cmpx      #64       compare with the at sign
 
 HandleEscapeDone    puls      PC,U      restore and return
 
-StoreMacroLine      pshs      U,Y,X,D   save the frame and locals
+StoreMacroLine      pshs      U,Y,X,D   save u and locals
                     clra                clear high byte
                     clrb                clear low byte
                     std       2,S       clear the local counter
@@ -6335,19 +6335,19 @@ ArgLenOk            ldd       2,S       load the argument count
                     lbsr      EmitMessageLine report the error
                     leas      2,S       drop the argument
 ArgReturn           ldd       2,S       load the result value
-                    stb       [<$04,S]  store the byte through the result pointer
+                    stb       [<4,S]    store the byte through the result pointer
                     ldd       4,S       load the return value
                     leas      6,S       discard the locals
                     puls      PC,U      restore and return
 
-SwapMacroPtr        pshs      U         save the frame pointer
+SwapMacroPtr        pshs      U         save the caller u register
                     ldd       <FreeListHd load the current macro pointer
-                    std       [<$04,S]  store the old value through the pointer
+                    std       [<4,S]    store the old value through the pointer
                     ldd       4,S       load the new pointer argument
                     std       <FreeListHd install the new macro pointer
                     puls      PC,U      restore and return
 
-GetMacroArg         pshs      U,D       save the frame and value
+GetMacroArg         pshs      U,D       save u and value
                     clra                clear the high byte
                     clrb                clear the low byte
                     std       ,S        initialize the local counter
@@ -6393,7 +6393,7 @@ NoParamErr          leax      >MsgNoParamForArg,PC point to the no-param message
 GetMacroArgDone     ldd       ,S        load the byte count result
                     puls      PC,U,X    restore and return
 
-CloseMacroFile      pshs      U         save the frame pointer
+CloseMacroFile      pshs      U         save the caller u register
                     ldd       <OutStream load the macro work file pointer
                     pshs      D         push it as the argument
                     lbsr      fclose    close the work file
@@ -6403,7 +6403,7 @@ CloseMacroFile      pshs      U         save the frame pointer
                     lbsr      unlink    delete the work file
                     puls      PC,U,X    restore and return
 
-MacroFileError      pshs      U         save the frame pointer
+MacroFileError      pshs      U         save the caller u register
                     leax      >MsgMacroFileError,PC point to the macro-file-error message
                     pshs      X         push the message argument
                     lbsr      FatalError report the fatal error
@@ -6434,7 +6434,7 @@ MsgMacroFileError   fcc       "macro file error"
 
 * fopen
 
-FindFreeStream      pshs      U         save the frame pointer
+FindFreeStream      pshs      U         save the caller u register
                     leau      >_iob,Y   point to the stream table
 FindFreeLoop        ldd       6,U       load the stream flags
                     clra                clear the high byte
@@ -6451,7 +6451,7 @@ FindFreeLoop        ldd       6,U       load the stream flags
 
                     puls      PC,U      restore and return
 
-InitStream          pshs      U         save the frame pointer
+InitStream          pshs      U         save the caller u register
                     ldu       8,S       load the supplied stream pointer
                     bne       GotStream use it if given
                     bsr       FindFreeStream allocate a free stream
@@ -6474,10 +6474,10 @@ ModeReadWrite       ldd       6,U       load the stream flags
 
 ModeSingle          ldd       6,U       load the stream flags
                     pshs      D         save them
-                    ldb       [<$08,S]  fetch the first mode character
+                    ldb       [<8,S]    fetch the first mode character
                     cmpb      #'r       is it 'r'
                     beq       ModeReadFlag yes read mode
-                    ldb       [<$08,S]  fetch the first mode character
+                    ldb       [<8,S]    fetch the first mode character
                     cmpb      #'d       is it 'd'
                     bne       ModeWriteFlag no write mode
 ModeReadFlag        ldd       #1        read-only flag
@@ -6498,7 +6498,7 @@ ReturnNull          clra                clear the high byte
                     clrb                return null
                     puls      PC,U      restore and return
 
-OpenForMode         pshs      U         save the frame pointer
+OpenForMode         pshs      U         save the caller u register
                     ldu       4,S       load the mode string pointer
                     leas      -4,S      make room for locals
                     clra                clear the high byte
@@ -6535,7 +6535,7 @@ ModeScanLoop        stx       -2,S      save the mode character
                     beq       PlusModeFlag yes read-write
                     bra       BadModeChar otherwise bad mode
 
-GetPrimaryMode      ldb       [<$0A,S]  fetch the primary mode character
+GetPrimaryMode      ldb       [<10,S]   fetch the primary mode character
                     sex                 sign-extend to a word
                     tfr       D,X       move it into X
                     lbra      DispatchMode dispatch on the mode
@@ -6602,7 +6602,7 @@ OpenSuccess         ldd       2,S       load the descriptor
 OpenReturn          leas      4,S       drop the locals
                     puls      PC,U      restore and return
 
-fdopen              pshs      U         save the frame pointer
+fdopen              pshs      U         save the caller u register
                     clra                clear the high byte
                     clrb                clear the low byte
                     pshs      D         push a null stream
@@ -6612,7 +6612,7 @@ fdopen              pshs      U         save the frame pointer
                     pshs      D         push it
                     lbra      InitStreamCall initialize the stream
 
-fopen               pshs      U         save the frame pointer
+fopen               pshs      U         save the caller u register
                     ldd       6,S       load the mode string
                     pshs      D         push it
                     ldd       6,S       load the file name
@@ -6630,7 +6630,7 @@ FopenGotFile        clra                clear the high byte
                     clrb                clear the low byte
                     bra       FopenFinish initialize the stream
 
-freopen             pshs      U         save the frame pointer
+freopen             pshs      U         save the caller u register
                     ldd       8,S       load the existing stream
                     pshs      D         push it
                     lbsr      fclose    close the old stream
@@ -6657,7 +6657,7 @@ InitStreamCall      lbsr      InitStream initialize the stream
                     leas      6,S       drop the arguments
 DoReturn            puls      PC,U      restore and return
 
-                    pshs      U         save the frame pointer
+                    pshs      U         save the caller u register
                     leax      >OutBuffer,Y point to the output stream
                     pshs      X         push the stream
                     ldd       6,S       load the string argument
@@ -6672,7 +6672,7 @@ DoReturn            puls      PC,U      restore and return
                     leas      4,S       drop the arguments
                     puls      PC,U      restore and return
 
-Fputs               pshs      U         save the frame pointer
+Fputs               pshs      U         save the caller u register
                     ldu       4,S       load the string pointer
                     leas      -1,S      make room for a byte
                     bra       FputsNext read the first byte
@@ -6690,7 +6690,7 @@ FputsNext           ldb       ,U+       fetch the next string byte
                     leas      1,S       drop the byte
                     puls      PC,U      restore and return
 
-Fwrite              pshs      U         save the frame pointer
+Fwrite              pshs      U         save the caller u register
                     ldu       4,S       load the buffer pointer
                     leas      -4,S      make room for locals
                     clra                clear the high byte
@@ -6730,7 +6730,7 @@ FwriteDone          ldd       2,S       load the items-written count
                     leas      4,S       drop the locals
                     puls      PC,U      restore and return
 
-FormatToScratch     pshs      U         save the frame pointer
+FormatToScratch     pshs      U         save the caller u register
                     leax      >OutBuffer,Y point to the scratch buffer
                     stx       >OutCursor,Y set the output cursor
                     leax      6,S       point to the variadic arguments
@@ -6738,7 +6738,7 @@ FormatToScratch     pshs      U         save the frame pointer
                     ldd       6,S       load the format string
                     bra       FormatEmit emit the formatted text
 
-Vsprintf            pshs      U         save the frame pointer
+Vsprintf            pshs      U         save the caller u register
                     ldd       4,S       load the output buffer
                     std       >OutCursor,Y set the output cursor
                     leax      8,S       point to the variadic arguments
@@ -6751,7 +6751,7 @@ FormatEmit          pshs      D         push the format string
                     leas      6,S       drop the arguments
                     puls      PC,U      restore and return
 
-Sprintf             pshs      U         save the frame pointer
+Sprintf             pshs      U         save the caller u register
                     ldd       4,S       load the output buffer
                     std       >OutCursor,Y set the output cursor
                     leax      8,S       point to the variadic arguments
@@ -6778,7 +6778,7 @@ EmitLiteralChar     ldb       8,S       reload the current character
                     ldb       8,S       reload the character
                     sex                 sign-extend the character
                     pshs      D         push the character argument
-                    jsr       [<$11,S]  call the output routine
+                    jsr       [<17,S]   call the output routine
                     leas      2,S       drop the pushed argument
 ScanFmtLoop         ldb       ,U+       read the next format character
                     stb       8,S       save the current character
@@ -6871,9 +6871,9 @@ LoadConvChar        ldb       8,S       load the conversion character
 
 FmtDecimal          ldd       6,S       load the field width
                     pshs      D         push the width argument
-                    ldx       <$15,S    load the variadic argument pointer
+                    ldx       <21,S     load the variadic argument pointer
                     leax      2,X       advance past the argument
-                    stx       <$15,S    store the updated pointer
+                    stx       <21,S     store the updated pointer
                     ldd       -2,X      fetch the integer argument
                     pshs      D         push it
                     lbsr      IntToDecStr convert signed integer to decimal
@@ -6881,9 +6881,9 @@ FmtDecimal          ldd       6,S       load the field width
 
 FmtOctal            ldd       6,S       load the field width
                     pshs      D         push the width argument
-                    ldx       <$15,S    load the variadic argument pointer
+                    ldx       <21,S     load the variadic argument pointer
                     leax      2,X       advance past the argument
-                    stx       <$15,S    store the updated pointer
+                    stx       <21,S     store the updated pointer
                     ldd       -2,X      fetch the integer argument
                     pshs      D         push it
                     lbsr      UIntToOctStr convert to an octal string
@@ -6900,9 +6900,9 @@ FmtHex              ldd       6,S       load the field width
                     clra                clear the high byte
                     andb      #2        test the uppercase class flag
                     pshs      D         push the case flag
-                    ldx       <$17,S    load the variadic argument pointer
+                    ldx       <23,S     load the variadic argument pointer
                     leax      2,X       advance past the argument
-                    stx       <$17,S    store the updated pointer
+                    stx       <23,S     store the updated pointer
                     ldd       -2,X      fetch the integer argument
                     pshs      D         push it
                     lbsr      UIntToHexStr convert to a hex string
@@ -6910,9 +6910,9 @@ FmtHex              ldd       6,S       load the field width
 
 FmtUnsigned         ldd       6,S       load the field width
                     pshs      D         push the width argument
-                    ldx       <$15,S    load the variadic argument pointer
+                    ldx       <21,S     load the variadic argument pointer
                     leax      2,X       advance past the argument
-                    stx       <$15,S    store the updated pointer
+                    stx       <21,S     store the updated pointer
                     ldd       -2,X      fetch the integer argument
                     pshs      D         push it
                     leax      >ConvBuffer,Y point at the conversion buffer
@@ -6926,7 +6926,7 @@ FmtFloat            ldd       4,S       load the precision-present flag
                     std       2,S       store it
 DoFloatFormat       ldd       6,S       load the field width
                     pshs      D         push the width argument
-                    leax      <$15,S    point at the argument pointer
+                    leax      <21,S     point at the argument pointer
                     pshs      X         push its address
                     ldd       6,S       load the precision
                     pshs      D         push it
@@ -6937,15 +6937,15 @@ DoFloatFormat       ldd       6,S       load the field width
                     leas      6,S       drop the arguments
                     lbra      PushResult emit the result
 
-FmtChar             ldx       <$13,S    load the variadic argument pointer
+FmtChar             ldx       <19,S     load the variadic argument pointer
                     leax      2,X       advance past the argument
-                    stx       <$13,S    store the updated pointer
+                    stx       <19,S     store the updated pointer
                     ldd       -2,X      fetch the character argument
                     lbra      OutputChar output the character
 
-FmtString           ldx       <$13,S    load the variadic argument pointer
+FmtString           ldx       <19,S     load the variadic argument pointer
                     leax      2,X       advance past the argument
-                    stx       <$13,S    store the updated pointer
+                    stx       <19,S     store the updated pointer
                     ldd       -2,X      fetch the string pointer
                     std       9,S       save the current string pointer
                     ldd       4,S       load the precision-present flag
@@ -6954,7 +6954,7 @@ FmtString           ldx       <$13,S    load the variadic argument pointer
                     std       4,S       save it as the scan pointer
                     bra       StrScanTest begin scanning the string
 
-StrScanLoop         ldb       [<$09,S]  load the character at the string pointer
+StrScanLoop         ldb       [<9,S]    load the character at the string pointer
                     beq       EmitStringPadded stop at the null terminator
                     ldd       9,S       load the string pointer
                     addd      #1        advance one character
@@ -6971,7 +6971,7 @@ EmitStringPadded    ldd       6,S       load the field width
                     pshs      D         push the length
                     ldd       8,S       load the precision
                     pshs      D         push it
-                    ldd       <$15,S    load the scan pointer
+                    ldd       <21,S     load the scan pointer
                     pshs      D         push it
                     lbsr      EmitPadded emit the string with padding
                     leas      8,S       drop the arguments
@@ -6989,7 +6989,7 @@ FmtLong             ldb       ,U+       read the character after the l modifier
                     leas      -11,X     unreachable filler bytes
 DoLongFormat        ldd       6,S       load the field width
                     pshs      D         push the width argument
-                    leax      <$15,S    point at the argument pointer
+                    leax      <21,S     point at the argument pointer
                     pshs      X         push its address
                     ldb       12,S      load the conversion character
                     sex                 sign-extend it
@@ -6997,7 +6997,7 @@ DoLongFormat        ldd       6,S       load the field width
                     lbsr      SelectConvStr format the long integer
 DropTwoArgs         leas      4,S       drop two arguments
 PushResult          pshs      D         push the result pointer
-EmitResult          ldd       <$13,S    load the field width for padding
+EmitResult          ldd       <19,S     load the field width for padding
                     pshs      D         push it
                     lbsr      PutSignedField emit the converted digits with padding
                     leas      6,S       drop the arguments
@@ -7006,7 +7006,7 @@ BackToScan          lbra      ScanFmtLoop back to the format loop
 DefaultConv         ldb       8,S       load the conversion character
                     sex                 sign-extend it
 OutputChar          pshs      D         push the character argument
-                    jsr       [<$11,S]  call the output routine
+                    jsr       [<17,S]   call the output routine
                     leas      2,S       drop the argument
                     lbra      ScanFmtLoop back to the format loop
 
@@ -7101,11 +7101,11 @@ CountDigitLoop      ldd       ,S        load the digit value
                     addd      #1        increment it
                     std       ,S        store it
 SubPowLoop          ldd       12,S      load the working value
-                    subd      [<$04,S]  subtract the current power of ten
+                    subd      [<4,S]    subtract the current power of ten
                     std       12,S      store it back
                     bge       CountDigitLoop loop while still non-negative
                     ldd       12,S      load the working value
-                    addd      [<$04,S]  add the power of ten back
+                    addd      [<4,S]    add the power of ten back
                     std       12,S      restore the value
                     ldd       ,S        load the digit value
                     beq       CheckDigitStart skip when the digit is zero
@@ -7222,7 +7222,7 @@ HexCopyTest         leau      -1,U      step back through scratch
                     bls       HexCopyLoop loop while digits remain
                     clra                clear the high byte
                     clrb                clear the low byte
-                    stb       [<$02,S]  terminate the output string
+                    stb       [<2,S]    terminate the output string
                     leax      >ConvBuffer,Y point at the output buffer
                     tfr       X,D       return the buffer pointer
                     lbra      PutcDone  restore and return
@@ -7238,7 +7238,7 @@ EmitPadded          pshs      U         save u
 
 PadCharLoop         ldd       >PadChar,Y load the pad character
                     pshs      D         push it
-                    jsr       [<$06,S]  output the pad character
+                    jsr       [<6,S]    output the pad character
                     leas      2,S       drop the argument
 PadCharTest         ldd       10,S      load the remaining pad count
                     addd      #-1       decrement it
@@ -7250,7 +7250,7 @@ PadCharTest         ldd       10,S      load the remaining pad count
 EmitStrCharLoop     ldb       ,U+       load the next string character
                     sex                 sign-extend it
                     pshs      D         push it
-                    jsr       [<$06,S]  output the character
+                    jsr       [<6,S]    output the character
                     leas      2,S       drop the pushed arguments
 PadRightLoop        ldd       8,S       load the loop counter
                     addd      #-1       decrement the counter
@@ -7263,7 +7263,7 @@ PadRightLoop        ldd       8,S       load the loop counter
 
 FieldFillLoop       ldd       >PadChar,Y load the output function pointer
                     pshs      D         push it as argument
-                    jsr       [<$06,S]  call the output routine
+                    jsr       [<6,S]    call the output routine
                     leas      2,S       drop the argument
 FieldFillNext       ldd       10,S      load the fill count
                     addd      #-1       decrement it
@@ -7272,7 +7272,7 @@ FieldFillNext       ldd       10,S      load the fill count
                     bgt       FieldFillLoop loop while positive
 FieldOutDone        puls      PC,U      restore and return
 
-PutSignedField      pshs      U         save the frame pointer
+PutSignedField      pshs      U         save the caller u register
                     ldu       6,S       load the argument pointer
                     ldd       8,S       load the value
                     pshs      D         push it
@@ -7290,7 +7290,7 @@ PutSignedField      pshs      U         save the frame pointer
 
 LeadPadLoop         ldd       >PadChar,Y load the output function pointer
                     pshs      D         push argument
-                    jsr       [<$06,S]  call the output routine
+                    jsr       [<6,S]    call the output routine
                     leas      2,S       drop the argument
 LeadPadNext         ldd       8,S       load the pad count
                     addd      #-1       decrement it
@@ -7302,7 +7302,7 @@ LeadPadNext         ldd       8,S       load the pad count
 PutStringLoop       ldb       ,U+       fetch the next character
                     sex                 sign extend to a word
                     pshs      D         push as argument
-                    jsr       [<$06,S]  call the output routine
+                    jsr       [<6,S]    call the output routine
                     leas      2,S       drop the argument
 PutStringNext       ldb       ,U        peek the current character
                     bne       PutStringLoop loop until null terminator
@@ -7312,7 +7312,7 @@ PutStringNext       ldb       ,U        peek the current character
 
 TrailPadLoop        ldd       >PadChar,Y load the output function pointer
                     pshs      D         push argument
-                    jsr       [<$06,S]  call the output routine
+                    jsr       [<6,S]    call the output routine
                     leas      2,S       drop the argument
 TrailPadNext        ldd       8,S       load the pad count
                     addd      #-1       decrement it
@@ -7321,7 +7321,7 @@ TrailPadNext        ldd       8,S       load the pad count
                     bgt       TrailPadLoop loop while positive
 StrFieldDone        puls      PC,U      restore and return
 
-PutcViaFlush        pshs      U         save the frame pointer
+PutcViaFlush        pshs      U         save the caller u register
                     ldd       >OutCursor,Y load the string buffer pointer
                     pshs      D         push it as the stream
                     ldd       6,S       load the character argument
@@ -7330,7 +7330,7 @@ PutcViaFlush        pshs      U         save the frame pointer
 PutcDone            leas      4,S       drop the arguments
                     puls      PC,U      restore and return
 
-StoreToStrBuf       pshs      U         save the frame pointer
+StoreToStrBuf       pshs      U         save the caller u register
                     ldd       4,S       load the character
                     ldx       >OutCursor,Y load the buffer pointer
                     leax      1,X       advance the pointer
@@ -7340,7 +7340,7 @@ StoreToStrBuf       pshs      U         save the frame pointer
 
 MsgMinInt           fcc       "-32768"
                     fcb       C$NULL
-Fseek               pshs      U         save the frame pointer
+Fseek               pshs      U         save the caller u register
                     ldu       4,S       load the file pointer
                     leas      -6,S      allocate the local frame
                     cmpu      #0        check for a null file
@@ -7385,7 +7385,7 @@ FseekInBuffer       ldd       ,U        load the current position
                     pshs      X         push its address
                     leax      14,S      point at the seek argument
                     lbsr      StoreLong copy the long value
-                    ldx       <$10,S    load the whence argument
+                    ldx       <16,S     load the whence argument
                     lbra      SeekDispatch dispatch on the whence
 
 SeekSetHandler      leax      2,S       point at the local
@@ -7444,7 +7444,7 @@ SeekDispatch        stx       -2,S      save the whence value
                     lbeq      SeekSetHandler handle seek-set case
                     cmpx      #1        check for seek-cur
                     lbeq      SeekCurHandler handle seek-cur case
-FseekReRead         ldd       <$10,S    load the whence
+FseekReRead         ldd       <16,S     load the whence
                     cmpd      #1        is it seek-cur
                     bne       FseekSetEnd skip if not seek-cur
                     leax      12,S      point at the position
@@ -7463,7 +7463,7 @@ FseekSetPtr         std       ,U        set the current pointer
 FseekClearEof       ldd       6,U       load the flags
                     andb      #239      clear the eof bit
                     std       6,U       store the flags
-                    ldd       <$10,S    load the position low word
+                    ldd       <16,S     load the position low word
                     pshs      D         push it
                     leax      14,S      point at the position
                     ldd       2,X       load the low word
@@ -7492,7 +7492,7 @@ FseekOk             clra                success result high byte
 FseekExit           leas      6,S       release the locals
                     puls      PC,U      restore and return
 
-Rewind              pshs      U         save the frame pointer
+Rewind              pshs      U         save the caller u register
                     clra                zero the high byte
                     clrb                zero the low byte
                     pshs      D         push a zero offset
@@ -7506,7 +7506,7 @@ Rewind              pshs      U         save the frame pointer
                     leas      8,S       drop the arguments
                     puls      PC,U      restore and return
 
-CurFilePos          pshs      U         save the frame pointer
+CurFilePos          pshs      U         save the caller u register
                     ldu       4,S       load the file pointer
                     beq       FilePosNull branch if null
                     ldd       6,U       load the flags
@@ -7560,7 +7560,7 @@ ComputeBuffered     pshs      D         push the buffer boundary
                     lbsr      Add32     subtract from the position
                     puls      PC,U      restore and return
 
-PutChar             pshs      U         save the frame pointer
+PutChar             pshs      U         save the caller u register
                     ldu       6,S       load the file pointer
                     ldd       6,U       load the flags
                     anda      #128      mask the unallocated bit
@@ -7636,7 +7636,7 @@ PutCharFlush        pshs      U         push the file pointer
 PutCharDone         ldd       4,S       load the character result
                     puls      PC,U      restore and return
 
-                    pshs      U         save the frame pointer
+                    pshs      U         save the caller u register
                     ldu       4,S       load the file pointer
                     ldd       6,S       load the argument
                     pshs      D         push it
@@ -7672,7 +7672,7 @@ TidyNext            ldd       ,S        load the counter
                     blt       TidyLoop  loop if more remain
                     puls      PC,U,X    restore and return
 
-fclose              pshs      U         save the frame pointer
+fclose              pshs      U         save the caller u register
                     ldu       4,S       load the file pointer
                     leas      -2,S      allocate a local
                     cmpu      #0        check for a null file
@@ -7708,7 +7708,7 @@ FcloseDoClose       std       ,S        save the flush result
 FlushErr            equ       IoErr shared not-writable error return
 FlushBuf            equ       WriteBuffer this module's helper name
 
-WriteBuffer         pshs      U         save the frame pointer
+WriteBuffer         pshs      U         save the caller u register
                     ldu       4,S       load the file pointer
                     leas      -4,S      allocate the locals
                     ldd       6,U       load the flags
@@ -7806,7 +7806,7 @@ SeekResetBuf        ldd       6,U       load status flags
 SeekExit            leas      4,S       discard locals
                     puls      PC,U      return
 
-Getc                pshs      U         save frame pointer
+Getc                pshs      U         save the caller u register
                     ldu       4,S       load file pointer
                     beq       ReturnEOF return eof if null
                     ldd       6,U       load status flags
@@ -7831,7 +7831,7 @@ GetcRefill          pshs      U         push file pointer
                     leas      2,S       drop argument
 GetcReturn          puls      PC,U      return
 
-                    pshs      U         save frame pointer
+                    pshs      U         save the caller u register
                     ldu       6,S       load file pointer
                     beq       ReturnEOF return eof if null
                     ldd       6,U       load status flags
@@ -7856,7 +7856,7 @@ UngetcStore         ldd       ,U        load buffer pointer
                     ldd       4,S       return the character
                     puls      PC,U      return
 
-                    pshs      U         save frame pointer
+                    pshs      U         save the caller u register
                     ldu       4,S       load file pointer
                     leas      -4,S      reserve two locals
                     pshs      U         push file pointer
@@ -7882,7 +7882,7 @@ GetwCombine         ldd       2,S       load high byte
 GetwExit            leas      4,S       discard locals
                     puls      PC,U      return
 
-FillBuf             pshs      U         save frame pointer
+FillBuf             pshs      U         save the caller u register
                     ldu       4,S       load file pointer
                     leas      -2,S      reserve local
                     ldd       6,U       load status flags
@@ -7968,17 +7968,17 @@ FillBufSuccess      ldd       2,U       load buffer base
                     ldd       2,U       reload buffer base
                     addd      ,S        add bytes read
                     std       4,U       set buffer end
-                    ldb       [<$02,U]  fetch first character
+                    ldb       [<2,U]    fetch first character
                     clra                zero-extend to word
                     puls      PC,U,X    return the character
 
-GetBuf              pshs      U         save frame pointer
+GetBuf              pshs      U         save the caller u register
                     ldu       4,S       load file pointer
                     ldd       6,U       load status flags
                     clra                clear high byte
                     andb      #192      test buffering bits
                     bne       GetBufMarkBuffered skip if already set
-                    leas      <-$20,S   reserve stat buffer
+                    leas      <-32,S    reserve stat buffer
                     leax      ,S        point at stat buffer
                     pshs      X         push it
                     ldd       8,U       load file descriptor
@@ -7999,7 +7999,7 @@ GetBufFullBuf       ldd       #128      fully-buffered flag
 GetBufSetType       ora       ,S+       merge into flags high byte
                     orb       ,S+       merge into flags low byte
                     std       6,U       store flags
-                    leas      <$20,S    release stat buffer
+                    leas      <32,S     release stat buffer
 GetBufMarkBuffered  ldd       6,U       load status flags
                     ora       #128      set buffered bit
                     std       6,U       store flags
@@ -8046,15 +8046,15 @@ GetBufFinish        ldd       2,U       load buffer base
                     std       ,U        set current pointer
                     puls      PC,U      return
 
-SelectConvStr       pshs      U         save frame pointer
+SelectConvStr       pshs      U         save the caller u register
                     ldb       5,S       load format character
                     sex                 sign-extend to word
                     tfr       D,X       into index register
                     bra       ConvDispatch dispatch on character
 
-ConvNumeric         ldd       [<$06,S]  load argument pointer
+ConvNumeric         ldd       [<6,S]    load argument pointer
                     addd      #4        advance past argument
-                    std       [<$06,S]  store updated pointer
+                    std       [<6,S]    store updated pointer
                     leax      >EmptyString,PC address of empty string
                     bra       ConvReturn return it
 
@@ -8075,13 +8075,13 @@ ConvDispatch        cmpx      #100      is it letter d
                     puls      PC,U      unreachable return
 
 EmptyString         fcb       $00
-ReturnEmptyStr      pshs      U         save frame pointer
+ReturnEmptyStr      pshs      U         save the caller u register
                     leax      >EmptyString2,PC address of empty string
                     tfr       X,D       into d for return
                     puls      PC,U      return
 
 EmptyString2        fcb       $00
-strlen              pshs      U         save frame pointer
+strlen              pshs      U         save the caller u register
                     ldu       4,S       load string pointer
 StrLenLoop          ldb       ,U+       scan next character
                     bne       StrLenLoop loop until null
@@ -8092,7 +8092,7 @@ StrLenLoop          ldb       ,U+       scan next character
 
                     use       lib/strcpy.asm
 
-                    pshs      U         save frame pointer
+                    pshs      U         save the caller u register
                     ldu       6,S       load source pointer
                     leas      -2,S      reserve local
                     ldd       6,S       load destination pointer
@@ -8114,7 +8114,7 @@ StrCatCopyLoop      ldb       ,U+       load source character
                     ldd       6,S       return destination
                     puls      PC,U,X    return
 
-strcmp              pshs      U         save frame pointer
+strcmp              pshs      U         save the caller u register
                     ldu       4,S       load first string pointer
                     bra       StrCmpLoop enter compare loop
 
@@ -8131,11 +8131,11 @@ StrCmpNext          leau      1,U       advance first pointer
 StrCmpLoop          ldb       ,U        load first character
                     sex                 sign-extend to word
                     pshs      D         push it
-                    ldb       [<$08,S]  load second character
+                    ldb       [<8,S]    load second character
                     sex                 sign-extend to word
                     cmpd      ,S++      compare the two characters
                     beq       StrCmpEqual equal, keep scanning
-                    ldb       [<$06,S]  load first character
+                    ldb       [<6,S]    load first character
                     sex                 sign-extend to word
                     pshs      D         push it
                     ldb       ,U        reload other character
@@ -8297,7 +8297,7 @@ GetSttOption        pshs      U         save U
                     puls      U         restore U
                     lbra      SyscallErr return the error
 
-GetSttStore         stx       [<$08,S]  store the result to the caller
+GetSttStore         stx       [<8,S]    store the result to the caller
                     ldx       8,S       load the result pointer
                     stu       2,X       store U there
                     puls      U         restore U

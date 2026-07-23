@@ -20,46 +20,46 @@
 
 MulEntry            tsta                is the first operand's high byte zero
                     bne       @MulFull  no, take the full multiply
-                    tst       $02,s     is the second operand's high byte zero
+                    tst       2,s       is the second operand's high byte zero
                     bne       @MulFull  no, take the full multiply
-                    lda       $03,s     both fit in eight bits: load one
+                    lda       3,s       both fit in eight bits: load one
                     mul                 eight-by-eight multiply
                     ldx       ,s        zero for the high result word
-                    stx       $02,s     store the zero high word
-                    ldx       #$0000    the product high word is zero
+                    stx       2,s       store the zero high word
+                    ldx       #0        the product high word is zero
                     std       ,s        store the product low word
                     puls      pc,d      return the 32-bit product
 @MulFull             pshs      d         save the operands
-                    ldd       #$0000    zero accumulator
+                    ldd       #0        zero accumulator
                     pshs      d         push zero high word
                     pshs      d         push zero low word
-                    lda       $05,s     first low byte
-                    ldb       $09,s     second low byte
+                    lda       5,s       first low byte
+                    ldb       9,s       second low byte
                     mul                 partial product
-                    std       $02,s     store it
-                    lda       $05,s     first low byte
-                    ldb       $08,s     second high byte
+                    std       2,s       store it
+                    lda       5,s       first low byte
+                    ldb       8,s       second high byte
                     mul                 partial product
-                    addd      $01,s     add running total
-                    std       $01,s     store it
+                    addd      1,s       add running total
+                    std       1,s       store it
                     bcc       @MulAcc1  skip carry
                     inc       ,s        propagate the carry
-@MulAcc1             lda       $04,s     first high byte
-                    ldb       $09,s     second low byte
+@MulAcc1             lda       4,s       first high byte
+                    ldb       9,s       second low byte
                     mul                 partial product
-                    addd      $01,s     add running total
-                    std       $01,s     store it
+                    addd      1,s       add running total
+                    std       1,s       store it
                     bcc       @MulAcc2  skip carry
                     inc       ,s        propagate the carry
-@MulAcc2             lda       $04,s     first high byte
-                    ldb       $08,s     second high byte
+@MulAcc2             lda       4,s       first high byte
+                    ldb       8,s       second high byte
                     mul                 partial product
                     addd      ,s        add running total
                     std       ,s        store it
-                    ldx       $06,s     gather low result
-                    stx       $08,s     place low result
+                    ldx       6,s       gather low result
+                    stx       8,s       place low result
                     ldx       ,s        load high result
-                    ldd       $02,s     load low result
-                    leas      $08,s     drop the temporaries
+                    ldd       2,s       load low result
+                    leas      8,s       drop the temporaries
                     rts                 return the product
 

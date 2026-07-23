@@ -6,8 +6,10 @@
 * Pulled in with "use lib/strcat.asm" where each module's copy sits.
 *
 * StrCat(dst, src): scans dst to its NUL, then appends the string at
-* src, returning dst.  dst/src come from the caller frame at $06,s; a
-* 2-byte cursor lives in the local frame.
+* src, returning dst.  dst/src are stack arguments at $06,s (src is
+* loaded into u as the working source pointer); a 2-byte cursor lives
+* on the stack.  args and locals are addressed off s; u is not a frame
+* pointer here.
 *
 * Self-contained: no parameters, no external references; both branch
 * targets (StrCatScan/StrCatLoop) are internal.  The entry is uncalled
@@ -17,25 +19,25 @@
 * C prototype:  char *strcat(char *dst, char *src);   returns dst
 * ====================================================================
 
-strcat              pshs      u         save frame pointer
-                    ldu       $06,s     source string
+strcat              pshs      u         save the caller u register
+                    ldu       6,s       source string
                     leas      -2,s       cursor local
-                    ldd       $06,s     destination pointer
+                    ldd       6,s       destination pointer
                     std       ,s        init cursor
 @StrCatScan          ldx       ,s        scan destination
-                    leax      $01,x     advance cursor
+                    leax      1,x       advance cursor
                     stx       ,s        store cursor
-                    ldb       -$01,x    destination byte
+                    ldb       -1,x      destination byte
                     bne       @StrCatScan find end of destination
                     ldd       ,s        cursor
                     addd      #$FFFF    back up onto nul
                     std       ,s        store cursor
 @StrCatLoop          ldb       ,u+       next source byte
                     ldx       ,s        destination cursor
-                    leax      $01,x     advance cursor
+                    leax      1,x       advance cursor
                     stx       ,s        store cursor
-                    stb       -$01,x    append byte
+                    stb       -1,x      append byte
                     bne       @StrCatLoop until nul appended
-                    ldd       $06,s     return destination
+                    ldd       6,s       return destination
                     puls      pc,u,x    return to caller
 

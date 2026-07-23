@@ -11,6 +11,6 @@
 * C prototype:  int  unlink(char *path)
 ********************************************************************
 
-unlink              ldx       $02,s     load pathname pointer
+unlink              ldx       2,s       load pathname pointer
                     os9       I$Delete  delete the file
                     lbra      SyscallRet return result

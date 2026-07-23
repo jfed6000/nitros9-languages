@@ -16,26 +16,26 @@
 * C prototype:  int   strcmp(char *s1, char *s2)
 * ====================================================================
 
-strcmp              pshs      u         save frame pointer
-                    ldu       $04,s     first string
+strcmp              pshs      u         save the caller u register
+                    ldu       4,s       first string
                     bra       @StrCmpLoop start comparing
-@StrCmpNext          ldx       $06,s     second string pointer
-                    leax      $01,x     advance it
-                    stx       $06,s     store pointer
-                    ldb       -$01,x    second string byte
+@StrCmpNext          ldx       6,s       second string pointer
+                    leax      1,x       advance it
+                    stx       6,s       store pointer
+                    ldb       -1,x      second string byte
                     bne       @StrCmpAdv continue while nonzero
                     clra                clear high byte
                     clrb                clear low byte
                     puls      pc,u      strings equal
-@StrCmpAdv           leau      $01,u     advance first string
+@StrCmpAdv           leau      1,u       advance first string
 @StrCmpLoop          ldb       ,u        first string byte
                     sex                 sign extend to word
                     pshs      d         save it
-                    ldb       [$08,s]   second string byte
+                    ldb       [8,s]     second string byte
                     sex                 sign extend to word
                     cmpd      ,s++      compare bytes
                     beq       @StrCmpNext equal keep scanning
-                    ldb       [$06,s]   second string byte
+                    ldb       [6,s]     second string byte
                     sex                 sign extend to word
                     pshs      d         save it
                     ldb       ,u        first string byte

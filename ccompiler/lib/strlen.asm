@@ -17,11 +17,11 @@
 
 strlen              neg       $0034     misframed prologue
                     nega                misframed prologue
-                    ldu       $04,s     string argument
+                    ldu       4,s       string argument
 @StrLenScan         ldb       ,u+       scan for terminator
                     bne       @StrLenScan until nul
                     tfr       u,d       end pointer
-                    subd      $04,s     minus start
+                    subd      4,s       minus start
                     addd      #$FFFF    exclude the nul
                     puls      pc,u      return length
 

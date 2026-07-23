@@ -17,14 +17,14 @@
 ********************************************************************
 
 lseek               pshs      u         save u
-                    ldd       $0a,s     load whence argument
+                    ldd       10,s      load whence argument
                     bne       @SeekWhence nonzero whence
-                    ldu       #$0000    absolute base high zero
-                    ldx       #$0000    absolute base low zero
+                    ldu       #0        absolute base high zero
+                    ldx       #0        absolute base low zero
                     bra       @SeekCompute compute new position
-@SeekWhence          cmpd      #$0001    whence from current
+@SeekWhence          cmpd      #1        whence from current
                     beq       @SeekCurPos get current position
-                    cmpd      #$0002    whence from end
+                    cmpd      #2        whence from end
                     beq       @SeekEndSize get file size
                     ldb       #E$Seek   invalid whence error
 @SeekErr             clra                clear high errno byte
@@ -32,28 +32,28 @@ lseek               pshs      u         save u
                     ldd       #$FFFF    position minus one
                     leax      HighResultWord,y   point to saved position
                     std       ,x        store high word
-                    std       $02,x     store low word
+                    std       2,x       store low word
                     puls      pc,u      return seek error
-@SeekEndSize         lda       $05,s     load path number
-                    ldb       #$02      size status code
+@SeekEndSize         lda       5,s       load path number
+                    ldb       #2        size status code
                     os9       I$GetStt  get file size
                     bcs       @SeekErr  seek error on failure
                     bra       @SeekCompute compute new position
-@SeekCurPos          lda       $05,s     load path number
-                    ldb       #$05      current position code
+@SeekCurPos          lda       5,s       load path number
+                    ldb       #5        current position code
                     os9       I$GetStt  get current position
                     bcs       @SeekErr  seek error on failure
 @SeekCompute         tfr       u,d       base low to d
-                    addd      $08,s     add offset low word
+                    addd      8,s       add offset low word
                     std       LowResultWord,y   save new position low
                     tfr       d,u       keep low in u
                     tfr       x,d       base high to d
-                    adcb      $07,s     add offset high with carry
-                    adca      $06,s     propagate carry
+                    adcb      7,s       add offset high with carry
+                    adca      6,s       propagate carry
                     bmi       @SeekErr  negative position error
                     tfr       d,x       keep high in x
                     std       HighResultWord,y   save new position high
-                    lda       $05,s     load path number
+                    lda       5,s       load path number
                     os9       I$Seek    seek to new position
                     bcs       @SeekErr  seek error on failure
                     leax      HighResultWord,y   point to new position

@@ -15,9 +15,9 @@
 ********************************************************************
 
 read                pshs      y         save y
-                    ldx       $06,s     load buffer pointer
-                    lda       $05,s     load path number
-                    ldy       $08,s     load byte count
+                    ldx       6,s       load buffer pointer
+                    lda       5,s       load path number
+                    ldy       8,s       load byte count
                     pshs      y         save count on stack
                     os9       I$Read    read from file
 @ReadResult          bcc       @ReadOk  return count on success
@@ -31,9 +31,9 @@ read                pshs      y         save y
 @ReadOk              tfr       y,d       returned count to result
                     puls      pc,y,x    return byte count
 readln              pshs      y         save y
-                    lda       $05,s     load path number
-                    ldx       $06,s     load buffer pointer
-                    ldy       $08,s     load byte count
+                    lda       5,s       load path number
+                    ldx       6,s       load buffer pointer
+                    ldy       8,s       load byte count
                     pshs      y         save count on stack
                     os9       I$ReadLn  read line from file
                     bra       @ReadResult share read result handling

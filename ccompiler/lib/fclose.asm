@@ -12,10 +12,10 @@
 * C prototype:  int   fclose(FILE *fp)
 ********************************************************************
 
-fclose              pshs      u         save frame pointer
-                    ldu       $04,s     load the FILE pointer
+fclose              pshs      u         save the caller u register
+                    ldu       4,s       load the FILE pointer
                     leas      -2,s      reserve a result slot
-                    cmpu      #$0000    is the pointer null
+                    cmpu      #0        is the pointer null
                     beq       @CloseNotOpen treat null as not open
                     ldd       _flag,u   load the flags
                     bne       @DoCloseStream proceed if the stream is open

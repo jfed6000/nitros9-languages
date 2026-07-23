@@ -13,8 +13,8 @@
 * C prototype:  int   open(char *path, int mode);   returns path number
 ********************************************************************
 
-open                ldx       $02,s     load pathname pointer
-                    lda       $05,s     load open mode
+open                ldx       2,s       load pathname pointer
+                    lda       5,s       load open mode
                     os9       I$Open    open the file
                     lbcs      SyscallErr return error
                     tfr       a,b       path number to result

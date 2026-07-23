@@ -7,36 +7,36 @@
 * C prototype:  int   strncmp(char *s1, char *s2, int n)
 * ====================================================================
 
-strncmp             pshs      u         save frame pointer
-                    ldu       $04,s     first string
+strncmp             pshs      u         save the caller u register
+                    ldu       4,s       first string
                     bra       @StrNCmpLoop start comparing
-@StrNCmpNext         ldx       $06,s     second string pointer
-                    leax      $01,x     advance it
-                    stx       $06,s     store pointer
-                    ldb       -$01,x    second string byte
+@StrNCmpNext         ldx       6,s       second string pointer
+                    leax      1,x       advance it
+                    stx       6,s       store pointer
+                    ldb       -1,x      second string byte
                     bne       @StrNCmpAdv continue while nonzero
                     clra                clear high byte
                     clrb                clear low byte
                     puls      pc,u      equal within count
-@StrNCmpAdv          leau      $01,u     advance first string
-@StrNCmpLoop         ldd       $08,s     remaining count
+@StrNCmpAdv          leau      1,u       advance first string
+@StrNCmpLoop         ldd       8,s       remaining count
                     addd      #$FFFF    minus one
-                    std       $08,s     decrement count
+                    std       8,s       decrement count
                     subd      #$FFFF    restore value
                     ble       @StrNCmpCheck count exhausted
                     ldb       ,u        first string byte
                     sex                 sign extend to word
                     pshs      d         save it
-                    ldb       [$08,s]   second string byte
+                    ldb       [8,s]     second string byte
                     sex                 sign extend to word
                     cmpd      ,s++      compare bytes
                     beq       @StrNCmpNext equal keep scanning
-@StrNCmpCheck        ldd       $08,s     remaining count
+@StrNCmpCheck        ldd       8,s       remaining count
                     bge       @StrNCmpDiff count not exhausted
                     clra                clear high byte
                     clrb                clear low byte
                     bra       @StrNCmpRet equal within count
-@StrNCmpDiff         ldb       [$06,s]   sign extend to word
+@StrNCmpDiff         ldb       [6,s]     sign extend to word
                     sex                 save it
                     pshs      d         first string byte
                     ldb       ,u        sign extend to word
