@@ -1,0 +1,15 @@
+@C.LINK
+Syntax: C.Link [<opts>] <mainobj> [<obj> ...] [<opts>]
+Usage : C compiler linker - build an OS-9 module from objects
+Opts  :
+  -o=<path>  write the linked module to <path>
+  -n=<name>  use <name> as the module name
+  -e=<num>   set the module edition number
+  -M=<size>  add <size> bytes of data memory
+  -l=<path>  link with library <path> (up to 5)
+  -m         print the linkage map
+  -s         print the final symbol addresses
+  -b=<name>  make the module callable from BASIC09, entry <name>
+  -t         allow static data in a BASIC09 callable module
+Note  : links the relocatable objects from c.asm with cstart.r and
+        clib.l into an executable module.  Normally run by CC1/CC2.

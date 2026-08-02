@@ -1,0 +1,7 @@
+@C.ASM
+Syntax: C.Asm <file> [-o=<file>]
+Usage : C compiler assembler - assemble to a relocatable object
+Opts  :
+  -o=<file>  write the relocatable object to <file>
+Note  : assembles the 6809 source from c.opt / c.pass2 into a
+        relocatable object (.r) for c.link.  Normally run by CC1.

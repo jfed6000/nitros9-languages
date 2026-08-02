@@ -1,0 +1,22 @@
+@CC2
+Syntax: CC2 [<opts>] <file> [<file> ...] [<opts>]
+Usage : Compile C source to an OS-9 module (single pass front end)
+Files : <name>.c  C source        <name>.a  assembler source
+        <name>.r  relocatable object (linked only)
+Opts  :
+  -d<name>   define preprocessor symbol <name>
+  -c         keep preprocessor line-number directives
+  -o         do not run the optimizer (c.opt)
+  -p         generate profiling information
+  -s         strip symbol information from the output
+  -r         stop after the relocatable object (.r), do not link
+  -a         stop after the assembler source (.a), do not assemble
+  -f=<file>  name the final linked module <file>
+  -n=<name>  set the output module name
+  -e=<num>   set the module edition number
+  -m=<size>  add <size> bytes of data memory
+  -l=<path>  link with library <path> (up to 4)
+  -x         build the command file but do not run it
+Note  : CC2 is the same driver as CC1 but uses the single pass front
+        end c.comp in place of c.pass1 and c.pass2.  c.comp needs more
+        free memory, so on small systems use CC1.

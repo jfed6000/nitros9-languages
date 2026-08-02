@@ -1,0 +1,6 @@
+@C.OPT
+Syntax: C.Opt <infile> <outfile>
+Usage : C compiler peephole optimizer
+Note  : reads 6809 assembler source and writes a smaller, faster
+        equivalent.  Both file names are positional.  CC1/CC2 run this
+        pass unless the -o (no optimize) option is given.

@@ -8,6 +8,13 @@ C_SOURCES	= $(wildcard sources/*.c)
 ASM_SOURCES	= $(wildcard sources/*.a)
 SYS_SOURCES	= $(wildcard sources/*.sys)
 
+# Help entries for the OS-9 "help" utility, one per compiler command.  They
+# are merged (cat) into a single "helpmsg" file that "help" reads from
+# /DD/SYS/helpmsg.  cc1 is listed first so it heads the topic list.
+HELPFILES	= sys/cc1.hp sys/cc2.hp sys/cprep.hp sys/cpass1.hp \
+		sys/cpass2.hp sys/ccomp.hp sys/copt.hp sys/casm.hp sys/clink.hp
+HELPMSG		= helpmsg
+
 # Most compiler modules share the C runtime startup, which lives in lib/ and
 # is pulled into each with "use lib/cstart.asm" (make keeps its own variant
 # via cstart_rev.asm; c.asm is a copy of c_asm).  Validate the lib first, and
@@ -140,10 +147,14 @@ $(FCLOSEMODS): lib/fclose.asm
 $(FFLUSHMODS): lib/fflush.asm
 make: lib/cstart_rev.asm
 
+# Merge the per-command help entries into one helpmsg file
+$(HELPMSG): $(HELPFILES)
+	$(MERGE) $(HELPFILES) > $@
+
 # Clean all components
 clean:
 	$(MAKE) -C lib clean
-	$(RM) $(CMDS) $(DSK) *.list *.map
+	$(RM) $(CMDS) $(DSK) $(HELPMSG) *.list *.map
 
 c.asm: c_asm
 	$(CP) $< $@
@@ -154,17 +165,19 @@ cc2: cc1.asm
 	$(AS) $(AFLAGS) -DCC2=1 $< $(ASOUT)$@
 
 $(DSK): Makefile $(CMDS) $(HEADERS) $(LIBRARIES) $(C_SOURCES) \
-	$(ASM_SOURCES) $(SYS_SOURCES)
+	$(ASM_SOURCES) $(SYS_SOURCES) $(HELPMSG)
 	$(RM) $@
 	$(OS9FORMAT_DS40) -q $@ -n"C Compiler"
 	$(MAKDIR) $@,CMDS
 	$(MAKDIR) $@,LIB
 	$(MAKDIR) $@,DEFS
+	$(MAKDIR) $@,SYS
 	$(MAKDIR) $@,SOURCES
 	$(MAKDIR) $@,SOURCES/SYS
 	$(OS9COPY) $(CMDS) $@,CMDS
 	$(OS9ATTR_EXEC) $(foreach file,$(CMDS),$@,CMDS/$(file))
 	$(CPL) $(HEADERS) $@,DEFS
 	$(OS9COPY) $(LIBRARIES) $@,LIB
+	$(CPL) $(HELPMSG) $@,SYS/helpmsg
 	$(CPL) $(C_SOURCES) $@,SOURCES
 	$(CPL) $(ASM_SOURCES) $(SYS_SOURCES) $@,SOURCES/SYS
