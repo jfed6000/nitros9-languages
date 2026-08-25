@@ -34,5 +34,6 @@ ccompiler/c.opt
 ccompiler/c_asm
 ccompiler/c.link
 ccompiler/make
+ccompiler/rd
 ccompiler/helpmsg
 ccompiler/lib/*_check

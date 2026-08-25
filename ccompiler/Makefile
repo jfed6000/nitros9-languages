@@ -4,7 +4,13 @@ DSK		= CCompiler.dsk
 CMDS		= cc1 cc2 c.prep c.pass1 c.pass2 c.comp c.opt c.asm c_asm c.link make
 HEADERS		= $(wildcard defs/*.h)
 LIBRARIES	= $(wildcard lib/*.l lib/*.r)
-C_SOURCES	= $(wildcard sources/*.c)
+# rd.c is a host-side maintainer tool (a modern-machine port of rdump.c that
+# reads big-endian OS-9 ROF files); it is compiled for this build host and is
+# deliberately not installed on the 6809, so keep it out of the sources copied
+# onto the disk image.  The disk carries the 6809 rdump.c source instead.
+C_SOURCES	= $(filter-out sources/rd.c,$(wildcard sources/*.c))
+HOSTCC		= cc
+HOSTCFLAGS	= -O2 -Wall
 ASM_SOURCES	= $(wildcard sources/*.a)
 SYS_SOURCES	= $(wildcard sources/*.sys)
 
@@ -107,7 +113,7 @@ FFLUSHMODS	= c.opt c_asm
 .PHONY: all banner clean lib
 
 # Make all components
-all:	banner lib $(CMDS) $(DSK)
+all:	banner lib $(CMDS) rd $(DSK)
 
 banner:
 	@$(ECHO) "**************************************************"
@@ -154,10 +160,16 @@ $(HELPMSG): $(HELPFILES)
 # Clean all components
 clean:
 	$(MAKE) -C lib clean
-	$(RM) $(CMDS) $(DSK) $(HELPMSG) *.list *.map
+	$(RM) $(CMDS) rd $(DSK) $(HELPMSG) *.list *.map
 
 c.asm: c_asm
 	$(CP) $< $@
+
+# rd is the host build of the ROF dumper (sources/rd.c).  It runs on the build
+# machine to inspect .r/.l files and is intentionally not copied to the disk;
+# the 6809 carries rdump.c as source instead.
+rd: sources/rd.c
+	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
 # cc2 is cc1 built for the single-pass c.comp front end (it invokes c.comp
 # instead of c.pass1 + c.pass2); selected in cc1.asm with -DCC2=1.
