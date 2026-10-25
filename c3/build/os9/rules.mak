@@ -19,9 +19,10 @@
 #   - C3LIBDIR    : the lwbackend runtime — c3lw.awk, os9c3.ld, crt0.o, fpdummy.o,
 #                   libc3.a, libc3lw.a
 #
-# The defaults match a stock `make -C build/unix install` (PREFIX=/usr/local):
+# The defaults match a stock `make -C c3 install` (PREFIX=/usr/local):
 # headers under $PREFIX/share/toolshed/defs, the runtime beside the binaries in
-# $PREFIX/bin.
+# $PREFIX/bin.  c3/Makefile overrides all of these to use the in-tree host
+# build and runtime instead, so it needs nothing installed.
 
 PREFIX		?= /usr/local
 C3BASE		?= $(PREFIX)/share/toolshed
