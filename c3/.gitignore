@@ -4,3 +4,12 @@ ctmp.*
 
 # Editor swap files
 *.swp
+
+# lwbackend runtime build artifacts (buildrt.sh / buildlibc.sh)
+lwbackend/obj/
+lwbackend/libcobj/
+lwbackend/crt0.o
+lwbackend/fpdummy.o
+lwbackend/fpinit.o
+lwbackend/libc3.a
+lwbackend/libc3lw.a
