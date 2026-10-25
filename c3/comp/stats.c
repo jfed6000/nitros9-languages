@@ -1,0 +1,746 @@
+/*
+     Modification History:
+
+     29-Aug-83      Improved while() code.
+     29-Aug-83      Improved for() code.
+     12-Sep-83 LAC  added register contents tracking code
+     13-Apr-84 LAC  Conversion for UNIX.
+*/
+
+#include "cj.h"
+#include "il.h"
+
+/*******************************
+ *                             *
+ *   statement parser          *
+ *                             *
+ *******************************/
+
+static void swcherr(void);
+
+/* casnode / CASESIZE now live in cj.h (shared with pass 2's switch codegen) */
+
+direct  casnode *caseptr,   /* list of cases */
+                *lastcase,  /* last case in current list */
+                *freecase;  /* list of spare case nodes */
+
+#if 0
+static int  swflag,         /* current switch level */
+#else
+static int
+#endif
+            deflabel;       /* switch default label */
+
+static labstruc *breakptr,      /* break label */
+                *contptr;       /* continue label */
+
+extern  expnode *dregcont,      /* D register content */
+                *xregcont;      /* X register content */
+
+static  expnode *sidexp(int);
+#ifndef MKIL
+static  expnode *emit(expnode *), *getptest(), *gettest();
+#endif
+
+static  symnode *checklabel(void);
+
+#ifndef MKIL
+/* file-local helpers, used before their definitions: static, prototyped here in
+   their own .c (not proto.h).  They share names with the pass-2 static helpers
+   in cmain2c.c, but that is harmless - stats.c is linked only into c3comp and
+   c3comp1, cmain2c.c only into c3comp2, so the two never meet */
+static void modnjmp(labstruc *);
+static void dotest(expnode *, labstruc *, labstruc *, int);
+#endif
+
+void statement(void)
+{
+   if (sym!=SEMICOL) lastst=0;
+
+contin:
+
+    switch (sym) {
+        case SEMICOL: break;
+        case KEYWORD:
+            switch (symval) {
+                case IF:        doif();         return;
+                case WHILE:     dowhile();      return;
+                case RETURN:    doreturn();     break;
+                case CASE:      docase();       return;
+                case SWITCH:    doswitch();     return;
+                case BREAK:     dobreak();      break;
+                case CONTIN:    docont();       break;
+                case DEFAULT:   dodefault();    return;
+                case FOR:       dofor();        return;
+                case DO:        dodo();         break;
+                case GOTO:      dogoto();       break;
+                case ELSE:
+                    error("no 'if' for 'else'");
+                    getsym();
+                    goto contin;
+                default:        goto what;
+            }
+            break;
+        case LBRACE:
+            block(0);
+            getsym();
+            return;
+        case 0xFFFF:
+            return;   /* EOF */
+        case NAME:
+            skipblanks();
+            if (curch==':') {
+                dolabel();
+                goto contin;
+            }
+            goto tryexp;
+        default:
+what:
+            if (issclass() || istype()) {
+                error("illegal declaration");
+                do {getsym();} while(sym!=SEMICOL);
+                break;
+            } else {
+tryexp:
+                if (sidexp(0)==0) {
+                    error("syntax error");
+                    junk();
+                    return;
+                }
+            }
+    }
+    need(SEMICOL);
+}
+
+void doif(void)
+{
+    register expnode *ptr;
+    labstruc tl,fl;
+    register int et;
+
+#ifdef MKIL
+    getsym();
+    need(LPAREN);
+    ptr = parsexp(0);                   /* raw test; pass 2 optims + tests */
+    need(RPAREN);
+    et = (sym == SEMICOL);              /* empty then: "if(c);" */
+    ilwrec(IL_IF); ilwint(et); ilweol();
+    if (ptr) ilexpr(ptr);
+    ilwrec(IL_ENDE); ilweol();
+    if (ptr) reltree(ptr);
+    if (et) getsym();
+    else statement();                  /* then-branch */
+    if (sym == KEYWORD && symval == ELSE) {
+        getsym();
+        if (sym != SEMICOL) {
+            ilwrec(IL_ELSE); ilweol();
+            statement();               /* else-branch */
+        }
+    }
+    ilwrec(IL_ENDIF); ilweol();
+#else
+    getsym();
+    ptr = getptest();
+
+    tl.labnum = fl.labnum = 0;
+    tl.labdreg = tl.labxreg = fl.labdreg = fl.labxreg = NULL;
+
+    if (et = (sym == SEMICOL)) {
+        getsym();
+        dotest(ptr,&tl,&fl,FALSE);
+        uselabel(&fl);
+    } else {
+        dotest(ptr,&tl,&fl,TRUE) ;
+        uselabel(&tl);
+        statement();
+    }
+    if (sym==KEYWORD && symval==ELSE) {
+        getsym();
+        if (sym != SEMICOL) {
+            if (et == 0) {
+                et = 1;
+                gen(JMP,tl.labnum = getlabel(),0);
+                tl.labdreg = dregcont;
+                tl.labxreg = xregcont;
+                dregcont = treecopy(fl.labdreg);
+                xregcont = treecopy(fl.labxreg);
+                uselabel(&fl);
+            }
+            statement();
+        }
+    }
+    uselabel(et ? &tl : &fl);
+#endif
+}
+
+void dowhile(void)
+{
+    register expnode *ptr;
+    labstruc brk,cnt,*savbreak,*savcont;
+    register int tlab;
+
+#ifdef MKIL
+    {
+        int eb;
+
+        getsym();
+        need(LPAREN);
+        ptr = parsexp(0);              /* raw test; pass 2 optims + tests */
+        need(RPAREN);
+        eb = (sym == SEMICOL);         /* empty body: "while(c);" */
+        ilwrec(IL_WHILE); ilwint(eb); ilweol();
+        if (ptr) ilexpr(ptr);
+        ilwrec(IL_ENDE); ilweol();
+        if (ptr) reltree(ptr);
+        if (eb) getsym();
+        else statement();              /* loop body */
+        ilwrec(IL_ENDWHILE); ilweol();
+    }
+#else
+    savbreak = breakptr;
+    savcont = contptr;
+    breakptr = &brk;
+    contptr = &cnt;
+
+    getsym();
+
+    brk.labnum =  0;
+    brk.labdreg = brk.labxreg = NULL;
+    cnt.labnum = getlabel();
+    cnt.labdreg = dregcont;
+    cnt.labxreg = xregcont;
+    dregcont = xregcont = NULL;
+    brk.labsp = cnt.labsp = sp;
+
+    ptr = getptest();
+    if (sym == SEMICOL)
+        tlab = cnt.labnum;
+    else {
+        gen(JMP,cnt.labnum,0);
+        label(tlab = getlabel());
+        statement();
+    }
+
+    uselabel(&cnt);
+    cnt.labnum = tlab;
+    dotest(ptr,&cnt,&brk,FALSE);
+    uselabel(&brk);
+
+    breakptr = savbreak;
+    contptr = savcont;
+#endif
+}
+
+void doswitch(void)
+{
+    register expnode *ptr;
+    labstruc brk,*savbreak;
+    casnode *savcase,*savlast,*cptr,*temp;
+    int savdef,tests;
+
+#ifdef MKIL
+    {
+        getsym();
+        need(LPAREN);
+        ptr = parsexp(0);
+        need(RPAREN);
+        ilwrec(IL_SWITCH); ilweol();
+        if (ptr) ilexpr(ptr);
+        ilwrec(IL_ENDE); ilweol();
+        if (ptr) reltree(ptr);
+        statement();                   /* switch body */
+        ilwrec(IL_ENDSW); ilweol();
+    }
+#else
+    getsym();
+    ++swflag;
+
+    savcase = caseptr;
+    savlast = lastcase;
+    savdef = deflabel;
+    caseptr = NULL;
+
+    savbreak = breakptr;
+    breakptr = &brk;
+
+    brk.labnum = deflabel = 0;
+    brk.labdreg = brk.labxreg = NULL;
+    brk.labsp = sp;
+
+    need(LPAREN);
+    if (ptr = optim(parsexp(0))) {
+           chkdecl(ptr);
+           switch(ptr->type) {
+               case CHAR:
+               case LONG: cvt(ptr,INT);
+               case INT:
+               case UNSIGN: break;
+               default: integerr(ptr);
+                        makedummy(ptr);
+           }
+           ldxexp(ptr);
+           reltree(ptr);
+    }
+    else experr();
+    need(RPAREN);
+
+    gen(JMP,tests=getlabel(),0);
+    statement();
+
+    if (lastst == 0) gen(JMP,setlabel(&brk),0);
+
+    label(tests);
+    cptr = caseptr;
+    while (cptr) {
+        temp = cptr->clink;
+        gen(JMPEQ,cptr->clab,cptr->cval);
+        cptr->clink = freecase;
+        freecase = cptr;
+        cptr = temp;
+    }
+
+    clrconts();
+    if (deflabel) {
+        gen(JMP,deflabel,0);
+        dregcont = treecopy(brk.labdreg);
+        xregcont = treecopy(brk.labxreg);
+    }
+    uselabel(&brk);
+
+    --swflag;
+    caseptr = savcase;
+    deflabel = savdef;
+    lastcase = savlast;
+
+    breakptr = savbreak;
+#endif
+}
+
+void docase(void)
+{
+    register casnode *ptr;
+    register int val;
+
+    getsym();
+    val=constexp(0);
+    need(COLON);
+#ifdef MKIL
+    ilwrec(IL_CASE); ilwint(val); ilweol();
+#else
+    clrconts();     /* clear register contents */
+
+    if (swflag) {
+        if (ptr = freecase) freecase = ptr->clink;
+        else ptr = (casnode *) grab(CASESIZE);
+
+        if (caseptr) lastcase->clink = ptr;
+        else caseptr = ptr;
+
+        lastcase = ptr;
+        ptr->clink = NULL;
+
+        ptr->cval = val;
+        label(ptr->clab = getlabel());
+    } else swcherr();
+#endif
+}
+
+void dodefault(void)
+{
+    getsym();
+#ifdef MKIL
+    need(COLON);
+    ilwrec(IL_DEFAULT); ilweol();
+#else
+    if (swflag == 0) swcherr();
+    if (deflabel) error("multiple defaults");
+    else label(deflabel = getlabel());
+    need(COLON);
+    clrconts();         /* clear register contents */
+#endif
+}
+
+static void swcherr(void)
+{
+       error("no switch statement");
+}
+
+void dodo(void)
+{
+    labstruc brk,cnt,*savbreak,*savcont;
+    int looptop;
+
+#ifdef MKIL
+    {
+        register expnode *ptr;
+
+        ilwrec(IL_DO); ilweol();
+        getsym();
+        statement();                   /* loop body */
+        if (sym != KEYWORD || symval != WHILE) error("while expected");
+        getsym();
+        need(LPAREN);
+        ptr = parsexp(0);
+        need(RPAREN);
+        ilwrec(IL_DOWHILE); ilweol();
+        if (ptr) ilexpr(ptr);
+        ilwrec(IL_ENDE); ilweol();
+        if (ptr) reltree(ptr);
+    }
+#else
+    savbreak = breakptr;
+    savcont = contptr;
+    breakptr = &brk;
+    contptr = &cnt;
+
+    brk.labsp = cnt.labsp = sp;
+    brk.labnum = cnt.labnum = 0;
+    brk.labdreg = brk.labxreg = cnt.labdreg = cnt.labxreg = NULL;
+    clrconts();         /* clear register contents */
+    getsym();
+    label(looptop=getlabel());
+    statement();
+
+    if (sym != KEYWORD || symval != WHILE) error("while expected");
+    getsym();
+    uselabel(&cnt);
+    cnt.labnum = looptop;
+    dotest(getptest(),&cnt,&brk,FALSE);
+    uselabel(&brk);
+
+    breakptr = savbreak;
+    contptr = savcont;
+#endif
+}
+
+void dofor(void)
+{
+    labstruc brk,cnt,tst,*savbreak,*savcont;
+    int slab;
+    register expnode *tptr = 0, *uptr = 0;
+
+#ifdef MKIL
+    {
+        register expnode *ip, *up;
+
+        getsym();
+        need(LPAREN);
+        ip = parsexp(0);                       /* init (may be empty) */
+        need(SEMICOL);
+        tptr = (sym != SEMICOL) ? parsexp(0) : 0;   /* test (may be empty) */
+        need(SEMICOL);
+        up = parsexp(0);                       /* update (may be empty) */
+        need(RPAREN);
+        ilwrec(IL_FOR); ilweol();
+        if (ip) ilexpr(ip);
+        ilwrec(IL_ENDE); ilweol();
+        if (tptr) ilexpr(tptr);
+        ilwrec(IL_ENDE); ilweol();
+        if (up) ilexpr(up);
+        ilwrec(IL_ENDE); ilweol();
+        if (ip) reltree(ip);
+        if (tptr) reltree(tptr);
+        if (up) reltree(up);
+        statement();                           /* body */
+        ilwrec(IL_ENDFOR); ilweol();
+    }
+#else
+    savbreak = breakptr;
+    savcont = contptr;
+    breakptr = &brk;
+    contptr = &cnt;
+
+    brk.labsp = cnt.labsp = sp;
+    brk.labnum = cnt.labnum = tst.labnum = 0;
+    brk.labdreg = brk.labxreg = cnt.labdreg =
+                cnt.labxreg = tst.labdreg = tst.labxreg = NULL;
+    slab = getlabel();
+
+    getsym();
+    need(LPAREN);
+
+    /* initialization */
+    sidexp(0);
+    need(SEMICOL);
+
+    /* test */
+    if (sym!=SEMICOL) {
+        /* there IS a test */
+        tptr = gettest();
+        gen(JMP,setlabel(&tst),0);
+    }
+    need(SEMICOL);
+
+    /* update */
+    if (uptr = optim(parsexp(0))) chkdecl(uptr);
+    need(RPAREN);
+
+    /* statement */
+    clrconts();         /* clear register contents */
+    label(slab);
+    statement();
+
+    uselabel(&cnt);
+
+    /* update code */
+    if (uptr) emit(uptr);
+
+    /* testcode */
+    if (tptr) {
+        uselabel(&tst);
+        cnt.labnum = slab;
+        dotest(tptr,&cnt,&brk,FALSE);
+    } else gen(JMP,slab,0);
+
+    uselabel(&brk);
+
+    breakptr = savbreak;
+    contptr = savcont;
+#endif
+}
+
+void doreturn(void)
+{
+#ifdef MKIL
+    {
+        register expnode *ptr;
+
+        getsym();
+        ilwrec(IL_RET); ilweol();
+        if (sym != SEMICOL && (ptr = parsexp(0))) {
+            ilexpr(ptr);
+            reltree(ptr);
+        }
+        ilwrec(IL_ENDE); ilweol();
+        lastst = RETURN;
+    }
+#else
+    getsym();
+    if (sym != SEMICOL) {
+        register expnode *ptr;
+
+        if (ptr=parsexp(0)) {
+            ptr=optim(ptr);
+            chkdecl(ptr);
+            chkstrct(ptr);
+            cvt(ptr,isptr(ftype) ? INT : ftype);
+#ifdef  SPLIT
+            pass2(RETURN,ptr,ftype);
+#else
+            switch(ftype) {
+                case LONG:
+                    lload(ptr);
+#ifdef  DOFLOATS
+                    goto common;
+                case FLOAT:
+                case DOUBLE:
+                    dload(ptr);
+common:
+#endif
+                    if(ptr->op!=FREG) {
+                        gen(LOADIM,UREG,FREG);
+                        gen(PUSH,UREG);
+#ifdef  DOFLOATS
+                        switch(ftype) {
+                            case FLOAT:
+                            case DOUBLE:
+                                gen(DBLOP,MOVE,ftype);
+                                break;
+                            default:
+                                gen(LONGOP,MOVE);
+                        }
+#else
+                        gen(LONGOP,MOVE);
+#endif
+                    }
+                    break;
+
+                default:
+                    lddexp(ptr);
+            }
+#endif
+            reltree(ptr);
+        }
+    }
+
+    modstk(0);
+    gen(RETURN,0,0);
+    lastst=RETURN;
+#endif
+}
+
+void dobreak(void)
+{
+#ifdef MKIL
+    ilwrec(IL_BREAK); ilweol();
+    getsym();
+    lastst = BREAK;
+#else
+    if (breakptr) modnjmp(breakptr);
+    else error("break error");
+    getsym();
+    lastst=BREAK;
+#endif
+}
+
+void docont(void)
+{
+#ifdef MKIL
+    ilwrec(IL_CONT); ilweol();
+    getsym();
+    lastst = CONTIN;
+#else
+    if (contptr) modnjmp(contptr);
+    else error("continue error");
+    getsym();
+    lastst=CONTIN;
+#endif
+}
+
+#ifndef MKIL
+static void modnjmp(register labstruc *labptr)
+{
+    modstk(labptr->labsp);
+    gen(JMP,setlabel(labptr),0);
+}
+#endif
+
+void dogoto(void)
+{
+    register symnode *ptr;
+
+    getsym();
+
+    if (sym != NAME) error("label required");
+    else {
+#ifdef MKIL
+        ilwrec(IL_GOTO);
+        ilwname(((symnode *) symval)->sname);
+        ilweol();
+        getsym();
+        lastst = GOTO;
+#else
+        if (ptr = checklabel()) {
+            gen(GOTO,ptr->offset,0);
+            ptr->x.labflg |= GONETO;
+        }
+        getsym();
+#endif
+    }
+    lastst=GOTO;
+}
+
+void dolabel(void)
+{
+    register symnode *ptr;
+
+#ifdef MKIL
+    ilwrec(IL_LABEL);
+    ilwname(((symnode *) symval)->sname);
+    ilweol();
+    getsym();
+    getsym();
+#else
+    if (ptr = checklabel()) {
+        if (ptr->storage == STATIC) multidef();
+        else {
+            ptr->storage = STATIC;
+            gen(LABEL,ptr->offset,0);
+            ptr->x.labflg |= DEFINED;
+        }
+    }
+    clrconts();         /* clear register contents */
+    getsym();
+    getsym();
+#endif
+}
+
+static symnode *checklabel(void)
+{
+    register symnode *ptr;
+
+    ptr = (symnode *) symval;
+
+    if (ptr->type == LABEL) return ptr;
+
+    if (ptr->type != UNDECL) {
+        if (ptr->blklev != 0) {
+            error("already a local variable");
+            return NULL;
+        }
+        pushdown(ptr);
+    }
+    ptr->type = LABEL;
+    ptr->storage = AUTO;
+    ptr->offset = getlabel();
+    ptr->x.labflg = 0;
+    ptr->blklev = blklev;
+    ptr->snext = labelist;
+    labelist = ptr;
+    return ptr;
+}
+
+static expnode *sidexp(int l)
+{
+    register expnode *ptr;
+
+#ifdef MKIL
+    if (ptr = parsexp(l)) {
+        ilwrec(IL_EXPR); ilweol();
+        ilexpr(ptr);
+        ilwrec(IL_ENDE); ilweol();
+        reltree(ptr);
+        return (expnode *) 1;       /* non-null: an expression was parsed */
+    }
+    return 0;
+#else
+    if (ptr = parsexp(l)) ptr = emit(optim(ptr));
+    return ptr;
+#endif
+}
+
+#ifndef MKIL
+static expnode *emit(register expnode *ptr)
+{
+    chkdecl(ptr);
+    switch (ptr->op) {
+        case INCAFT:
+            ptr->op = INCBEF;
+            break;
+        case DECAFT:
+            ptr->op = DECBEF;
+            break;
+    }
+    ptr = tranexp(ptr);
+    reltree(ptr);
+    return ptr;
+}
+
+static expnode *getptest(void)
+{
+    register expnode *ptr;
+
+    need(LPAREN);
+    ptr = gettest();
+    need(RPAREN);
+    return ptr;
+}
+
+static expnode *gettest(void)
+{
+    register expnode *ptr;
+
+    if (ptr = optim(parsexp(0))) chkdecl(ptr);
+    else error("condition needed");
+    return ptr;
+}
+
+static void dotest(register expnode *ptr, labstruc *tl, labstruc *fl, int nj)
+{
+    if (ptr) {
+        tranbool(ptr,tl,fl,nj);
+        reltree(ptr);
+    }
+}
+#endif
+
