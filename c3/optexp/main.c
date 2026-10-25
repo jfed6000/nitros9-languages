@@ -1,0 +1,291 @@
+#include "op.h"
+
+/* #include "../ident.c" */
+
+#define LINESIZE 100
+
+FILE           *in,
+               *outf,
+               *datfile;
+DIRECT int      dbflag,
+                inserts,
+                inlcnt;
+
+#ifdef DEBUG
+DIRECT int      debugon,
+                debugcnt;
+
+#endif
+
+extern int      insmax;
+
+int main(int argc, char **argv)
+{
+	int             c;
+	char           *argp,
+	               *infile,
+	               *outfile;
+
+	in = stdin;
+	outf = stdout;
+	infile = outfile = NULL;
+
+#ifdef DEBUG
+	debugcnt = 29999;
+#endif
+
+	while (++argv, --argc)
+	{
+		if (*(argp = *argv) == '-')
+			switch (*++argp)
+			{
+			case '\0':
+				dbflag = 1;
+				break;
+#ifdef DEBUG
+			case 'd':
+				debugon = 1;
+				debugcnt = 0;
+				if (*++argp != '=')
+					--argp;
+				while ((c = *++argp) != 0)
+					debugcnt = debugcnt * 10 + (c - '0');
+				break;
+#endif
+			case 'i':
+				insmax = 0;
+				if (*++argp != '=')
+					--argp;
+				while ((c = *++argp) != 0)
+					insmax = insmax * 10 + (c - '0');
+				break;
+			default:
+				error("unknown option '%s'\n", --argp, NULL, NULL);
+			}
+		else if (!infile)
+			infile = argp;
+		else if (!outfile)
+			outfile = argp;
+		else
+			error("too many files", NULL, NULL, NULL);
+	}
+
+	if (infile)
+		/* fopen, not freopen(...,stdin): on OS-9 freopen's fclose(stdin) +
+		   reuse of path 0 leaves `in` reading the console, so getc blocks
+		   forever (same fix as comp's cmain.c). */
+		if ((in = fopen(infile, "r")) == NULL)
+			error("can't open %s", infile, NULL, NULL);
+
+	if (outfile)
+		if ((outf = fopen(outfile, "w")) == NULL)
+			error("can't open %s", outfile, NULL, NULL);
+
+	datfile = outf;
+
+#ifdef DEBUG
+	debug("files open,");
+#endif
+	labelinit();
+#ifdef DEBUG
+	debug(" labels initted,");
+#endif
+	insinit();
+#ifdef DEBUG
+	debug(" instructs initted,");
+#endif
+	optinit();
+#ifdef DEBUG
+	debug("opts initted.\n");
+#endif
+
+	optimise();
+#ifdef DEBUG
+	debug("finished optimise\n");
+#endif
+
+	if (dbflag)
+	{
+		int             totbytes,
+		                bytes;
+
+		fprintf(stderr, "statistics:\n");
+		fprintf(stderr, "\ttotal instructions : %d\n", inserts);
+		fprintf(stderr, "\tlong branches :  %5d, %5d, %3d%%\n",
+			lbf, lbdone, percent(lbdone, lbf));
+		fprintf(stderr, "\tremoved       :         %5d, %3d%%\n",
+			opsdone, percent(opsdone, inserts));
+		bytes = 2 * lbdone;
+		bytes += estimate(opsdone);
+		totbytes = estimate(inserts);
+		fprintf(stderr, "\ttotal bytes   :  %5d, %5d, %3d%%\n",
+			totbytes, bytes, percent(bytes, totbytes));
+	}
+	exit(0);
+}
+
+int             estimate(int n)
+{
+	return n + n + (n * 3 / 5);
+}
+
+int percent(unsigned x, unsigned y)
+{
+	return y ? x / ((y + 50) / 100) : 0;
+}
+
+
+static DIRECT int datflag,
+                endflag;
+
+#define DIRECTPAGE  2
+
+void optimise(void)
+{
+	char            line[LINESIZE];
+	char            lab[LABELSIZE + 1],
+	                mnem[MNEMSIZE + 1],
+	                args[ARGSIZE + 1];
+	label          *l,
+	               *lp1,
+	               *lp2;
+	char           *p;
+/*	instruction    *i; */
+	int             dpflag,
+	                globflag;
+
+	l = NULL;
+	datflag = endflag = FALSE;
+	inlcnt = 0;
+
+	while (fgets(line, LINESIZE, in) != NULL)
+	{
+		{
+			register char  *lp = line;
+
+			/* Strip the line terminator without running off the end:
+			   fgets may not store a newline (last line / EOF), and on
+			   OS-9 the line end is CR.  Stop at CR, LF, or the NUL. */
+			while (*lp && *lp != '\n' && *lp != '\r')
+				++lp;
+			*lp = '\0';
+		}
+		++inlcnt;
+#ifdef DEBUG
+		if (inlcnt >= debugcnt)
+			dbflag = debugon;
+		debug("\nline %5d: \"%s\"\n", inlcnt, line);
+#endif
+		p = line;
+
+		if (*p == '\0' || *p == '*')
+			continue;
+
+		p = parse(LABEL, lab, p, &globflag);
+		p = parse(MNEM, mnem, p, &globflag);
+		while (*p == ' ' || *p == '\t')
+			++p;
+
+		/*
+		 * scrutinise the first character for a match before
+		 * bothering 'strcmp()', he's very busy
+		 */
+		switch (*mnem)
+		{
+		case 'e':
+			if (strcmp(mnem, "endsect") == 0)
+			{
+				endsect();
+				endflag = TRUE;
+				continue;
+			}
+			break;
+		case 'i':
+			if (strcmp(mnem, "info") == 0)
+				goto put;
+			break;
+		case 'n':
+			if (strcmp(mnem, "nam") == 0)
+			{
+		put:		fprintf(outf, "%s\n", line);
+				continue;
+			}
+			break;
+		case 'p':
+			if (strcmp(mnem, "psect") == 0)
+			{
+				endsect();
+				goto put;
+			}
+			break;
+		case 't':
+			if (strcmp(mnem, "ttl") == 0)
+				goto put;
+			break;
+		case 'v':
+			if (strcmp(mnem, "vsect") == 0)
+			{
+				dpflag = (p[0] == 'd' && p[1] == 'p'
+					  ? DIRECTPAGE : TRUE);
+				if (datflag == dpflag && endflag)
+				{
+					endflag = FALSE;
+					continue;
+				}
+				endsect();
+				datflag = dpflag;
+				goto put;
+			}
+			break;
+		}
+
+		endsect();
+		if (datflag)
+			fprintf(datfile, "%s\n", line);
+		else
+		{
+			if (*lab)
+			{
+				if ((lp1 = findlabel(lab)) == NULL)
+					lp1 = inslabel(lab);
+				if (globflag)
+					lp1->lflags |= GLOBAL;
+				for (lp2 = lp1; lp2->nextl; lp2 = lp2->nextl);
+				lp2->nextl = l;
+				l = lp1;
+			}
+			if (*mnem)
+			{
+				parse(ARGS, args, p, &globflag);
+				if (insins(&ilist, mnem, args, &l))
+				{
+					optim(ilist.pred);
+					finddupl(ilist.pred);
+				}
+				++inserts;
+				if (inscount >= insmax)
+					rminst();
+			}
+		}
+	}
+
+	if (l)
+		insins(&ilist, "nop", "", &l);
+	endsect();
+	while (inscount)
+		rminst();
+}
+
+void endsect(void)
+{
+	if (endflag)
+	{
+		if (datflag)
+			datflag = FALSE;
+		else
+			while (inscount)
+				rminst();
+		fprintf(outf, " endsect\n");
+		endflag = FALSE;
+	}
+}
