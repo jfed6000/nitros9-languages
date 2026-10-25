@@ -1,0 +1,10 @@
+@C.PREP
+Syntax: C.Prep [<opts>] <file.c>
+Usage : C preprocessor - phase 1 of the C compiler
+Opts  :
+  -D<name>   define preprocessor symbol <name>
+  -l         emit line-number directives in the output
+  -e=<path>  send error messages to <path>
+Note  : expands #include, #define and #if, writing the result to
+        standard output.  System headers are read from /DD/DEFS/.
+        Normally run by CC1/CC2, not directly.

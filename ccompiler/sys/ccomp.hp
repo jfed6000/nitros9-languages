@@ -1,0 +1,10 @@
+@C.COMP
+Syntax: C.Comp [<opts>] <file>
+Usage : C compiler single pass front end - assembler source in one step
+Opts  :
+  -o=<file>  write output to <file> (default: standard output)
+  -s         strip symbol information from the output
+  -p         emit profiling information
+Note  : does the work of c.pass1 and c.pass2 together and is driven by
+        CC2.  It needs more free memory than the two pass path, so on
+        small systems compile with CC1 instead.

@@ -1,0 +1,4737 @@
+                    nam       c.opt
+                    ttl       program module
+
+* Annotated 2026-07-14 (Claude Code):
+*   - renamed disassembled labels to meaningful names
+*   - added an inline comment to every instruction
+*   - re-disassembled the "**** STACK OVERFLOW ****" banner that had
+*     been decoded as instructions
+*   - separated the direct-page globals from the startup code they had
+*     been mis-resolved onto (disassembler assumed DP=$00); they are now
+*     a direct-page equate block with the references repointed
+*   - verified byte-identical to the original assembly (module CRC $D5C6D2)
+
+                    use       defsfile
+
+tylg                set       Prgrm+Objct
+atrv                set       ReEnt+rev
+rev                 set       1
+edition             set       4
+
+                    mod       eom,name,tylg,atrv,_start,size
+
+                    * ------------------------------------------------------------------
+                    * Data area (named rmb fields).  rmb reserves RAM without emitting
+                    * bytes; OS-9 allocates <size> at load, cstart inits from WorkBlockImage.
+                    * Names for ,y-referenced fields are derived from the code comments.
+                    * ------------------------------------------------------------------
+                    rmb       1
+GlbVar0001          rmb       2
+GlbVar0003          rmb       2
+GlbVar0005          rmb       2
+GlbVar0007          rmb       2
+GlbVar0009          rmb       2
+GlbVar000B          rmb       2
+GlbVar000D          rmb       2
+GlbVar000F          rmb       2
+GlbVar0011          rmb       2
+GlbVar0013          rmb       2
+GlbPtr0015          rmb       2
+GlbWord0017         rmb       2
+GlbWord0019         rmb       2
+GlbWord001B         rmb       2
+GlbVar001D          rmb       2
+GlbVar001F          rmb       2
+GlbWord0021         rmb       2
+LabelCtr            rmb       2
+NumericOptionValue  rmb       2
+StringArgument      rmb       36
+StringArgument2     rmb       251
+OpcodeTable         rmb       626
+CtypeTab            rmb       128
+Pow10               rmb       8
+TableEnd            rmb       2
+WorkArea            rmb       1
+WorkArea2           rmb       2
+InputPathBuffer     rmb       13
+OutputPathBuffer    rmb       13
+OutputStream        rmb       182
+PastTableEnd        rmb       64
+BreakPointer        rmb       2
+SeekBuffer          rmb       2
+ResultLowWord       rmb       6
+OldRegionPointer    rmb       2
+RegionLimit         rmb       2
+Errno           rmb       2
+InputFilePointer    rmb       2
+OutputFilePointer   rmb       2
+InputStream         rmb       2
+TableBase           rmb       512
+HashTable           rmb       256
+OutputPointer       rmb       2
+OutputBuffer        rmb       10
+ScratchBuffer       rmb       10
+LeftJustifyFlag     rmb       2
+PadCharacter        rmb       2
+UpdateFreeCount     rmb       2
+HeapStart           rmb       2944     remaining data, bss and heap
+size                equ       .
+
+name                equ       *
+                    fcs       /c.opt/
+                    fcb       edition
+
+* --- shared C runtime startup (see lib/cstart.asm) ---
+RTBASE              equ       PastTableEnd  runtime-globals block base in the data area
+DATAEND             equ       HeapStart  end of static data / heap start / stack limit
+HDRADV              equ       LabelCtr  advance to where the non-DP data starts
+                    use       lib/cstart.asm
+
+* --- record/node struct field offsets (U-relative) ---
+Flags               equ       $06       flags/attributes word in the record header
+BufferSize          equ       $0B       byte count held in a stream/buffer record
+
+main                pshs      u         save the caller u register
+                    leas      -8,s       reserve locals
+                    leax      InputPathBuffer,y   point to input path buffer
+                    stx       InputFilePointer,y   save input file pointer
+                    leax      OutputPathBuffer,y   point to output path buffer
+                    stx       OutputFilePointer,y   save output file pointer
+                    clra                zero high byte
+                    clrb                zero low byte
+                    std       ,s        clear input file slot
+SaveOutFileArg      std       2,s       clear output file slot
+                    lbra      MainArgLoop enter argument loop
+
+ProcessArg          ldd       [14,s]    load current argv pointer
+                    std       4,s       save arg pointer local
+                    tfr       d,x       arg pointer into X
+                    ldb       ,x        get first character
+                    cmpb      #'-      leading dash
+                    lbne      HandleFileArg not an option
+                    ldx       4,s       reload arg pointer
+                    leax      1,x       skip the dash
+                    stx       4,s       save advanced pointer
+                    ldb       ,x        get option letter
+                    sex                 sign-extend to D
+                    tfr       d,x       option letter into X
+                    lbra      DispatchOpt dispatch on option
+
+SetFlag0007         ldd       #1        flag value one
+                    std       GlbVar0007 set statistics option flag
+                    lbra      MainArgLoop back to argument loop
+
+HandleOptI          clra                zero high byte
+                    clrb                zero low byte
+                    std       >NumericOptionValue,y  clear numeric option value
+                    ldx       4,s       reload arg pointer
+                    leax      1,x       skip option letter
+                    stx       4,s       save pointer
+                    ldb       ,x        get next character
+                    cmpb      #'=      equals sign
+                    beq       NextOptChar parse number after equals
+                    ldd       4,s       reload pointer
+                    addd      #$FFFF    back up one character
+                    std       4,s       save pointer
+                    bra       NextOptChar parse digits
+
+AccumDigitLoop      ldd       >NumericOptionValue,y  load running value
+                    pshs      d         save it
+                    ldd       #10       multiplier ten
+                    lbsr      MulEntry  multiply value by ten
+                    pshs      d         save product
+                    ldd       8,s       reload digit character
+                    addd      #$FFD0    subtract ascii zero
+                    addd      ,s++      add to scaled value
+                    std       >NumericOptionValue,y  store accumulated number
+NextOptChar         ldx       4,s       reload pointer
+                    leax      1,x       advance pointer
+                    stx       4,s       save pointer
+                    ldb       ,x        get next digit character
+                    sex                 sign-extend
+                    std       6,s       save character
+                    bne       AccumDigitLoop accumulate if nonzero
+                    bra       MainArgLoop back to argument loop
+
+UnknownOpt          ldd       4,s       reload arg pointer
+                    addd      #$FFFF    back up one character
+                    std       4,s       save pointer
+                    pshs      d         push bad option pointer
+                    leax      MsgUnknownOption,pcr point to error format
+                    pshs      x         push format string
+                    lbsr      FatalError report unknown option
+                    leas      4,s        clean up arguments
+                    bra       MainArgLoop back to argument loop
+
+DispatchOpt         stx       -2,s      save option letter
+                    lbeq      SetFlag0007 empty option sets flag
+                    cmpx      #'i       letter i
+                    lbeq      HandleOptI handle i option
+                    bra       UnknownOpt unknown option
+
+HandleFileArg       ldd       2,s       output file already set
+                    bne       SetInFile try input slot
+                    ldd       4,s       load arg pointer
+                    lbra      SaveOutFileArg save as output file
+
+SetInFile           ldd       ,s        input file already set
+                    bne       TooManyFiles too many files
+                    ldd       4,s       load arg pointer
+                    std       ,s        save as input file
+                    bra       MainArgLoop back to argument loop
+
+TooManyFiles        leax      MsgTooManyFiles,pcr point to error format
+                    pshs      x         push format string
+                    lbsr      FatalError report extra file error
+                    leas      2,s        clean up argument
+MainArgLoop         ldd       14,s      load argv pointer
+                    addd      #2        advance to next argv
+                    std       14,s      save argv pointer
+                    ldd       12,s      load remaining count
+                    addd      #$FFFF    decrement count
+                    std       12,s      save count
+                    lbne      ProcessArg process next argument
+                    ldd       2,s       output file specified
+                    beq       CheckInFile skip if none
+                    leax      InputPathBuffer,y   point to output path buffer
+                    pshs      x         push buffer pointer
+                    leax      StrModeR,pcr point to open mode string
+                    pshs      x         push mode
+                    ldd       6,s       load output filename
+                    pshs      d         push filename
+                    lbsr      AssembleOperandAlloc open output file
+                    leas      6,s        clean up arguments
+                    std       InputFilePointer,y   save output file handle
+                    bne       CheckInFile continue if opened
+                    ldd       2,s       reload output filename
+                    pshs      d         push filename
+                    leax      MsgCantOpenIn,pcr point to error format
+                    pshs      x         push format
+                    lbsr      FatalError report open failure
+                    leas      4,s        clean up arguments
+CheckInFile         ldd       ,s        input file specified
+                    beq       RunPasses skip if none
+                    leax      StrModeW,pcr point to open mode string
+                    pshs      x         push mode
+                    ldd       2,s       load input filename
+                    pshs      d         push filename
+                    lbsr      AssembleOperand open input file
+                    leas      4,s        clean up arguments
+                    std       OutputFilePointer,y   save input file handle
+                    bne       RunPasses continue if opened
+                    ldd       ,s        reload input filename
+                    pshs      d         push filename
+                    leax      MsgCantOpenOut,pcr point to error format
+                    pshs      x         push format
+                    lbsr      FatalError report open failure
+                    leas      4,s        clean up arguments
+RunPasses           ldd       OutputFilePointer,y   load input file handle
+                    std       InputStream,y   set current input stream
+                    lbsr      InitHashTable run pass one
+                    lbsr      InitLineState run pass two
+                    lbsr      BuildOpcodeHash run pass three
+                    lbsr      OptMain   finalize output
+                    ldd       GlbVar0007 statistics flag set
+                    lbeq      MainDone  skip stats if clear
+                    leas      -4,s       reserve print args
+                    leax      MsgStatistics,pcr point to format string
+                    pshs      x         push format
+                    leax      OutputStream,y   point to output stream
+                    pshs      x         push stream
+                    lbsr      fprintf   print statistics header
+                    leas      4,s        clean up arguments
+                    ldd       GlbVar0009 load a counter
+                    pshs      d         push value
+                    leax      MsgTotalInsns,pcr point to format string
+                    pshs      x         push format
+                    leax      OutputStream,y   point to output stream
+                    pshs      x         push stream
+                    lbsr      fprintf   print statistic line
+                    leas      6,s        clean up arguments
+                    ldd       GlbWord0019 load byte count
+                    pshs      d         push value
+                    ldd       GlbWord001B load second count
+                    pshs      d         push value
+                    lbsr      ComputeRatio compute ratio
+                    leas      4,s        clean up arguments
+                    pshs      d         push computed ratio
+                    ldd       GlbWord001B load count
+                    pshs      d         push value
+                    ldd       GlbWord0019 load count
+                    pshs      d         push value
+                    leax      MsgLongBranches,pcr point to format string
+                    pshs      x         push format
+                    leax      OutputStream,y   point to output stream
+                    pshs      x         push stream
+                    lbsr      fprintf   print statistic line
+                    leas      10,s       clean up arguments
+                    ldd       GlbVar0009 load counter
+                    pshs      d         push value
+                    ldd       GlbWord0021 load count
+                    pshs      d         push value
+                    lbsr      ComputeRatio compute ratio
+                    leas      4,s        clean up arguments
+                    pshs      d         push ratio
+                    ldd       GlbWord0021 load count
+                    pshs      d         push value
+                    leax      MsgRemoved,pcr point to format string
+                    pshs      x         push format
+                    leax      OutputStream,y   point to output stream
+                    pshs      x         push stream
+                    lbsr      fprintf   print statistic line
+                    leas      8,s        clean up arguments
+                    ldd       GlbWord001B load count
+                    aslb                shift low byte left
+                    rola                rotate into high byte
+                    std       ,s        save doubled value
+                    pshs      d         push value
+                    ldd       GlbWord0021 load count
+                    pshs      d         push value
+                    bsr       ScalePercent scale to percentage
+                    leas      2,s        clean up argument
+                    addd      ,s++      add doubled count
+                    std       ,s        save total
+                    ldd       GlbVar0009 load counter
+                    pshs      d         push value
+                    bsr       ScalePercent scale to percentage
+                    leas      2,s        clean up argument
+                    std       2,s       save result
+                    pshs      d         push value
+                    ldd       2,s       reload result
+                    pshs      d         push value
+                    bsr       ComputeRatio compute ratio
+                    leas      4,s        clean up arguments
+                    pshs      d         push ratio
+                    ldd       2,s       reload value
+                    pshs      d         push value
+                    ldd       6,s       load counter
+                    pshs      d         push value
+                    leax      MsgTotalBytes,pcr point to format string
+                    pshs      x         push format
+                    leax      OutputStream,y   point to output stream
+                    pshs      x         push stream
+                    lbsr      fprintf   print statistic line
+                    leas      10,s       clean up arguments
+                    leas      4,s        clean up locals
+MainDone            leas      8,s        release locals
+                    puls      pc,u      restore u and return
+
+ScalePercent        pshs      u         save the caller u register
+                    ldd       4,s       load argument
+                    addd      4,s       double it
+                    pshs      d         save doubled value
+                    ldd       6,s       load second argument
+                    pshs      d         push it
+                    ldd       #3        scale factor three
+                    lbsr      MulEntry  multiply
+                    pshs      d         save product
+                    ldd       #5        divisor five
+                    lbsr      SDivEntry divide
+                    addd      ,s++      add saved offset
+                    puls      pc,u      restore u and return
+
+ComputeRatio        pshs      u         save the caller u register
+                    ldd       6,s       load divisor argument
+                    beq       RetZero   avoid divide by zero
+                    ldd       4,s       load dividend
+                    pshs      d         push value
+                    ldd       8,s       load scaled numerator
+                    addd      #50       add rounding half
+                    pshs      d         push value
+                    ldd       #100      hundred
+                    lbsr      UDivEntry scale by hundred
+                    lbsr      UDivEntry continue scaling
+                    bra       RetExit   return computed ratio
+
+RetZero             clra                clear high byte of zero return
+                    clrb                clear low byte of zero return
+RetExit             puls      pc,u      restore u and return
+
+OptMain             pshs      u         save the caller u register
+                    leas      -228,s     allocate local stack frame
+                    clra                clear high byte
+                    clrb                clear low byte
+                    std       12,s      clear local list head
+                    clra                clear high byte
+                    clrb                clear low byte
+                    std       GlbVar000F clear section-open flag
+                    std       GlbVar000D clear current section type
+                    clra                clear high byte
+                    clrb                clear low byte
+                    std       GlbVar000B clear line counter
+                    lbra      ReadLineLoop enter main read-line loop
+
+ProcessLine         leau      128,s     point at start of line buffer
+                    bra       EolScanLoop begin end-of-line scan
+
+EolNext             leau      1,u       advance scan pointer
+EolScanLoop         ldb       ,u        read line character
+                    cmpb      #C$CR      test for carriage return
+                    bne       EolNext   keep scanning until carriage return
+                    clra                clear high byte of terminator
+                    clrb                clear low byte of terminator
+                    stb       ,u        null-terminate the line
+                    ldd       GlbVar000B load line counter
+                    addd      #1        increment it
+                    std       GlbVar000B store updated line count
+                    leax      128,s     point at line buffer
+                    stx       6,s       save line pointer local
+                    ldb       [6,s]     read first character
+                    lbeq      ReadLineLoop skip empty line
+                    ldb       [6,s]     reload first character
+                    cmpb      #'*      test for comment star
+                    lbeq      ReadLineLoop skip comment line
+                    leax      ,s        point at output field buffer
+                    pshs      x         push destination arg
+                    ldd       8,s       load line pointer
+                    pshs      d         push source arg
+                    leax      120,s     point at label buffer
+                    pshs      x         push buffer arg
+                    ldd       #1        field index one
+                    pshs      d         push index arg
+                    lbsr      CopyField copy the label field
+                    leas      8,s        drop call arguments
+                    std       6,s       save updated line pointer
+                    pshs      d         push line pointer arg
+                    leax      107,s     point at opcode buffer
+                    pshs      x         push buffer arg
+                    ldd       #2        field index two
+                    pshs      d         push index arg
+                    lbsr      CopyField copy the opcode field
+                    leas      6,s        drop call arguments
+                    bra       SkipWsLoop skip leading whitespace
+
+SkipWsNext          ldd       6,s       load line pointer
+                    addd      #1        advance one character
+SkipWsLoop          std       6,s       store advanced pointer
+                    ldb       [6,s]     read current character
+                    cmpb      #'        test for space
+                    beq       SkipWsNext skip spaces
+                    ldb       [6,s]     reload character
+                    cmpb      #9        test for tab
+                    lbeq      SkipWsNext skip tabs
+                    ldb       105,s     load first opcode character
+                    sex                 sign-extend to word
+                    tfr       d,x       move into X for dispatch
+                    lbra      DispatchDirective dispatch on opcode letter
+
+MatchEndsect        leax      OpEndsect,pcr point at endsect keyword
+                    pshs      x         push keyword arg
+                    leax      107,s     point at opcode buffer
+                    pshs      x         push buffer arg
+                    lbsr      strcmp    compare the two strings
+                    leas      4,s        drop call arguments
+                    std       -2,s      save compare result
+                    lbne      DefaultLine not endsect, handle as instruction
+                    lbsr      EmitEndsect flush current section
+                    ldd       #1        flag value one means open
+StoreSectFlag       std       GlbVar000F mark section open
+                    lbra      ReadLineLoop next line
+
+MatchInfo           leax      OpInfo,pcr point at info keyword
+                    pshs      x         push keyword arg
+                    leax      107,s     point at opcode buffer
+                    pshs      x         push buffer arg
+                    lbsr      strcmp    compare the two strings
+                    leas      4,s        drop call arguments
+                    std       -2,s      save compare result
+                    lbeq      SectPassThru matched info, handle section
+                    lbra      DefaultLine not info, handle as instruction
+
+MatchNam            leax      OpNam,pcr point at nam keyword
+                    pshs      x         push keyword arg
+                    leax      107,s     point at opcode buffer
+                    pshs      x         push buffer arg
+                    lbsr      strcmp    compare the two strings
+                    leas      4,s        drop call arguments
+                    std       -2,s      save compare result
+                    lbne      DefaultLine not nam, handle as instruction
+                    bra       EmitPassLine pass line through unchanged
+
+ResetFrame          leas      65308,x   reset stack to entry frame
+EmitPassLine        leax      128,s     point at line buffer
+                    pshs      x         push string arg
+                    leax      FmtPctSCr,pcr point at %s format
+                    pshs      x         push format arg
+                    ldd       OutputFilePointer,y   load output file pointer
+EmitFmtLine         pshs      d         push file arg
+                    lbsr      fprintf   print the line verbatim
+                    leas      6,s        drop call arguments
+                    lbra      ReadLineLoop next line
+
+MatchPsect          leax      OpPsect,pcr point at psect keyword
+                    pshs      x         push keyword arg
+                    leax      107,s     point at opcode buffer
+                    pshs      x         push buffer arg
+                    lbsr      strcmp    compare the two strings
+                    leas      4,s        drop call arguments
+                    std       -2,s      save compare result
+                    lbne      DefaultLine not psect, handle as instruction
+                    lbsr      EmitEndsect flush current section
+                    lbra      SectPassThru handle the new section
+
+MatchTtl            leax      OpTtl,pcr point at ttl keyword
+                    pshs      x         push keyword arg
+                    leax      107,s     point at opcode buffer
+                    pshs      x         push buffer arg
+                    lbsr      strcmp    compare the two strings
+                    leas      4,s        drop call arguments
+                    std       -2,s      save compare result
+                    beq       SectPassThru matched ttl, handle section
+                    lbra      DefaultLine not ttl, handle as instruction
+
+MatchVsect          leax      OpVsect,pcr point at vsect keyword
+                    pshs      x         push keyword arg
+                    leax      107,s     point at opcode buffer
+                    pshs      x         push buffer arg
+                    lbsr      strcmp    compare the two strings
+                    leas      4,s        drop call arguments
+                    std       -2,s      save compare result
+                    lbne      DefaultLine not vsect, handle as instruction
+                    ldb       [6,s]     read next character
+                    cmpb      #'d      test for letter d
+                    bne       SectNumOne default section number
+                    ldx       6,s       load line pointer
+                    ldb       1,x       read following character
+                    cmpb      #'p      test for letter p
+                    bne       SectNumOne default section number
+                    ldd       #2        section number two for dp
+                    bra       StoreSectNum store the section number
+
+SectNumOne          ldd       #1        section number one
+StoreSectNum        std       2,s       save the section number
+                    ldd       GlbVar000D load current section type
+                    cmpd      2,s       compare with the new one
+                    bne       SwitchSect different, switch section
+                    ldd       GlbVar000F load section-open flag
+                    beq       SwitchSect not open, switch section
+                    clra                clear high byte
+                    clrb                clear low byte
+                    lbra      StoreSectFlag clear open flag and continue
+
+SwitchSect          lbsr      EmitEndsect flush current section
+                    ldd       2,s       load new section number
+                    std       GlbVar000D set current section type
+SectPassThru        leax      228,s     point at frame base
+                    lbra      ResetFrame reset stack and pass through
+
+DispatchDirective   cmpx      #'e       test opcode letter e
+                    lbeq      MatchEndsect dispatch to endsect handler
+                    cmpx      #'i       test opcode letter i
+                    lbeq      MatchInfo dispatch to info handler
+                    cmpx      #'n       test opcode letter n
+                    lbeq      MatchNam  dispatch to nam handler
+                    cmpx      #'p       test opcode letter p
+                    lbeq      MatchPsect dispatch to psect handler
+                    cmpx      #'t       test opcode letter t
+                    lbeq      MatchTtl  dispatch to ttl handler
+                    cmpx      #'v       test opcode letter v
+                    lbeq      MatchVsect dispatch to vsect handler
+DefaultLine         lbsr      EmitEndsect flush current section
+                    ldd       GlbVar000D load current section type
+                    beq       HandleLabelField no section, handle label field
+                    leax      128,s     point at line buffer
+                    pshs      x         push string arg
+                    leax      FmtPctSCr2,pcr point at %s format
+                    pshs      x         push format arg
+                    ldd       InputStream,y   load output file pointer
+                    lbra      EmitFmtLine print the line
+
+HandleLabelField    ldb       116,s     load label field first char
+                    beq       HandleOpcodeField no label, handle opcode
+                    leax      116,s     point at label field
+                    pshs      x         push arg
+                    lbsr      HashLookup look up label in table
+                    leas      2,s        drop arg
+                    std       10,s      save symbol pointer
+                    bne       MarkLabelUsed found, mark it used
+                    leax      116,s     point at label field
+                    pshs      x         push arg
+                    lbsr      HashInsert insert label into table
+                    leas      2,s        drop arg
+                    std       10,s      save symbol pointer
+MarkLabelUsed       ldd       ,s        load flag
+                    beq       ListAppendInit skip mark if zero
+                    ldx       10,s      load symbol pointer
+                    ldd       10,x      load symbol flags
+                    orb       #$01      set the defined bit
+                    std       10,x      store flags back
+ListAppendInit      ldd       10,s      load symbol pointer
+                    bra       ListWalkTest enter list walk
+
+ListWalkLoop        ldx       8,s       load list node
+                    ldd       8,x       load its next link
+ListWalkTest        std       8,s       save current node
+                    ldx       8,s       reload node
+                    ldd       8,x       load its next link
+                    bne       ListWalkLoop walk to end of list
+                    ldd       12,s      load pending list head
+                    ldx       8,s       load last node
+                    std       8,x       link head onto tail
+                    ldd       10,s      load new symbol
+                    std       12,s      make it the new head
+HandleOpcodeField   ldb       105,s     load opcode field char
+                    beq       ReadLineLoop no opcode, next line
+                    ldd       6,s       load line pointer
+                    pshs      d         push source arg
+                    leax      16,s      point at operand buffer
+                    pshs      x         push buffer arg
+                    ldd       #3        field index three
+                    pshs      d         push index arg
+                    lbsr      CopyField copy the operand field
+                    leas      6,s        drop call arguments
+                    leax      12,s      point at list head arg
+                    pshs      x         push arg
+                    leax      16,s      point at operand buffer
+                    pshs      x         push arg
+                    leax      109,s     point at opcode buffer
+                    pshs      x         push arg
+                    leax      >GlbPtr0015,y  point at opcode pattern table
+                    pshs      x         push arg
+                    lbsr      AddLineNode match opcode and operand pattern
+                    leas      8,s        drop call arguments
+                    std       -2,s      save match result
+                    beq       CountInsn no match, just count it
+                    ldd       GlbWord0017 load matched instruction
+                    pshs      d         push arg
+                    lbsr      OptBranchPass apply peephole transform
+                    leas      2,s        drop arg
+                    ldd       GlbWord0017 reload instruction
+                    pshs      d         push arg
+                    lbsr      OptimizeInsnList emit optimized instruction
+                    leas      2,s        drop arg
+CountInsn           ldd       GlbVar0009 load instruction count
+                    addd      #1        increment it
+                    std       GlbVar0009 store updated count
+                    ldd       GlbVar0013 load buffered byte count
+                    cmpd      >NumericOptionValue,y  compare against flush threshold
+                    blt       ReadLineLoop below limit, read next line
+                    lbsr      PrintInsn flush output buffer
+ReadLineLoop        ldd       InputFilePointer,y   load input file pointer
+                    pshs      d         push file arg
+                    ldd       #100      max line length one hundred
+                    pshs      d         push arg
+                    leax      132,s     point at line buffer
+                    pshs      x         push buffer arg
+                    lbsr      ReadCountedChars read next input line
+                    leas      6,s        drop call arguments
+                    std       -2,s      save read result
+                    lbne      ProcessLine got a line, process it
+                    ldd       12,s      load pending list head
+                    beq       FinishFlush none pending, finish
+                    leax      12,s      point at list head arg
+                    pshs      x         push arg
+                    leax      StrEmpty,pcr point at empty string
+                    pshs      x         push arg
+                    leax      OpNop,pcr point at nop mnemonic
+                    pshs      x         push arg
+                    leax      >GlbPtr0015,y  point at opcode table
+                    pshs      x         push arg
+                    lbsr      AddLineNode emit dangling labels as nop
+                    leas      8,s        drop call arguments
+FinishFlush         bsr       EmitEndsect flush current section
+                    bra       DrainTest drain the output
+
+DrainLoop           lbsr      PrintInsn flush output buffer
+DrainTest           ldd       GlbVar0013 load buffered count
+                    bne       DrainLoop drain until empty
+                    leas      228,s      release local frame
+                    puls      pc,u      return to caller
+
+EmitEndsect         pshs      u         save the caller u register
+                    ldd       GlbVar000F load section-open flag
+                    beq       EmitEndsectRet nothing open, return
+                    ldd       GlbVar000D load section type
+                    beq       EndsectDrainTest data section, just drain
+                    clra                clear high byte
+                    clrb                clear low byte
+                    std       GlbVar000D clear section type
+                    bra       EmitEndsectStr emit the endsect line
+
+EndsectDrainLoop    lbsr      PrintInsn flush output buffer
+EndsectDrainTest    ldd       GlbVar0013 load buffered count
+                    bne       EndsectDrainLoop drain until empty
+EmitEndsectStr      leax      StrEndsect,pcr point at endsect string
+                    pshs      x         push string arg
+                    ldd       OutputFilePointer,y   load output file pointer
+                    pshs      d         push file arg
+                    lbsr      fprintf   print the endsect line
+                    leas      4,s        drop call arguments
+                    clra                clear high byte
+                    clrb                clear low byte
+                    std       GlbVar000F clear section-open flag
+EmitEndsectRet      puls      pc,u      return to caller
+
+MsgUnknownOption    fcc       /unknown option '%s'/
+                    fcb       C$CR,C$NULL
+MsgTooManyFiles     fcc       /too many files/
+                    fcb       C$NULL
+StrModeR            fcb       $72
+                    fcb       C$NULL
+MsgCantOpenIn       fcc       /can't open %s/
+                    fcb       C$NULL
+StrModeW            fcb       $77
+                    fcb       C$NULL
+MsgCantOpenOut      fcc       /can't open %s/
+                    fcb       C$NULL
+MsgStatistics       fcc       /statistics:/
+                    fcb       C$CR,C$NULL
+MsgTotalInsns       fcb       $09        tab (statistics line indent)
+                    fcc       /total instructions : %d/
+                    fcb       C$CR,C$NULL
+MsgLongBranches     fcb       $09        tab (statistics line indent)
+                    fcc       /long branches :  %5d, %5d, %3d%%/
+                    fcb       C$CR,C$NULL
+MsgRemoved          fcb       $09        tab (statistics line indent)
+                    fcc       /removed       :         %5d, %3d%%/
+                    fcb       C$CR,C$NULL
+MsgTotalBytes       fcb       $09        tab (statistics line indent)
+                    fcc       /total bytes   :  %5d, %5d, %3d%%/
+                    fcb       C$CR,C$NULL
+OpEndsect           fcc       /endsect/
+                    fcb       C$NULL
+OpInfo              fcc       /info/
+                    fcb       C$NULL
+OpNam               fcc       /nam/
+                    fcb       C$NULL
+FmtPctSCr           fcc       /%s/
+                    fcb       C$CR,C$NULL
+OpPsect             fcc       /psect/
+                    fcb       C$NULL
+OpTtl               fcc       /ttl/
+                    fcb       C$NULL
+OpVsect             fcc       /vsect/
+                    fcb       C$NULL
+FmtPctSCr2          fcc       /%s/
+                    fcb       C$CR,C$NULL
+OpNop               fcc       /nop/
+                    fcb       C$NULL
+StrEmpty            fcb       C$NULL
+StrEndsect          fcc       / endsect/
+                    fcb       C$CR,C$NULL
+CopyField           pshs      u         save the caller u register
+                    ldu       6,s       load destination pointer
+                    leas      -2,s       allocate local counter
+                    ldx       6,s       load source pointer
+                    lbra      ParseTypeDispatch enter the copy loop
+
+CopyFieldInit       ldd       #11       maximum field width eleven
+                    std       ,s        save remaining count
+                    ldb       [10,s]    read source character
+                    cmpb      #'        test for space
+                    lbeq      ParseDone stop on space
+                    ldb       [10,s]    reload character
+                    cmpb      #9        test for tab
+                    lbeq      ParseDone stop on tab
+CopyFieldLoop       ldx       10,s      load source pointer
+                    leax      1,x       advance it
+                    stx       10,s      save advanced pointer
+                    ldb       -1,x      read the character
+                    stb       ,u+       store into destination
+                    ldd       ,s        load remaining count
+                    addd      #$FFFF    decrement it
+                    std       ,s        save the count
+                    beq       CopyCheckWs width exhausted, stop
+                    ldb       [10,s]    read next character
+                    sex                 sign-extend for index
+                    leax      CtypeTab,y point at character-class table
+                    leax      d,x       index by character value
+                    ldb       ,x        load class byte
+                    clra                clear high byte
+                    andb      #$0f      mask the class bits
+                    bne       CopyFieldLoop still in field, keep copying
+                    bra       CopyCheckWs delimiter reached, stop
+
+CopySkipWs          ldd       10,s      load source pointer
+                    addd      #1        advance one character
+                    std       10,s      store advanced pointer
+CopyCheckWs         ldb       [10,s]    read character
+                    sex                 sign-extend char value as class index
+                    leax      CtypeTab,y point to the character class table
+                    leax      d,x       index the table by character
+                    ldb       ,x        load the character class byte
+                    clra                clear high byte
+                    andb      #$0f      extract the class low nibble
+                    bne       CopySkipWs keep scanning identifier characters
+                    ldb       [10,s]    read the current source char
+                    cmpb      #':      test for a colon
+                    bne       NoColon   no colon so clear the flag
+                    ldd       #1        set the colon-seen flag
+                    bra       StoreColonFlag go store the flag
+
+NoColon             clra                clear high byte of flag
+                    clrb                clear the colon flag
+StoreColonFlag      std       [12,s]    store colon flag to caller
+                    lbeq      ParseDone no colon so parse is done
+                    ldd       10,s      load the source pointer
+                    addd      #1        advance past the colon
+                    std       10,s      save the pointer
+                    lbra      ParseDone parse is done
+
+ParseType2          ldd       #10       set field width of ten
+                    std       ,s        init the copy counter
+                    bra       SkipSpace2 skip leading whitespace
+
+SkipSpace2Loop      ldd       10,s      load the source pointer
+                    addd      #1        advance the pointer
+                    std       10,s      save the pointer
+SkipSpace2          ldb       [10,s]    read the current char
+                    cmpb      #'        test for a space
+                    beq       SkipSpace2Loop skip the space
+                    ldb       [10,s]    read the current char
+                    cmpb      #9        test for a tab
+                    lbeq      SkipSpace2Loop skip the tab
+                    bra       CopyChar2Test begin the copy test
+
+CopyChar2Loop       ldx       10,s      load the source pointer
+                    leax      1,x       advance the pointer
+                    stx       10,s      save the pointer
+                    ldb       -1,x      read the char
+                    stb       ,u+       copy char to output buffer
+CopyChar2Test       ldd       ,s        load remaining count
+                    addd      #$FFFF    decrement the count
+                    std       ,s        save the count
+                    subd      #$FFFF    test if count exhausted
+                    beq       SkipTail2 count done so skip the rest
+                    ldb       [10,s]    read the current char
+                    sex                 sign-extend as class index
+                    leax      CtypeTab,y point to class table
+                    leax      d,x       index by character
+                    ldb       ,x        load the class byte
+                    clra                clear high byte
+                    andb      #$0f      extract the class nibble
+                    bne       CopyChar2Loop copy while identifier char
+                    bra       SkipTail2 skip trailing chars
+
+SkipTail2Loop       ldd       10,s      load the pointer
+                    addd      #1        advance the pointer
+                    std       10,s      save the pointer
+SkipTail2           ldb       [10,s]    read the current char
+                    sex                 sign-extend as class index
+                    leax      CtypeTab,y point to class table
+                    leax      d,x       index by character
+                    ldb       ,x        load the class byte
+                    clra                clear high byte
+                    andb      #$0f      extract the class nibble
+                    bne       SkipTail2Loop skip remaining identifier chars
+                    lbra      ParseDone parse is done
+
+ParseType3          ldd       #90       set field width of ninety
+                    std       ,s        init the copy counter
+                    bra       SkipSpace3 skip leading whitespace
+
+SkipSpace3Loop      ldd       10,s      load the pointer
+                    addd      #1        advance the pointer
+                    std       10,s      save the pointer
+SkipSpace3          ldb       [10,s]    read the current char
+                    cmpb      #'        test for a space
+                    beq       SkipSpace3Loop skip the space
+                    ldb       [10,s]    read the current char
+                    cmpb      #9        test for a tab
+                    lbeq      SkipSpace3Loop skip the tab
+                    bra       CopyChar3Test begin the copy test
+
+CopyChar3Loop       ldx       10,s      load the pointer
+                    leax      1,x       advance the pointer
+                    stx       10,s      save the pointer
+                    ldb       -1,x      read the char
+                    stb       ,u+       copy char to output buffer
+CopyChar3Test       ldd       ,s        load remaining count
+                    addd      #$FFFF    decrement the count
+                    std       ,s        save the count
+                    subd      #$FFFF    test if count exhausted
+                    beq       ParseDone count done so finish
+                    ldb       [10,s]    read the current char
+                    bne       CopyChar3Loop copy until the null terminator
+                    bra       ParseDone parse is done
+
+ParseBadType        ldd       6,s       load the bad type value
+                    pshs      d         push it for the message
+                    leax      >MsgBadType,pcr point to the error format
+                    pshs      x         push the format
+                    lbsr      FatalError print the error message
+                    leas      4,s        clean up the arguments
+                    bra       ParseDone parse is done
+
+ParseTypeDispatch   cmpx      #1        is it type one
+                    lbeq      CopyFieldInit parse type one
+                    cmpx      #2        is it type two
+                    lbeq      ParseType2 parse type two
+                    cmpx      #3        is it type three
+                    lbeq      ParseType3 parse type three
+                    bra       ParseBadType otherwise report a bad type
+
+ParseDone           clra                clear high byte
+                    clrb                clear the terminator
+                    stb       ,u        null-terminate the output
+                    ldd       10,s      return the source pointer
+                    leas      2,s        drop the local
+                    puls      pc,u      restore and return
+
+MsgBadType          fcc       /parse called with bad type : %d/
+                    fcb       C$NULL
+InitHashTable       pshs      u,d       save regs and reserve a local
+                    leax      TableBase,y   point to the hash table base
+                    stx       ,s        save the table pointer
+                    ldu       #0        init the bucket index
+                    bra       InitBucketTest enter the init loop
+
+InitBucketLoop      ldd       ,s        load the current entry pointer
+                    ldx       ,s        load the entry pointer
+                    std       2,x       set forward link to itself
+                    std       [,s]      set back link to itself
+                    ldd       ,s        load the entry pointer
+                    addd      #4        advance to the next entry
+                    std       ,s        save the pointer
+                    leau      1,u       next bucket index
+InitBucketTest      cmpu      #128      done all 128 buckets
+                    blt       InitBucketLoop loop over the buckets
+                    lbra      PopUReturn return
+
+HashInsert          pshs      u,d       save regs and reserve a local
+                    lbsr      AllocNode allocate a node
+                    std       ,s        save the node pointer
+                    ldd       6,s       load the key string
+                    pshs      d         push the string
+                    lbsr      HashString compute the hash
+                    leas      2,s        clean up the argument
+                    aslb                multiply the hash by four
+                    rola                multiply the hash by four
+                    aslb                multiply the hash by four
+                    rola                multiply the hash by four
+                    leax      TableBase,y   point to the table base
+                    leax      d,x       index to the bucket
+                    leau      ,x        set u to the bucket head
+                    ldd       6,s       load the key string
+                    pshs      d         push the string
+                    ldd       2,s       load the node pointer
+                    addd      #12       offset to the node key field
+                    pshs      d         push the destination
+                    lbsr      strcpy    copy the key string in
+                    leas      4,s        clean up the arguments
+                    stu       [,s]      store node into bucket slot
+                    ldd       2,u       load the bucket forward link
+                    ldx       ,s        load the bucket pointer
+                    std       2,x       link node into the bucket
+                    ldd       ,s        load the node pointer
+                    std       [2,u]     finish linking the node
+                    ldd       ,s        load the node pointer
+                    std       2,u       finish linking the node
+                    ldd       ,s        return the node pointer
+                    lbra      PopUReturn return
+
+HashLookup          pshs      u,x,d     save the registers
+                    ldd       8,s       load the key string
+                    pshs      d         push the string
+                    bsr       HashString compute the hash
+                    leas      2,s        clean up the argument
+                    aslb                multiply the hash by four
+                    rola                multiply the hash by four
+                    aslb                multiply the hash by four
+                    rola                multiply the hash by four
+                    leax      TableBase,y   point to the table base
+                    leax      d,x       index to the bucket
+                    stx       ,s        save the bucket pointer
+                    ldd       [,s]      load the first node
+                    bra       LookupTest enter the lookup loop
+
+LookupLoop          ldd       2,s       load the node pointer
+                    addd      #12       offset to the node key
+                    pshs      d         push the key pointer
+                    ldd       10,s      load the search key
+                    pshs      d         push the search key
+                    lbsr      strcmp    compare the strings
+                    leas      4,s        clean up the arguments
+                    std       -2,s      save the compare result
+                    bne       LoadNextNode no match so advance
+                    ldd       2,s       return the matching node
+                    bra       LookupDone lookup is done
+
+LoadNextNode        ldd       [2,s]     load the next node
+LookupTest          std       2,s       save the current node
+                    ldd       2,s       load the current node
+                    cmpd      ,s        reached the bucket head
+                    bne       LookupLoop continue the lookup
+                    clra                clear high byte for not found
+                    clrb                clear result for not found
+LookupDone          leas      4,s        clean up the stack
+                    puls      pc,u      restore and return
+
+HashString          pshs      u         save u
+                    ldu       4,s       load the string pointer
+                    leas      -2,s       reserve a local
+                    clra                clear high byte of hash
+                    clrb                clear the hash accumulator
+                    bra       HashTest  enter the hash loop
+
+HashLoop            ldd       ,s        load the accumulator
+                    pshs      d         push it
+                    ldb       ,u+       load the next character
+                    sex                 sign-extend the character
+                    addd      ,s++      add character to the hash
+HashTest            std       ,s        save the hash
+                    ldb       ,u        peek the next character
+                    bne       HashLoop  loop until the null terminator
+                    ldd       ,s        load the final hash
+                    clra                clear high byte
+                    andb      #$7f      mask hash to 0-127
+PopUReturn          leas      2,s        clean up the local
+                    puls      pc,u      restore and return
+
+AllocNode           pshs      u         save u
+                    ldu       GlbVar0011 load the free list head
+                    beq       AllocFromHeap empty so allocate from heap
+                    ldd       ,u        unlink the node
+                    std       GlbVar0011 update the free list head
+                    clra                clear high byte
+                    clrb                clear low byte
+                    std       10,u      clear a node field
+                    std       8,u       clear a node field
+                    std       Flags,u     clear a node field
+                    std       4,u       clear a node field
+                    bra       AllocReturn return the node
+
+AllocFromHeap       ldd       #24       node size is 24 bytes
+                    pshs      d         push the size
+                    lbsr      LookupOpcode allocate memory
+                    leas      2,s        clean up the argument
+                    tfr       d,u       set u to the new node
+AllocReturn         tfr       u,d       return the node pointer
+                    puls      pc,u      restore and return
+
+FreeNode            pshs      u         save u
+                    ldu       4,s       load the node pointer
+                    ldd       4,u       check reference field four
+                    bne       FreeDone  still referenced so keep it
+                    ldd       Flags,u     check reference field six
+                    bne       FreeDone  still referenced so keep it
+                    ldd       ,u        unlink the node
+                    std       [2,u]     relink the neighbor
+                    ldd       2,u       load the forward link
+                    ldx       ,u        load the back link
+                    std       2,x       relink the neighbors
+                    ldd       GlbVar0011 load the free list head
+                    std       ,u        chain node onto the free list
+                    stu       GlbVar0011 update the free list head
+FreeDone            puls      pc,u      restore and return
+
+GenLabel            pshs      u         save u
+                    ldd       >LabelCtr,y load the label counter
+                    addd      #1        increment the counter
+                    std       >LabelCtr,y save the counter
+                    pshs      d         push the counter
+                    leax      >MsgLabelFmt,pcr point to the label format
+                    pshs      x         push the format
+                    ldd       8,s       load the destination buffer
+                    pshs      d         push the destination
+                    lbsr      Sprintf   format the label string
+                    leas      6,s        clean up the arguments
+                    puls      pc,u      restore and return
+
+MsgLabelFmt         fcb       $5F       label format string data
+                    fcb       36,$25    label format string data
+                    fcb       100,$00   label format string data
+SearchStrings       pshs      u         save u
+                    ldu       6,s       load the array start
+                    bra       SearchTest enter the search loop
+
+SearchLoop          ldd       ,u        load the array string
+                    pshs      d         push it
+                    ldd       6,s       load the target string
+                    pshs      d         push it
+                    lbsr      strcmp    compare the strings
+                    leas      4,s        clean up the arguments
+                    std       -2,s      save the compare result
+                    lbeq      AllocDone match found
+                    leau      2,u       advance to the next entry
+SearchTest          cmpu      8,s       reached the array end
+                    bcs       SearchLoop continue the search
+                    clra                clear high byte for not found
+                    clrb                clear result for not found
+                    puls      pc,u      restore and return
+
+InitLineState       pshs      u         save u
+                    leax      >GlbPtr0015,y  point to the line buffer
+                    stx       GlbWord0017 set the buffer end pointer
+                    tfr       x,d       copy pointer to d
+                    std       GlbPtr0015 set the buffer start pointer
+                    clra                clear high byte
+                    clrb                clear low byte
+                    std       GlbVar001D clear a global
+                    std       GlbVar001F clear a global
+                    std       GlbVar0013 reset the byte counter
+                    puls      pc,u      restore and return
+
+AddLineNode         pshs      u         save u
+                    leas      -10,s      reserve local variables
+                    lbsr      AllocInsnNode allocate a line node
+                    tfr       d,u       set u to the node
+                    ldd       20,s      load the list head
+                    beq       NoTailNode list is empty
+                    ldd       [20,s]    load the tail node
+                    bra       SetNodeBack go set the back link
+
+NoTailNode          clra                clear high byte for null tail
+                    clrb                clear low byte for null tail
+SetNodeBack         std       4,u       set the node back link
+                    beq       CopyLineText list empty so skip linking
+                    ldd       [20,s]    load the current tail
+                    bra       FindTailTest enter the link loop
+
+FindTailLoop        ldx       8,s       load the tail node
+                    stu       4,x       link the node
+                    ldx       8,s       load the node
+                    ldd       8,x       advance to the next
+FindTailTest        std       8,s       save the pointer
+                    ldd       8,s       load the pointer
+                    bne       FindTailLoop walk to the tail
+                    clra                clear high byte
+                    clrb                clear low byte
+                    std       [20,s]    update the list head
+CopyLineText        ldd       16,s      load the source string
+                    pshs      d         push it
+                    pshs      u         push the node
+                    ldd       #8        offset to the node text
+                    addd      ,s++      add the node base
+                    pshs      d         push the destination
+                    lbsr      strcpy    copy text into the node
+                    leas      4,s        clean up the arguments
+                    ldd       18,s      load the text pointer
+                    std       4,s       save the working pointer
+                    tfr       d,x       copy pointer to x
+                    ldb       ,x        read the first char
+                    beq       StrlenDone empty string
+StrlenLoop          ldx       4,s       load the pointer
+                    leax      1,x       advance the pointer
+                    stx       4,s       save the pointer
+                    ldb       ,x        read the char
+                    bne       StrlenLoop scan to end of the string
+StrlenDone          ldd       4,s       load the end pointer
+                    subd      18,s      compute the string length
+                    std       ,s        save the length
+                    ldd       14,s      load the list tail
+                    std       ,u        set node forward link
+                    ldx       14,s      load the list tail
+                    ldd       2,x       load its back link
+                    std       2,u       copy the back link
+                    ldx       14,s      load the list tail
+                    stu       [2,x]     link node into the list
+                    ldx       14,s      load the list tail
+                    stu       2,x       finish linking the node
+                    ldd       GlbVar0013 load the line count
+                    addd      #1        increment the count
+                    std       GlbVar0013 save the count
+                    leax      8,u       point to the node text
+                    stx       6,s       save the text pointer
+                    ldb       ,x        read the first opcode char
+                    sex                 sign-extend the char
+                    tfr       d,x       copy to x
+                    lbra      DispatchOperand dispatch on the opcode
+
+CheckBranchOp       ldx       6,s       load the text pointer
+                    leax      1,x       advance the pointer
+                    stx       6,s       save the pointer
+                    ldb       ,x        read the next char
+                    cmpb      #'b      test for letter b
+                    lbne      EmitInsnTail not a branch so handle elsewhere
+MatchBranchOp       leax      >StringArgument2,y  point to a string argument
+                    pshs      x         push it
+                    leax      >StringArgument,y  point to a string argument
+                    pshs      x         push it
+                    ldd       10,s      load the pointer
+                    addd      #1        advance the pointer
+                    pshs      d         push it
+                    lbsr      SearchStrings search the string list
+                    leas      6,s        clean up the arguments
+                    std       2,s       save the result
+                    lbeq      EmitInsnTail not found
+                    ldd       Flags,u     load a node field
+                    pshs      d         push it
+                    leax      >StringArgument,y  point to a string argument
+                    pshs      x         push it
+                    ldd       6,s       load a value
+                    subd      ,s++      compute the difference
+                    pshs      d         push the difference
+                    ldd       #2        set the argument count
+                    lbsr      SDivEntry call the helper routine
+                    orb       #$60      set operand-mode bits in low byte
+                    ora       ,s+       merge high flag byte from stack
+                    orb       ,s+       merge low flag byte from stack
+                    std       Flags,u     store combined flags into node
+                    ldd       [2,s]     load field indirectly through arg
+                    pshs      d         push the value
+                    pshs      u         push node pointer
+                    ldd       #8        offset eight
+                    addd      ,s++      compute node plus eight address
+                    pshs      d         push that address
+                    lbsr      strcpy    call copy helper
+                    leas      4,s        drop the arguments
+                    leax      ,s        point at local buffer
+                    pshs      x         push buffer pointer
+                    ldd       20,s      load argument
+                    pshs      d         push it
+                    ldd       22,s      load next argument
+                    pshs      d         push it
+                    ldd       #1        flag value one
+                    pshs      d         push it
+                    lbsr      CopyField call insert helper
+                    leas      8,s        drop the arguments
+                    ldd       18,s      load operand argument
+                    pshs      d         push it
+                    lbsr      HashLookup look up matching node
+                    leas      2,s        drop argument
+                    std       8,s       save matched node
+                    leax      >StringArgument,y  load sentinel address
+                    cmpx      2,s       compare against sentinel
+                    bne       BumpReplaceCount branch when not sentinel
+                    ldd       8,s       load matched node
+                    beq       ChkNodeRef skip if none matched
+                    ldx       8,s       load matched node
+                    ldd       4,x       load its next field
+                    beq       ChkNodeRef skip if next empty
+                    ldx       8,s       reload matched node
+                    ldd       4,x       load next field
+                    pshs      d         push it
+                    pshs      u         push current node
+                    lbsr      UnlinkInsn unlink the duplicate instruction
+                    leas      4,s        drop the arguments
+ChkNodeRef          ldd       4,u       load node reference field
+                    bne       SetKeepFlag branch if already referenced
+                    leax      >GlbPtr0015,y  load other sentinel address
+                    cmpx      2,u       compare node source
+                    beq       SetKeepFlag branch if from sentinel
+                    ldx       2,u       load node source
+                    ldd       6,x       load its flags
+                    anda      #$01      isolate bit zero
+                    clrb                clear low byte
+                    std       -2,s      save the test flag
+                    beq       SetKeepFlag branch if bit clear
+                    pshs      u         push current node
+                    lbsr      FreeOperand remove the instruction
+                    leas      2,s        drop argument
+                    ldd       GlbWord0021 load delete counter
+                    addd      #1        add one
+                    std       GlbWord0021 bump the delete counter
+                    clra                clear result high
+                    clrb                clear result low
+                    lbra      OptExit   return null via exit
+
+SetKeepFlag         ldd       Flags,u     load node flags
+                    ora       #$01      set keep bit zero
+                    std       Flags,u     store flags
+BumpReplaceCount    ldd       GlbWord0019 load replace counter
+                    addd      #1        add one
+                    std       GlbWord0019 bump the replace counter
+                    ldd       8,s       load matched node
+                    bne       SetEmitFlag branch if already found
+                    ldd       18,s      load operand argument
+                    pshs      d         push it
+                    lbsr      HashInsert create a new node
+                    leas      2,s        drop argument
+                    std       8,s       save the new node
+SetEmitFlag         ldd       Flags,u     load node flags
+                    ora       #$02      set emitted bit one
+                    std       Flags,u     store flags
+                    ldd       8,s       load result node
+                    std       19,u      store operand pointer in node
+                    pshs      d         push node value
+                    pshs      u         push current node
+                    lbsr      LinkRefNode link the new reference node
+                    leas      4,s        drop the arguments
+                    bra       EmitInsnTail jump to emit tail
+
+MatchPuls           leax      StrPuls,pcr load 'puls' string
+                    pshs      x         push string pointer
+                    ldd       8,s       load mnemonic pointer
+                    pshs      d         push it
+                    lbsr      strcmp    compare the strings
+                    leas      4,s        drop the arguments
+                    std       -2,s      save comparison result
+                    bne       EmitInsnTail not puls, go to tail
+                    leax      StrPcSuffix,pcr load ',pc' string
+                    pshs      x         push string pointer
+                    ldd       20,s      load base address
+                    addd      2,s       add offset
+                    addd      #$FFFD    back up three bytes
+                    bra       CmpMnemonic join the compare path
+
+MatchRts            leax      StrRts,pcr load 'rts' string
+                    pshs      x         push string pointer
+                    ldd       8,s       load mnemonic pointer
+CmpMnemonic         pshs      d         push it
+                    lbsr      strcmp    compare the strings
+                    leas      4,s        drop the arguments
+                    std       -2,s      save comparison result
+                    bne       EmitInsnTail no match, go to tail
+                    ldd       Flags,u     load node flags
+                    ora       #$01      set keep bit zero
+                    std       Flags,u     store flags
+                    bra       EmitInsnTail branch to emit tail
+
+DispatchOperand     cmpx      #108      is operand type l
+                    lbeq      CheckBranchOp handle the l case
+                    cmpx      #98       is operand type b
+                    lbeq      MatchBranchOp handle the b case
+                    cmpx      #112      is operand type p
+                    beq       MatchPuls handle the puls case
+                    cmpx      #114      is operand type r
+                    beq       MatchRts  handle the rts case
+EmitInsnTail        ldd       Flags,u     load node flags
+                    clra                clear high byte
+                    andb      #$20      test emitted bit five
+                    bne       ReturnNode skip emit if already set
+                    ldd       18,s      load operand argument
+                    pshs      d         push it
+                    ldd       2,s       load matched node
+                    pshs      d         push it
+                    lbsr      AllocStrBuf emit the output instruction
+                    leas      2,s        drop argument
+                    std       19,u      store operand pointer in node
+                    pshs      d         push returned value
+                    lbsr      strcpy    free the temporary
+                    leas      4,s        drop the arguments
+ReturnNode          tfr       u,d       return the node pointer
+OptExit             leas      10,s       drop local frame
+                    puls      pc,u      restore and return
+
+AllocInsnNode       pshs      u         save caller register
+                    ldu       GlbVar001D load free-list head
+                    bne       ReuseFreeNode reuse if a free node exists
+                    ldd       GlbVar001F load allocation counter
+                    addd      #1        add one
+                    std       GlbVar001F bump the allocation counter
+                    pshs      d         push it
+                    ldd       >NumericOptionValue,y  load current instruction count
+                    addd      #3        add margin of three
+                    cmpd      ,s++      compare against limit
+                    bge       AllocFresh within limit, continue
+                    leax      MsgRunOut,pcr load out-of-instructions message
+                    pshs      x         push message pointer
+                    lbsr      FatalError report the error
+                    leas      2,s        drop argument
+AllocFresh          ldd       #21       node size twenty-one
+                    pshs      d         push it
+                    lbsr      LookupOpcode allocate the memory
+                    leas      2,s        drop argument
+                    tfr       d,u       new node into u
+                    bra       AllocDone go to return
+
+ReuseFreeNode       ldd       ,u        load next free pointer
+                    std       GlbVar001D unlink from free list
+                    clra                clear high
+                    clrb                clear low
+                    std       19,u      clear operand field
+                    std       Flags,u     clear the flags
+AllocDone           tfr       u,d       return the node pointer
+                    puls      pc,u      restore and return
+
+LinkRefNode         pshs      u         save caller register
+                    lbsr      AllocRefCell allocate a reference node
+                    tfr       d,u       new node into u
+                    ldd       4,s       load value argument
+                    std       2,u       store into node
+                    ldx       6,s       load target node argument
+                    ldd       6,x       load its chain head
+                    std       ,u        chain existing into new node
+                    ldx       6,s       reload target node
+                    stu       6,x       store new node as chain head
+                    puls      pc,u      restore and return
+
+UnlinkInsn          pshs      u,d       save registers and locals
+                    ldd       6,s       load first node
+                    cmpd      8,s       compare to target
+                    lbeq      FreeOperandDone done if it is the target
+                    ldx       6,s       load first node
+                    ldu       4,x       load head of the chain
+                    lbeq      FreeOperandDone done if chain empty
+UnlinkLoop          stu       ,s        remember current node
+                    ldd       8,s       load the target
+                    std       4,u       relink current past target
+                    ldu       8,u       advance to next node
+                    bne       UnlinkLoop loop until end of chain
+                    ldx       8,s       load target node
+                    ldd       4,x       load its reference field
+                    ldx       ,s        load current node
+                    std       8,x       append it to current
+                    ldx       6,s       load first node
+                    ldd       4,x       load its reference field
+                    ldx       8,s       load target node
+                    std       4,x       move head ref onto target
+                    clra                clear high
+                    clrb                clear low
+                    ldx       6,s       load first node
+                    std       4,x       clear its reference field
+                    lbra      FreeOperandDone return
+
+PrintInsn           pshs      u,d       save registers and locals
+                    ldu       GlbPtr0015 load global reference node
+                    pshs      u         push it
+                    leax      >GlbPtr0015,y  load sentinel address
+                    cmpx      ,s++      compare against sentinel
+                    bne       ChkRefChain branch if not sentinel
+                    leax      MsgTooManyRemoved,pcr load too-many-instructions message
+                    pshs      x         push message pointer
+                    lbsr      FatalError report the error
+                    leas      2,s        drop argument
+ChkRefChain         ldd       Flags,u     load node flags
+                    clra                clear high byte
+                    andb      #$60      isolate bits five and six
+                    cmpd      #96       both bits set
+                    bne       PrintLabels skip if not both set
+                    ldd       #4        scan type four
+                    pshs      d         push it
+                    pshs      u         push node
+                    lbsr      AdjustRefs scan back references
+                    leas      4,s        drop the arguments
+PrintLabels         ldd       4,u       load reference chain head
+                    std       ,s        save the iterator
+                    beq       RefLoopCond skip if no references
+                    ldd       #5        scan type five
+                    pshs      d         push it
+                    pshs      u         push node
+                    lbsr      AdjustRefs scan references
+                    bra       DropScanArgs drop scan arguments
+
+PrintRefLoop        ldd       ,s        load current reference node
+                    addd      #12       offset to operand text
+                    pshs      d         push it
+                    leax      FmtStr,pcr load '%s' format
+                    pshs      x         push format pointer
+                    ldd       OutputFilePointer,y   load output file pointer
+                    pshs      d         push it
+                    lbsr      fprintf   print the label operand
+                    leas      6,s        drop the arguments
+                    ldx       ,s        reload iterator
+                    ldd       10,x      load node flags
+                    clra                clear high byte
+                    andb      #$01      test bit zero
+                    beq       NextRefLabel skip separator if clear
+                    ldd       OutputFilePointer,y   load output file pointer
+                    pshs      d         push it
+                    ldd       #':       colon character
+                    pshs      d         push it
+                    lbsr      Putc      output the colon
+                    leas      4,s        drop the arguments
+NextRefLabel        ldx       ,s        reload iterator
+                    ldd       8,x       load next reference
+                    std       ,s        advance the iterator
+                    beq       RefLoopCond stop if end of chain
+                    ldd       OutputFilePointer,y   load output file pointer
+                    pshs      d         push it
+                    ldd       #13       separator character
+                    pshs      d         push it
+                    lbsr      Putc      output the separator
+DropScanArgs        leas      4,s        drop scan arguments
+RefLoopCond         ldd       ,s        load iterator
+                    bne       PrintRefLoop loop while references remain
+                    ldd       OutputFilePointer,y   load output file pointer
+                    pshs      d         push it
+                    ldd       #'        space character
+                    pshs      d         push it
+                    lbsr      Putc      output the space
+                    leas      4,s        drop the arguments
+                    ldd       Flags,u     load node flags
+                    clra                clear high byte
+                    andb      #$20      test bit five
+                    beq       EmitMnemonic branch if clear
+                    ldd       Flags,u     load node flags
+                    anda      #$02      test bit one
+                    clrb                clear low byte
+                    std       -2,s      save the test flag
+                    beq       UseOperand branch if clear
+                    ldd       19,u      load operand pointer
+                    addd      #12       offset to operand text
+                    bra       EmitBranch merge with emit path
+
+UseOperand          ldd       19,u      load operand pointer
+EmitBranch          pshs      d         push it
+                    pshs      u         push node
+                    ldd       #8        offset eight
+                    addd      ,s++      compute node plus eight
+                    pshs      d         push mnemonic address
+                    ldd       Flags,u     load node flags
+                    clra                clear high byte
+                    andb      #$40      test bit six
+                    beq       NoSuffix  branch if clear
+                    leax      StrLongPrefix,pcr load 'l' suffix string
+                    bra       FmtBranch go set suffix
+
+NoSuffix            leax      StrEmpty2,pcr load empty suffix string
+FmtBranch           tfr       x,d       suffix pointer into d
+                    pshs      d         push it
+                    leax      FmtBranchInsn,pcr load branch format string
+                    pshs      x         push format pointer
+                    ldd       OutputFilePointer,y   load output file pointer
+                    pshs      d         push it
+                    lbsr      fprintf   print the branch instruction
+                    leas      10,s       drop the arguments
+                    bra       EmitNewline go to newline
+
+EmitMnemonic        pshs      u         push node
+                    ldd       #8        offset eight
+                    addd      ,s++      compute node plus eight
+                    pshs      d         push mnemonic address
+                    leax      FmtStrB,pcr load '%s' format
+                    pshs      x         push format pointer
+                    ldd       OutputFilePointer,y   load output file pointer
+                    pshs      d         push it
+                    lbsr      fprintf   print the mnemonic
+                    leas      6,s        drop the arguments
+                    ldb       [19,u]    load first operand char
+                    beq       EmitNewline skip if no operand
+                    ldd       19,u      load operand pointer
+                    pshs      d         push it
+                    leax      FmtSpaceStr,pcr load ' %s' format
+                    pshs      x         push format pointer
+                    ldd       OutputFilePointer,y   load output file pointer
+                    pshs      d         push it
+                    lbsr      fprintf   print the operand text
+                    leas      6,s        drop the arguments
+EmitNewline         ldd       OutputFilePointer,y   load output file pointer
+                    pshs      d         push it
+                    ldd       #13       carriage return character
+                    pshs      d         push it
+                    lbsr      Putc      output the newline
+                    leas      4,s        drop the arguments
+                    pshs      u         push node
+                    lbsr      FreeOperand release the instruction node
+                    leas      2,s        drop argument
+                    lbra      FreeOperandDone return
+
+AdjustRefs          pshs      u,y,x,d   save registers and locals
+                    ldu       10,s      load node argument
+                    ldd       12,s      load type argument
+                    cmpd      #4        is type four
+                    lbne      ScanOtherType handle other types
+                    ldd       Flags,u     load node flags
+                    anda      #$02      test bit one
+                    clrb                clear low byte
+                    std       -2,s      save the test flag
+                    beq       ResolveOperand branch if clear
+                    ldd       19,u      use operand pointer directly
+                    bra       HaveTarget go to merge point
+
+ResolveOperand      ldd       19,u      load operand pointer
+                    pshs      d         push it
+                    lbsr      HashLookup resolve to operand node
+                    leas      2,s        drop argument
+HaveTarget          std       2,s       save resolved node
+                    lbeq      ScanDone  done if null
+                    ldx       2,s       load resolved node
+                    ldd       4,x       load its reference field
+                    std       4,s       save it
+                    lbeq      ScanDone  done if null
+                    ldd       #36       loop limit thirty-six
+                    bra       ScanFwdCond enter the scan loop
+
+ScanFwdLoop         cmpu      4,s       current equals target
+                    bne       DecCounter no, decrement and continue
+                    ldd       Flags,u     load node flags
+                    orb       #$80      set found bit seven
+                    std       Flags,u     store flags
+                    ldx       10,s      load node argument
+                    ldd       6,x       load its flags
+                    andb      #$BF      clear bit six
+                    std       6,x       store flags
+                    lbra      BumpMatchCount count it and finish
+
+DecCounter          ldd       ,s        load counter
+                    addd      #$FFFF    decrement it
+ScanFwdCond         std       ,s        store the counter
+                    ldd       ,s        reload counter
+                    lbeq      ScanDone  done if exhausted
+                    ldu       ,u        follow to next node
+                    pshs      u         push it
+                    leax      >GlbPtr0015,y  load sentinel address
+                    cmpx      ,s++      reached sentinel
+                    bne       ScanFwdLoop loop if not
+                    lbra      ScanDone  done
+
+ScanOtherType       ldd       #36       loop limit thirty-six
+                    bra       ChainCountStore enter second scan loop
+
+ScanRefLoop2        ldd       Flags,u     load node flags
+                    clra                clear high byte
+                    andb      #$60      isolate bits five and six
+                    cmpd      #96       both bits set
+                    bne       NextChainNode skip if not both set
+                    ldd       Flags,u     load node flags
+                    anda      #$02      test bit one
+                    clrb                zero the low byte to build result
+                    std       -2,s      store result to local temp
+                    beq       MapOperand branch when operand is zero
+                    ldd       19,u      load the operand field
+                    bra       OperandReady join the common operand path
+
+MapOperand          ldd       19,u      load the operand field
+                    pshs      d         pass operand as argument
+                    lbsr      HashLookup call helper to map operand
+                    leas      2,s        drop the argument
+OperandReady        std       2,s       save the mapped operand value
+                    beq       NextChainNode branch if operand is null
+                    ldd       10,s      load the saved node
+                    ldx       2,s       load the mapped result pointer
+                    cmpd      4,x       compare against its target field
+                    bne       NextChainNode branch if the targets differ
+                    ldd       Flags,u     load the instruction flags
+                    andb      #$BF      clear the $40 flag bit
+                    std       Flags,u     store the updated flags
+BumpMatchCount      ldd       GlbWord001B load the global match counter
+                    addd      #1        increment the counter
+                    std       GlbWord001B store the counter back
+                    bra       ScanDone  done with this node
+
+NextChainNode       ldd       ,s        load the loop counter
+                    addd      #$FFFF    decrement the counter
+ChainCountStore     std       ,s        store the updated counter
+                    ldd       ,s        reload the counter
+                    beq       ScanDone  exit loop when it reaches zero
+                    ldu       ,u        follow the link to the next node
+                    pshs      u         save the node pointer
+                    leax      >GlbPtr0015,y  address the list-head sentinel
+                    cmpx      ,s++      compare node against the sentinel
+                    lbne      ScanRefLoop2 loop while not at the list head
+ScanDone            leas      6,s        release the locals
+                    puls      pc,u      restore register and return
+
+FreeOperand         pshs      u         save the register
+                    ldu       4,s       load the node argument
+                    leas      -2,s       reserve a local word
+                    ldd       Flags,u     load the node flags
+                    clra                keep only the low byte
+                    andb      #$20      test the $20 flag bit
+                    beq       FreeOperandStr branch when the flag is clear
+                    ldd       19,u      load the operand reference pointer
+                    pshs      d         pass operand as argument
+                    pshs      u         pass the node as argument
+                    bsr       RemoveRef unlink the operand reference
+                    leas      4,s        drop the arguments
+                    bra       OperandFreed continue past the else branch
+
+FreeOperandStr      ldd       19,u      load the operand string pointer
+                    pshs      d         pass it as argument
+                    lbsr      FreeStrBuf free the operand string buffer
+                    leas      2,s        drop the argument
+OperandFreed        ldd       4,u       load the node's list-head field
+                    bra       ClearFieldTest enter the field-clearing loop test
+
+ClearFieldLoop      clra                clear high byte
+                    clrb                clear low byte for zero
+                    ldx       ,s        load the current node
+                    std       4,x       clear its field $04
+                    ldd       ,s        load the node
+                    pshs      d         pass it as argument
+                    lbsr      FreeNode  call the helper
+                    leas      2,s        drop the argument
+                    ldx       ,s        reload the node
+                    ldd       8,x       load its next link
+ClearFieldTest      std       ,s        store as current node
+                    ldd       ,s        reload the node
+                    bne       ClearFieldLoop loop while node is non-null
+                    ldd       ,u        load the node's forward link
+                    std       [2,u]     patch the predecessor link
+                    ldd       2,u       load the back link
+                    ldx       ,u        load the forward link
+                    std       2,x       patch the successor back link
+                    ldd       GlbVar001D load the free-list head
+                    std       ,u        link the node into the free list
+                    stu       GlbVar001D update the free-list head
+                    ldd       GlbVar0013 load the live allocation count
+                    addd      #$FFFF    decrement the count
+                    std       GlbVar0013 store the count back
+FreeOperandDone     leas      2,s        release the local
+                    puls      pc,u      restore register and return
+
+RemoveRef           pshs      u,x,d     save the working registers
+                    ldd       10,s      load the list argument
+                    beq       RemoveRefDone exit if the list is empty
+                    ldd       10,s      reload the list pointer
+                    addd      #6        point at its link field
+                    bra       RemoveRefAdvance enter the search loop
+
+RemoveRefLoop       ldx       2,s       load the current entry
+                    ldd       2,x       load its key
+                    cmpd      8,s       compare with the target key
+                    bne       RemoveRefNext branch when it does not match
+                    ldd       [2,s]     load the matched node's link
+                    std       [,s]      unlink the matched node
+                    ldd       10,s      load the list argument
+                    pshs      d         pass it as argument
+                    lbsr      FreeNode  call the helper
+                    leas      2,s        drop the argument
+                    ldd       2,s       load the matched node
+                    pshs      d         pass it as argument
+                    bsr       FreeRefCell free the reference cell
+                    leas      2,s        drop the argument
+                    bra       RemoveRefDone done after removal
+
+RemoveRefNext       ldd       2,s       load the current entry
+RemoveRefAdvance    std       ,s        store it as cursor
+                    ldd       [,s]      load the next link
+                    std       2,s       save the next entry
+                    bne       RemoveRefLoop loop while entry is non-null
+RemoveRefDone       leas      4,s        release the locals
+                    puls      pc,u      restore register and return
+
+AllocRefCell        pshs      u         save the register
+                    ldu       GlbVar0001 load the free-list head
+                    beq       AllocRefNew allocate when the list is empty
+                    ldd       ,u        load the next free cell
+                    std       GlbVar0001 pop it from the free list
+                    bra       AllocRefInit use the popped cell
+
+AllocRefNew         ldd       #4        request four bytes
+                    pshs      d         pass the size
+                    lbsr      LookupOpcode call the raw allocator
+                    leas      2,s        drop the argument
+                    tfr       d,u       move pointer into u
+AllocRefInit        clra                clear high byte
+                    clrb                clear low byte for zero
+                    std       2,u       clear the cell field
+                    bra       ClearAndReturn finish and return the cell
+
+FreeRefCell         pshs      u         save the register
+                    ldu       4,s       load the cell argument
+                    ldd       GlbVar0001 load the free-list head
+                    std       ,u        link the cell in front
+                    stu       GlbVar0001 update the free-list head
+                    puls      pc,u      restore register and return
+
+AllocStrBuf         pshs      u         save the register
+                    ldd       4,s       load the size argument
+                    cmpd      #16       compare against sixteen
+                    bge       AllocLargePool use the large pool when big
+                    ldu       GlbVar0003 load the small free list
+                    beq       AllocSmallNew allocate when it is empty
+                    ldd       ,u        load the next free cell
+                    std       GlbVar0003 pop it from the small list
+                    bra       AllocBufInit use the popped cell
+
+AllocSmallNew       ldd       #16       request sixteen bytes
+                    bra       AllocBufMalloc allocate the buffer
+
+AllocLargePool      ldu       GlbVar0005 load the large free list
+                    beq       AllocLargeNew allocate when it is empty
+                    ldd       ,u        load the next free cell
+                    std       GlbVar0005 pop it from the large list
+                    bra       AllocBufInit use the popped cell
+
+AllocLargeNew       ldd       #91       request ninety-one bytes
+AllocBufMalloc      pshs      d         pass the size
+                    lbsr      LookupOpcode call the raw allocator
+                    leas      2,s        drop the argument
+                    tfr       d,u       move pointer into u
+AllocBufInit        clra                clear high byte
+                    clrb                clear low byte for zero
+ClearAndReturn      std       ,u        clear the cell header
+                    tfr       u,d       return the pointer in d
+                    puls      pc,u      restore register and return
+
+FreeStrBuf          pshs      u         save the register
+                    ldu       4,s       load the string argument
+                    beq       FreeBufDone skip when the pointer is null
+                    bra       StrLenTest enter the length loop
+
+StrLenLoop2         leau      1,u       advance the pointer
+StrLenTest          ldb       ,u        load the current character
+                    bne       StrLenLoop2 loop until the terminator
+                    tfr       u,d       copy the end pointer
+                    subd      4,s       compute the string length
+                    cmpd      #16       compare against sixteen
+                    bge       FreeLargeBuf use large list when long
+                    ldd       GlbVar0003 load the small free-list head
+                    std       [4,s]     link the buffer in
+                    ldd       4,s       load the buffer pointer
+                    std       GlbVar0003 push onto the small free list
+                    bra       FreeBufDone done
+
+FreeLargeBuf        ldd       GlbVar0005 load the large free-list head
+                    std       [4,s]     link the buffer in
+                    ldd       4,s       load the buffer pointer
+                    std       GlbVar0005 push onto the large free list
+FreeBufDone         puls      pc,u      restore register and return
+
+Otxt_1052           fcc       /ra/
+                    fcb       C$NULL
+Otxt_1055           fcc       /sr/
+                    fcb       C$NULL
+Otxt_1058           fcc       /eq/
+                    fcb       C$NULL
+Otxt_105B           fcc       /ne/
+                    fcb       C$NULL
+Otxt_105E           fcc       /lt/
+                    fcb       C$NULL
+Otxt_1061           fcc       /ge/
+                    fcb       C$NULL
+Otxt_1064           fcc       /le/
+                    fcb       C$NULL
+Otxt_1067           fcc       /gt/
+                    fcb       C$NULL
+Otxt_106A           fcc       /lo/
+                    fcb       C$NULL
+Otxt_106D           fcc       /hs/
+                    fcb       C$NULL
+Otxt_1070           fcc       /ls/
+                    fcb       C$NULL
+BraCondHi           fcc       /hi/
+                    fcb       C$NULL
+Otxt_1076           fcc       /pl/
+                    fcb       C$NULL
+BraCondMi           fcc       /mi/
+                    fcb       C$NULL
+Otxt_107C           fcc       /cc/
+                    fcb       C$NULL
+BraCondCs           fcc       /cs/
+                    fcb       C$NULL
+Otxt_1082           fcc       /vc/
+                    fcb       C$NULL
+Otxt_1085           fcc       /vs/
+                    fcb       C$NULL
+StrPuls             fcc       /puls/
+                    fcb       C$NULL
+StrPcSuffix         fcc       /,pc/
+                    fcb       C$NULL
+StrRts              fcc       /rts/
+                    fcb       C$NULL
+MsgRunOut           fcc       /run out of instructions/
+                    fcb       C$NULL
+MsgTooManyRemoved   fcc       /removing too many instructions/
+                    fcb       C$NULL
+FmtStr              fcc       /%s/
+                    fcb       C$NULL
+FmtBranchInsn       fcc       /%sb%s %s/
+                    fcb       C$NULL
+StrLongPrefix       fcb       $6C
+                    fcb       C$NULL
+StrEmpty2           fcb       C$NULL
+FmtStrB             fcc       /%s/
+                    fcb       C$NULL
+FmtSpaceStr         fcc       / %s/
+                    fcb       C$NULL
+BuildOpcodeHash     pshs      u,d       save the working registers
+                    leau      OpcodeTable,y   point at the opcode table
+                    bra       BuildHashTest enter the build loop test
+
+BuildHashLoop       ldd       2,u       load the opcode key
+                    pshs      d         pass it as argument
+                    lbsr      HashString hash the opcode
+                    leas      2,s        drop the argument
+                    aslb                shift index left
+                    rola                scale the index by two
+                    leax      HashTable,y   point at the hash table
+                    leax      d,x       index into the bucket
+                    stx       ,s        save the bucket pointer
+                    ldd       [,s]      load the current bucket head
+                    std       14,u      chain the existing entry
+                    stu       [,s]      insert entry at bucket head
+                    leau      16,u      advance to the next entry
+BuildHashTest       ldd       ,u        load the entry opcode
+                    bne       BuildHashLoop loop while opcode is non-zero
+                    leas      2,s        release the local
+                    puls      pc,u      restore register and return
+
+OptBranchPass       pshs      u         save the register
+                    ldu       4,s       load the node argument
+                    leas      -12,s      reserve the local frame
+                    ldu       2,u       load the first instruction
+                    bra       OptLoopTest enter the scan loop test
+
+OptLoopReset        leas      -12,x     reset the stack to the frame base
+OptLoopTest         leax      >GlbPtr0015,y  address the list-head sentinel
+                    pshs      x         save the sentinel
+                    cmpu      ,s++      compare node against the head
+                    lbeq      WalkExit  exit when the list is exhausted
+                    ldd       ,u        load the next instruction link
+                    std       10,s      save the next instruction
+                    pshs      d         pass it as argument
+                    leax      >GlbPtr0015,y  address the list head
+                    cmpx      ,s++      check for the end sentinel
+                    lbeq      WalkExit  exit if at the list head
+                    ldx       10,s      load the next instruction
+                    ldd       4,x       load its target field
+                    lbeq      OptTableLookup branch when the field is zero
+                    ldd       Flags,u     load the current flags
+                    clra                keep only the low byte
+                    andb      #$20      test the $20 flag bit
+                    lbeq      WalkExit  skip when the flag is clear
+                    ldd       Flags,u     reload the flags
+                    clra                keep only the low byte
+                    andb      #$3f      mask the opcode bits
+                    cmpd      #33       compare with opcode $21
+                    lbeq      WalkExit  skip when it matches
+                    ldx       19,u      load the operand pointer
+                    ldd       4,x       load its target field
+                    cmpd      10,s      compare with the next instruction
+                    bne       OptCheckPredecessor branch when they differ
+                    ldd       10,s      load the next instruction
+                    pshs      d         pass it as argument
+                    pshs      u         pass the current node
+                    lbsr      UnlinkInsn call the fold helper
+                    leas      4,s        drop the arguments
+                    pshs      u         pass the node
+                    lbsr      FreeOperand free the operand node
+                    leas      2,s        drop the argument
+                    ldx       10,s      load the next instruction
+                    ldu       2,x       advance to the following instruction
+                    ldd       GlbWord0021 load the optimization counter
+                    addd      #1        increment the counter
+                    std       GlbWord0021 store the counter back
+                    leax      12,s      point at the frame base
+                    lbra      OptLoopReset loop for the next instruction
+
+OptCheckPredecessor ldd       Flags,u     load the flags
+                    anda      #$01      test the $0100 flag bit
+                    clrb                clear the low byte
+                    std       -2,s      store the test result
+                    lbeq      WalkExit  skip when the flag is clear
+                    ldd       4,u       load the field
+                    lbne      WalkExit  skip when it is non-zero
+                    ldu       2,u       advance to the next node
+                    pshs      u         save the node
+                    leax      >GlbPtr0015,y  address the list head
+                    cmpx      ,s++      check for the end sentinel
+                    lbeq      WalkExit  skip if at the list head
+                    ldd       Flags,u     load the flags
+                    clra                keep only the low byte
+                    andb      #$3f      mask the opcode bits
+                    cmpd      #33       compare with opcode $21
+                    lble      WalkExit  skip when at or below $21
+                    ldx       19,u      load the operand pointer
+                    ldd       4,x       load its target field
+                    cmpd      10,s      compare with the next instruction
+                    lbne      WalkExit  skip when they differ
+                    pshs      u         pass the node
+                    lbsr      InvertBranchNode call the fold helper
+                    leas      2,s        drop the argument
+                    lbra      WalkExit  done with this instruction
+
+OptTableLookup      pshs      u         save the node
+                    ldd       #8        offset of eight
+                    addd      ,s++      compute the operand field address
+                    pshs      d         pass it as argument
+                    lbsr      HashString hash the opcode
+                    leas      2,s        drop the argument
+                    aslb                shift index left
+                    rola                scale the index by two
+                    leax      HashTable,y   point at the pattern hash table
+                    leax      d,x       index into the bucket
+                    ldd       ,x        load the bucket head
+                    std       8,s       save the table entry
+                    clra                clear high byte
+                    clrb                clear low byte for zero
+                    std       4,s       clear the match local
+                    lbra      ScanNodeLoop enter the pattern-match loop
+
+OptMatchLoop        ldx       8,s       load the table entry
+                    ldd       2,x       load its first operand
+                    pshs      d         pass it as argument
+                    pshs      u         pass the node
+                    ldd       #8        offset of eight
+                    addd      ,s++      compute the operand field address
+                    pshs      d         pass it as argument
+                    lbsr      MatchPattern compare the operands
+                    leas      4,s        drop the arguments
+                    std       -2,s      save the comparison result
+                    lbeq      AdvanceNextNode skip when no match
+                    ldx       8,s       load the table entry
+                    ldd       4,x       load its second operand
+                    pshs      d         pass it as argument
+                    ldd       19,u      load the operand pointer
+                    pshs      d         pass it as argument
+                    lbsr      MatchPattern compare the operands
+                    leas      4,s        drop the arguments
+                    std       -2,s      save the comparison result
+                    beq       AdvanceNextNode skip when no match
+                    ldx       8,s       load the table entry
+                    ldd       6,x       load its third operand
+                    pshs      d         pass it as argument
+                    ldd       12,s      load the node field
+                    addd      #8        compute the operand field address
+                    pshs      d         pass it as argument
+                    lbsr      MatchPattern compare the operands
+                    leas      4,s        drop the arguments
+                    std       -2,s      save the comparison result
+                    beq       AdvanceNextNode skip when no match
+                    ldx       8,s       load the table entry
+                    ldd       8,x       load its action code
+                    cmpd      #1        compare with action one
+                    bne       OptActionOther branch when not action one
+                    ldd       19,u      load the operand pointer
+                    bra       OptActionEmit use the operand for the action
+
+OptActionOther      ldx       8,s       load the table entry
+                    ldd       8,x       load its action code
+OptActionEmit       pshs      d         pass it as argument
+                    ldx       12,s      load the node pointer
+                    ldd       19,x      load its operand pointer
+                    pshs      d         push argument for the pattern match
+                    lbsr      MatchPattern test whether the pattern matches
+                    leas      4,s        drop the call arguments
+                    std       -2,s      save the match result
+                    beq       AdvanceNextNode no match, advance to next node
+                    ldd       #1        set the matched flag
+                    std       4,s       store the matched flag
+                    bra       CheckMatchFlag proceed with the matched node
+
+AdvanceNextNode     ldx       8,s       load current node
+                    ldd       14,x      fetch its next-node link
+                    std       8,s       advance to the next node
+ScanNodeLoop        ldd       8,s       reload the node pointer
+                    lbne      OptMatchLoop keep scanning while nodes remain
+CheckMatchFlag      ldd       4,s       check the matched flag
+                    lbeq      WalkExit  nothing matched, finish the walk
+                    ldx       8,s       load the matched node
+                    ldx       10,x      load its first operand link
+                    bra       OperandDispatch dispatch on operand kind
+
+OperandKind2        ldd       10,s      take frame operand base
+                    addd      #8        offset to the operand field
+                    bra       EmitOperand emit this operand
+
+OperandDefault      ldx       8,s       load node pointer
+                    ldd       10,x      load the operand pointer
+EmitOperand         pshs      d         push operand argument
+                    pshs      u         push node context
+                    ldd       #8        offset constant
+                    addd      ,s++      compute the operand address
+                    pshs      d         push computed address
+                    lbsr      strcpy    emit or copy the operand
+                    leas      4,s        drop the call arguments
+                    bra       HandleDest go handle the destination
+
+OperandDispatch     cmpx      #1        operand kind 1
+                    beq       HandleDest skip, handle destination
+                    cmpx      #2        operand kind 2
+                    beq       OperandKind2 use the frame operand
+                    bra       OperandDefault default operand handling
+
+HandleDest          ldx       8,s       load the matched node
+                    ldx       12,x      load its destination link
+                    bra       DestDispatch dispatch on destination kind
+
+ZeroDest            clra                zero value high
+                    clrb                zero value low
+                    stb       [19,u]    clear the destination field
+                    bra       DisposeAndCount finish the emit
+
+DestKind2           ldx       10,s      take frame base
+                    ldd       19,x      load destination operand value
+                    bra       EmitDest  emit the destination
+
+DestDefault         ldx       8,s       load the node
+                    ldd       12,x      load the destination pointer
+EmitDest            pshs      d         push destination argument
+                    ldd       19,u      push the node's field
+                    pshs      d         push it
+                    lbsr      strcpy    emit or copy the destination
+                    leas      4,s        drop the arguments
+                    bra       DisposeAndCount finish the emit
+
+DestDispatch        stx       -2,s      save the destination kind
+                    beq       ZeroDest  zero destination
+                    cmpx      #1        kind 1
+                    beq       DisposeAndCount no destination work
+                    cmpx      #2        kind 2
+                    beq       DestKind2 frame destination
+                    bra       DestDefault default destination
+
+DisposeAndCount     ldd       10,s      pass the node
+                    pshs      d         push it
+                    lbsr      FreeOperand dispose of the node
+                    leas      2,s        drop the argument
+                    ldd       GlbWord0021 load the optimization counter
+                    addd      #1        increment it
+                    std       GlbWord0021 record another change made
+                    ldx       [8,s]     follow the node link
+                    bra       NextDispatch dispatch on next step
+
+FollowContext       ldu       2,u       follow the context link
+                    bra       ResumeOuter continue the outer loop
+
+NextDispatch        cmpx      #1        kind 1
+                    beq       FollowContext follow the context
+                    cmpx      #2        kind 2
+                    beq       WalkExit  done
+ResumeOuter         lbra      OptLoopTest resume the outer scan
+
+WalkExit            leas      12,s       release the locals
+                    puls      pc,u      return
+
+InvertBranchNode    pshs      u         save the caller u register
+                    ldu       4,s       load the node argument
+                    ldd       Flags,u     read the attribute word
+                    clra                keep only the low byte
+                    andb      #$3f      isolate the condition bits
+                    eorb      #$01      invert the branch sense
+                    pshs      d         save the inverted condition
+                    ldx       ,u        load the first linked node
+                    ldd       6,x       read its attribute word
+                    anda      #$FE      clear the low flag bit
+                    andb      #$C0      keep the top two bits
+                    ora       ,s+       merge the inverted condition high
+                    orb       ,s+       merge the inverted condition low
+                    std       Flags,u     write back the rewritten attribute
+                    clra                zero high byte
+                    andb      #$1f      isolate the opcode index
+                    aslb                scale to a word index
+                    rola                carry into high byte
+                    leax      >StringArgument,y  opcode replacement table base
+                    leax      d,x       index into the table
+                    ldd       ,x        fetch the replacement opcode
+                    pshs      d         push it
+                    pshs      u         push the node
+                    ldd       #8        field offset
+                    addd      ,s++      compute the target address
+                    pshs      d         push it
+                    lbsr      strcpy    emit the rewritten operand
+                    leas      4,s        drop the arguments
+                    ldd       19,u      take the node field
+                    pshs      d         push it
+                    pshs      u         push the node
+                    lbsr      RemoveRef process the linked list
+                    leas      4,s        drop the arguments
+                    ldx       ,u        load the first child
+                    ldd       19,x      take its field
+                    std       19,u      promote the field up
+                    pshs      d         push it
+                    pshs      u         push the node
+                    lbsr      LinkRefNode relink the node
+                    leas      4,s        drop the arguments
+                    ldd       ,u        take the child pointer
+                    pshs      d         push it
+                    lbsr      FreeOperand free the child node
+                    leas      2,s        drop the argument
+                    ldd       GlbWord0021 load the change counter
+                    addd      #1        increment it
+                    std       GlbWord0021 record the optimization
+                    puls      pc,u      return
+
+MatchPattern        pshs      u         save the caller u register
+                    ldu       4,s       load the pattern argument
+                    ldd       6,s       check the input pointer
+                    lbne      MatchNextChar start matching if input present
+                    ldd       #1        default the match to true
+                    puls      pc,u      return the match result
+
+                    lbra      MatchNextChar resume the match loop
+
+MatchPlaceholder    ldb       [6,s]     load the current pattern char
+                    cmpb      #'<      is it the < placeholder
+                    lbne      MatchLiteral no, do a literal compare
+                    ldb       ,u        load the input class byte
+                    sex                 extend to a word
+                    leax      CtypeTab,y character class table base
+                    leax      d,x       index into the table
+                    ldb       ,x        fetch the class flags
+                    clra                zero high byte
+                    andb      #$08      test the is-digit flag
+                    lbeq      MatchFail not a digit, fail the match
+                    leas      -2,s       make room for the accumulator
+                    clra                zero accumulator high
+                    clrb                zero accumulator low
+                    std       ,s        initialise the number to zero
+ParseDigitLoop      ldd       ,s        load the running accumulator
+                    pshs      d         push it for the multiply
+                    ldd       #10       multiply by ten
+                    lbsr      MulEntry  accumulator times ten
+                    pshs      d         push the result
+                    ldb       ,u+       load the next input digit
+                    sex                 extend to a word
+                    addd      ,s++      add the digit in
+                    addd      #$FFD0    subtract ascii zero
+                    std       ,s        store the new accumulator
+                    ldb       ,u        peek the next input char
+                    sex                 extend to a word
+                    leax      CtypeTab,y character class table base
+                    leax      d,x       index into the table
+                    ldb       ,x        fetch the class flags
+                    clra                zero high byte
+                    andb      #$08      test the is-digit flag
+                    bne       ParseDigitLoop keep consuming digits
+                    ldd       ,s        load the parsed number
+                    cmpd      #255      does it exceed one byte
+                    bls       PlaceholderOk within range, accept
+                    clra                too big, fail high
+                    clrb                too big, fail low
+                    leas      2,s        drop the accumulator
+                    puls      pc,u      return no match
+
+PlaceholderOk       leas      2,s        drop the accumulator
+                    ldd       6,s       load the pattern pointer
+                    addd      #1        advance past the placeholder
+                    std       6,s       update the pattern pointer
+                    bra       MatchNextChar continue matching
+
+MatchLiteral        ldb       ,u+       load input char and advance
+                    sex                 extend to a word
+                    pshs      d         save the input char
+                    ldx       8,s       load the pattern pointer
+                    leax      1,x       advance the pattern
+                    stx       8,s       update the pattern pointer
+                    ldb       -1,x      load the pattern char
+                    sex                 extend to a word
+                    cmpd      ,s++      compare to the input char
+                    bne       MatchFail mismatch, fail the match
+MatchNextChar       ldb       [6,s]     peek the next pattern char
+                    lbne      MatchPlaceholder more pattern, keep matching
+                    ldb       ,u        input at its end
+                    bne       MatchFail leftover input, fail
+                    ldd       #1        full match succeeded
+                    bra       MatchReturn return true
+
+MatchFail           clra                match failed high
+                    clrb                match failed low
+MatchReturn         puls      pc,u      return the result
+
+OptimizeInsnList    pshs      u         save the caller u register
+                    ldu       4,s       load the list argument
+                    leas      -10,s      allocate the locals
+                    leax      >GlbPtr0015,y  sentinel node address
+                    cmpx      2,u       is the list head the sentinel
+                    lbeq      ScanDone2 empty list, skip to end
+                    clra                zero high
+                    clrb                zero low
+                    std       ,s        clear the chain head
+                    ldd       4,u       load the list start
+                    bra       BlockLoop enter the block loop
+
+NextBlock           ldx       6,s       load the block pointer
+                    ldd       6,x       fetch the next block link
+                    bra       AdvanceInstr advance the block
+
+InstrLoop           ldx       4,s       load the instruction pointer
+                    ldd       2,x       load the operand link
+                    std       8,s       save the operand node
+                    ldx       8,s       reload the operand node
+                    ldd       4,x       load its value field
+                    beq       InstrNext none, skip this instruction
+                    ldx       8,s       reload the operand node
+                    ldd       6,x       load its attributes
+                    anda      #$01      test the low flag bit
+                    clrb                clear low byte
+                    std       -2,s      save the flag
+                    beq       InstrNext flag clear, skip
+                    ldx       8,s       reload the operand node
+                    ldd       6,x       load its attributes
+                    clra                zero high byte
+                    andb      #$80      test the high flag bit
+                    bne       InstrNext set, skip this instruction
+                    lbsr      AllocRefCell allocate a new chain cell
+                    std       2,s       save the new cell
+                    ldd       ,s        load the current chain head
+                    std       [2,s]     link it into the new cell
+                    ldd       2,s       load the new cell
+                    std       ,s        make it the chain head
+                    ldd       8,s       load the operand node
+                    ldx       ,s        load the new cell
+                    std       2,x       record the operand in the cell
+InstrNext           ldd       [4,s]     follow the instruction link
+AdvanceInstr        std       4,s       advance the instruction
+                    ldd       4,s       reload the instruction pointer
+                    bne       InstrLoop loop over instructions
+                    ldx       6,s       load the block pointer
+                    ldd       8,x       load the block's other link
+BlockLoop           std       6,s       set the current block
+                    ldd       6,s       reload the current block
+                    lbne      NextBlock loop over blocks
+                    lbra      ChainDone done collecting, process chain
+
+ChainLoop           pshs      u         save the caller u register
+                    ldx       2,s       load the chain head
+                    ldd       2,x       load its operand node
+                    std       10,s      save the operand node
+                    pshs      d         push it
+                    lbsr      UnlinkInsn look up or process the node
+                    leas      4,s        drop the arguments
+                    ldx       8,s       load the result pointer
+                    ldd       2,x       load its link
+                    std       8,s       save it
+                    pshs      d         push it
+                    leax      >GlbPtr0015,y  sentinel node address
+                    cmpx      ,s++      is it the sentinel
+                    beq       ChainAdvance yes, skip
+                    ldx       8,s       reload the node
+                    ldd       6,x       load its attributes
+                    clra                zero high byte
+                    andb      #$20      test the flag bit
+                    beq       ChainAdvance clear, skip
+                    ldx       8,s       reload the node
+                    ldd       6,x       load its attributes
+                    anda      #$01      test the low flag
+                    clrb                clear low byte
+                    std       -2,s      save the flag
+                    beq       DestOpcodeCheck clear, take the other branch
+                    ldd       [8,s]     load the operand value
+                    pshs      d         push it
+                    lbsr      FreeOperand free the node
+                    bra       ChainStep continue
+
+DestOpcodeCheck     ldx       8,s       reload the node
+                    ldd       6,x       load its attributes
+                    clra                zero high byte
+                    andb      #$3f      isolate the low bits
+                    cmpd      #33       compare to the opcode threshold
+                    ble       ChainAdvance below threshold, skip
+                    ldx       8,s       reload the node
+                    ldx       19,x      load its child node
+                    ldd       4,x       load the child value
+                    ldx       8,s       reload the node
+                    cmpd      [,x]      does it match the operand
+                    bne       ChainAdvance no, skip
+                    ldd       8,s       load the node
+                    pshs      d         push it
+                    lbsr      InvertBranchNode rewrite the branch node
+ChainStep           leas      2,s        drop the argument
+ChainAdvance        ldd       [,s]      load the next chain entry
+                    std       2,s       advance the chain
+                    ldd       ,s        load the chain cell
+                    pshs      d         push it
+                    lbsr      FreeRefCell free the chain cell
+                    leas      2,s        drop the argument
+                    ldd       2,s       load the next cell
+                    std       ,s        update the chain head
+ChainDone           ldd       ,s        load the chain head
+                    lbne      ChainLoop loop over the chain
+                    ldx       2,u       load the list head
+                    ldd       6,x       load its attributes
+                    anda      #$01      test the flag bit
+                    clrb                clear low byte
+                    std       -2,s      save the flag
+                    bne       CheckListFlag set, skip the block loop
+                    ldd       4,u       load the list start
+                    bra       SecondBlockSet enter the second block loop
+
+SecondBlockLoop     ldx       6,s       load the block pointer
+                    ldd       6,x       load its next link
+                    bra       AdvanceInstr2 advance
+
+SecondInstrLoop     ldx       4,s       load the instruction pointer
+                    ldd       2,x       load the operand link
+                    std       8,s       save it
+                    tfr       d,x       copy to index register
+                    ldd       6,x       load operand attributes
+                    anda      #$01      test the flag bit
+                    clrb                clear low byte
+                    std       -2,s      save the flag
+                    beq       SecondInstrNext clear, skip
+                    ldd       8,s       load the node
+                    pshs      d         push it
+                    ldx       8,s       reload the node
+                    ldd       8,x       load its field
+                    pshs      d         push it
+                    lbsr      UpdateUseChain process or emit the node
+                    leas      4,s        drop the arguments
+SecondInstrNext     ldd       [4,s]     follow the instruction link
+AdvanceInstr2       std       4,s       advance the instruction
+                    ldd       4,s       reload the instruction pointer
+                    bne       SecondInstrLoop loop over instructions
+                    ldx       6,s       load the block pointer
+                    ldd       8,x       load its block link
+SecondBlockSet      std       6,s       set the current block
+                    ldd       6,s       reload the current block
+                    bne       SecondBlockLoop loop over blocks
+                    pshs      u         push the list
+                    ldd       4,u       load the list start
+                    pshs      d         push it
+                    lbsr      UpdateUseChain process the list
+                    leas      4,s        drop the arguments
+CheckListFlag       ldd       Flags,u     load the list attributes
+                    anda      #$01      test the flag bit
+                    clrb                clear low byte
+                    std       -2,s      save the flag
+                    lbeq      ScanDone2 clear, finish
+                    ldd       Flags,u     load the attributes again
+                    clra                zero high byte
+                    andb      #$20      test the flag bit
+                    beq       AdvanceFromU clear, take the other path
+                    ldx       19,u      load the child node
+                    ldd       4,x       load its value field
+                    std       8,s       save it
+                    beq       UseChildField none, use the child field
+                    ldx       8,s       reload the node
+                    ldd       2,x       load its operand
+                    pshs      d         push it
+                    ldd       2,u       load the list operand
+                    pshs      d         push it
+                    lbsr      MatchBlockPair compare the operands
+                    leas      4,s        drop the arguments
+                    std       -2,s      save the compare result
+                    lbne      ScanDone2 differ, finish
+                    pshs      u         push the list
+                    ldx       10,s      reload the node
+                    ldd       4,x       load its value field
+                    bra       EmitListNode emit it
+
+UseChildField       pshs      u         push the list
+                    ldd       19,u      load the child field
+EmitListNode        pshs      d         push the argument
+                    lbsr      UpdateUseChain process the node
+                    leas      4,s        drop the arguments
+                    lbra      ScanDone2 finish
+
+AdvanceFromU        ldd       2,u       load next-instruction pointer from u
+                    lbra      SetCurrent jump to set it as current
+
+ScanPairLoop        ldx       8,s       load current instruction pointer
+                    ldd       6,x       load its flags field
+                    anda      #$01      isolate the low operand flag bit
+                    clrb                clear low byte of masked flag
+                    std       -2,s      save masked flag locally
+                    beq       AdvanceInsn skip if flag bit clear
+                    ldx       8,s       reload current instruction
+                    ldd       6,x       reload flags field
+                    clra                clear high byte
+                    andb      #$A0      mask the a0 flag bits
+                    bne       AdvanceInsn skip if any of those bits set
+                    ldd       8,s       take current pointer
+                    addd      #8        offset to operand text field
+                    pshs      d         push first strcmp argument
+                    pshs      u         push u pointer
+                    ldd       #8        prepare operand field offset
+                    addd      ,s++      compute u plus offset
+                    pshs      d         push second strcmp argument
+                    lbsr      strcmp    compare the two operand strings
+                    leas      4,s        pop the arguments
+                    std       -2,s      save comparison result
+                    bne       AdvanceInsn skip if operands differ
+                    ldx       8,s       reload current instruction
+                    ldd       19,x      load secondary field
+                    pshs      d         push first argument
+                    ldd       19,u      load u secondary field
+                    pshs      d         push second argument
+                    lbsr      strcmp    compare the secondary fields
+                    leas      4,s        pop arguments
+                    std       -2,s      save result
+                    bne       AdvanceInsn skip if fields differ
+                    ldd       2,u       load u operand pointer
+                    pshs      d         push argument
+                    ldx       10,s      load other operand base
+                    ldd       2,x       load its operand pointer
+                    pshs      d         push argument
+                    bsr       MatchBlockPair deep-compare the operand chains
+                    leas      4,s        pop arguments
+                    std       -2,s      save result
+                    bne       ScanDone2 exit if a match was made
+AdvanceInsn         ldx       8,s       load current instruction
+                    ldd       2,x       load next-instruction link
+SetCurrent          std       8,s       set it as the current instruction
+                    leax      >GlbPtr0015,y  load the list sentinel address
+                    cmpx      8,s       reached end of list
+                    lbne      ScanPairLoop loop while more instructions remain
+ScanDone2           leas      10,s       tear down the scan frame
+                    puls      pc,u      return
+
+MatchBlockPair      pshs      u         save u register
+                    ldu       4,s       load first operand argument
+                    leas      -20,s      allocate local workspace
+                    clra                clear high byte
+                    clrb                clear low byte
+                    std       ,s        init depth counter to zero
+                    stu       6,s       save operand pointer local
+                    pshs      u         push u for comparison
+                    ldd       28,s      load second operand argument
+                    std       6,s       store it locally
+                    cmpd      ,s++      compare the two operand pointers
+                    bne       MatchLoop continue if they differ
+                    lbra      ReturnZero identical operands return zero
+
+                    bra       MatchLoop fall into the match loop
+
+MatchNextLoop       ldu       2,u       follow u to next operand
+                    ldx       26,s      load other chain pointer
+                    ldd       2,x       load its next link
+                    std       26,s      advance the other pointer
+                    ldd       ,s        load depth counter
+                    addd      #1        increment matched depth
+                    std       ,s        store depth back
+MatchLoop           leax      >GlbPtr0015,y  load the list sentinel
+                    pshs      x         push sentinel
+                    cmpu      ,s++      reached end of u chain
+                    lbeq      MatchEnd  stop at chain end
+                    leax      >GlbPtr0015,y  load sentinel again
+                    cmpx      26,s      other pointer at end
+                    lbeq      MatchEnd  stop at chain end
+                    cmpu      4,s       u back at original start
+                    lbeq      MatchEnd  stop on wrap
+                    ldd       26,s      load other pointer
+                    cmpd      6,s       other back at original
+                    lbeq      MatchEnd  stop on wrap
+                    ldd       Flags,u     load u flags
+                    clra                clear high byte
+                    andb      #$3f      mask opcode class bits
+                    pshs      d         push opcode class
+                    ldx       28,s      load other operand base
+                    ldd       6,x       load its flags
+                    clra                clear high byte
+                    andb      #$3f      mask opcode class bits
+                    cmpd      ,s++      same opcode class
+                    lbne      MatchEnd  differ so no match
+                    ldd       Flags,u     load u flags
+                    clra                clear high byte
+                    andb      #$80      test the high flag bit
+                    lbne      MatchEnd  set means no match
+                    ldd       Flags,u     load u flags again
+                    clra                clear high byte
+                    andb      #$20      test bit five
+                    beq       CompareOperandText branch to text compare if clear
+                    ldx       19,u      load u symbol pointer
+                    ldd       4,x       load symbol reference
+                    beq       CompareSymbol branch if no symbol
+                    ldx       19,u      reload symbol pointer
+                    ldd       4,x       load symbol reference
+                    ldx       26,s      load other operand base
+                    ldx       19,x      load its symbol pointer
+                    cmpd      4,x       compare symbol references
+                    bne       MarkNotEqual differ so not equal
+MarkEqual           ldd       #1        mark operands equal
+                    bra       MatchResult branch with equal result
+
+CompareSymbol       ldd       19,u      load u field
+                    ldx       26,s      load other operand base
+                    cmpd      19,x      compare the fields
+                    bra       CheckEqual branch on comparison
+
+CompareOperandText  ldd       26,s      load other operand pointer
+                    addd      #8        offset to operand text
+                    pshs      d         push first argument
+                    pshs      u         push u pointer
+                    ldd       #8        prepare operand offset
+                    addd      ,s++      compute u operand address
+                    pshs      d         push second argument
+                    lbsr      strcmp    compare operand text
+                    leas      4,s        pop arguments
+                    std       -2,s      save result
+                    bne       MarkNotEqual differ so not equal
+                    ldx       26,s      load other operand base
+                    ldd       19,x      load secondary field
+                    pshs      d         push argument
+                    ldd       19,u      load u secondary field
+                    pshs      d         push argument
+                    lbsr      strcmp    compare secondary fields
+                    leas      4,s        pop arguments
+                    std       -2,s      save result
+CheckEqual          beq       MarkEqual equal marks a match
+MarkNotEqual        clra                clear high byte for zero result
+                    clrb                clear low byte
+MatchResult         lbne      MatchNextLoop continue loop if operands matched
+MatchEnd            ldu       ,u        follow u to parent pointer
+                    ldd       ,s        load depth counter
+                    lbeq      ReturnZero no matches so return zero
+                    ldd       [26,s]    dereference other chain
+                    std       26,s      store dereferenced pointer
+                    std       4,s       save as work pointer
+                    ldd       4,u       load u forward link
+                    std       2,s       store it locally
+                    bne       MergeLoopTest branch if link present
+                    ldx       26,s      load other pointer
+                    ldd       4,x       load its forward link
+                    std       2,s       store locally
+                    bne       MergeLoopTest branch if link present
+                    leax      8,s       point at local pair
+                    pshs      x         push pointer argument
+                    lbsr      GenLabel  allocate a new node
+                    std       ,s        save allocated node
+                    lbsr      HashInsert link the node
+                    leas      2,s        pop argument
+                    std       2,s       store node pointer
+                    ldd       26,s      load other pointer
+                    ldx       2,s       load node pointer
+                    std       4,x       link node forward
+                    ldd       2,s       load node pointer
+                    ldx       26,s      load other pointer
+                    std       4,x       link node backward
+                    bra       MergeLoopTest proceed to merge loop
+
+MergeLoop           ldd       26,s      load other pointer
+                    pshs      d         push argument
+                    pshs      u         push u
+                    lbsr      UnlinkInsn merge the matched operands
+                    leas      4,s        pop arguments
+                    ldu       ,u        follow u parent link
+                    ldd       2,u       load u operand pointer
+                    pshs      d         push argument
+                    lbsr      FreeOperand remove the redundant instruction
+                    leas      2,s        pop argument
+                    ldd       GlbWord0021 load optimisation counter
+                    addd      #1        increment it
+                    std       GlbWord0021 store counter back
+                    ldd       [26,s]    dereference other chain
+                    std       26,s      advance other pointer
+MergeLoopTest       ldd       ,s        load depth counter
+                    addd      #$FFFF    decrement by one
+                    std       ,s        store counter
+                    subd      #$FFFF    test for remaining depth
+                    bge       MergeLoop loop while depth left
+                    clra                clear high byte
+                    clrb                clear low byte
+                    pshs      d         push zero argument
+                    ldd       4,s       load work pointer
+                    addd      #12       offset to target field
+                    pshs      d         push argument
+                    leax      OpLbra,pcr point at lbra mnemonic
+                    pshs      x         push mnemonic argument
+                    pshs      u         push u
+                    lbsr      AddLineNode emit the branch instruction
+                    leas      8,s        pop arguments
+                    pshs      u         push u
+                    lbsr      OptBranchPass finalize the emitted block
+                    leas      2,s        pop argument
+                    ldd       4,s       load work pointer
+                    pshs      d         push argument
+                    ldx       6,s       load operand base
+                    ldd       4,x       load its forward link
+                    pshs      d         push argument
+                    bsr       UpdateUseChain update the use chain
+                    leas      4,s        pop arguments
+                    ldd       #1        return success
+                    bra       ReturnValue branch to common exit
+
+ReturnZero          clra                clear high byte for zero
+                    clrb                clear low byte
+ReturnValue         leas      20,s       tear down local frame
+                    puls      pc,u      return with result
+
+UpdateUseChain      pshs      u,d       save registers and result slot
+                    bra       UseLoopTest enter the use loop test
+
+UseNextLoop         ldx       6,s       load operand base
+                    ldd       6,x       load next use pointer
+                    bra       UseStore  store advanced pointer
+
+UseCheckLoop        ldx       ,s        load use list head
+                    ldu       2,x       load use record pointer
+                    ldd       Flags,u     load its flags
+                    anda      #$01      isolate low flag bit
+                    clrb                clear low byte
+                    std       -2,s      save masked flag
+                    beq       UseFollow skip if flag clear
+                    ldd       Flags,u     load flags again
+                    clra                clear high byte
+                    andb      #$80      test high flag bit
+                    bne       UseFollow skip if set
+                    ldx       8,s       load current operand
+                    ldd       2,x       load its operand pointer
+                    pshs      d         push argument
+                    ldd       2,u       load use operand pointer
+                    pshs      d         push argument
+                    lbsr      MatchBlockPair compare the operands
+                    leas      4,s        pop arguments
+                    std       -2,s      save result
+                    bne       UseNextBlock exit block on match
+UseFollow           ldd       [,s]      follow the use link
+UseStore            std       ,s        store advanced pointer
+                    ldd       ,s        load pointer
+                    bne       UseCheckLoop loop while entries remain
+UseNextBlock        ldx       6,s       load operand base
+                    ldd       8,x       load next block link
+                    std       6,s       store block pointer
+UseLoopTest         ldd       6,s       load block pointer
+                    bne       UseNextLoop loop while blocks remain
+                    leas      2,s        pop result slot
+                    puls      pc,u      return
+
+Otxt_17A9           fcc       /,x+/
+                    fcb       C$NULL
+Otxt_17AD           fcc       /,y+/
+                    fcb       C$NULL
+Otxt_17B1           fcc       /,u+/
+                    fcb       C$NULL
+Otxt_17B5           fcc       /,-x/
+                    fcb       C$NULL
+Otxt_17B9           fcc       /,-y/
+                    fcb       C$NULL
+Otxt_17BD           fcc       /,-u/
+                    fcb       C$NULL
+Otxt_17C1           fcc       /,x++/
+                    fcb       C$NULL
+Otxt_17C6           fcc       /,y++/
+                    fcb       C$NULL
+Otxt_17CB           fcc       /,u++/
+                    fcb       C$NULL
+Otxt_17D0           fcc       /,--x/
+                    fcb       C$NULL
+Otxt_17D5           fcc       /,--y/
+                    fcb       C$NULL
+Otxt_17DA           fcc       /,--u/
+                    fcb       C$NULL
+Otxt_17DF           fcc       /,s++/
+                    fcb       C$NULL
+Otxt_17E4           fcc       /-4,s/
+                    fcb       C$NULL
+Otxt_17E9           fcc       /-6,s/
+                    fcb       C$NULL
+OpLbra              fcc       /lbra/
+                    fcb       C$NULL
+LookupOpcode        pshs      u,d       save registers
+                    ldd       6,s       load mnemonic argument
+                    pshs      d         push argument
+                    lbsr      Sbrk      look up the mnemonic index
+                    leas      2,s        pop argument
+                    std       ,s        save index
+                    cmpd      #$FFFF    lookup failed
+                    bne       LookupDone2 skip error on success
+                    leax      >MsgMemoryOverflow,pcr point at memory overflow message
+                    pshs      x         push message argument
+                    bsr       FatalError report the fatal error
+                    leas      2,s        pop argument
+LookupDone2         ldd       ,s        load lookup result
+                    bra       ErrorReturn branch to return
+
+FatalError          pshs      u         save u
+                    leax      >MsgOptimiserError,pcr point at error prefix string
+                    pshs      x         push argument
+                    leax      OutputStream,y   load stderr stream pointer
+                    pshs      x         push stream argument
+                    lbsr      fprintf   print the error prefix
+                    leas      4,s        pop arguments
+                    ldd       10,s      load message argument
+                    pshs      d         push it
+                    ldd       10,s      load message argument
+                    pshs      d         push it
+                    ldd       10,s      load message argument
+                    pshs      d         push it
+                    ldd       10,s      load message argument
+                    pshs      d         push it
+                    leax      OutputStream,y   load stderr stream pointer
+                    pshs      x         push stream argument
+                    lbsr      fprintf   print the formatted message
+                    leas      10,s       pop arguments
+                    leax      OutputStream,y   load stderr stream pointer
+                    pshs      x         push stream argument
+                    ldd       #13       prepare carriage return
+                    pshs      d         push it
+                    lbsr      Putc      write the newline
+                    leas      4,s        pop arguments
+                    ldd       #1        prepare exit status one
+                    pshs      d         push status
+                    lbsr      exit      terminate the program
+ErrorReturn         leas      2,s        pop argument
+                    puls      pc,u      return
+
+MsgMemoryOverflow   fcc       /memory overflow/
+                    fcb       C$NULL
+MsgOptimiserError   fcc       /C optimiser error: /
+                    fcb       C$NULL
+AllocOperand        pshs      u         save u
+                    leau      InputPathBuffer,y   point at the operand table base
+AllocScanLoop       ldd       Flags,u     load entry flags
+                    clra                clear high byte
+                    andb      #$03      mask the in-use bits
+                    lbeq      ReturnSlot free slot found
+                    leau      13,u      advance to next table entry
+                    pshs      u         push entry pointer
+                    leax      PastTableEnd,y   point past table end
+                    cmpx      ,s++      compare against end
+                    bhi       AllocScanLoop loop while within table
+                    ldd       #200      prepare overflow error code
+                    std       Errno,y   set the error flag
+                    lbra      ReturnNull return null on overflow
+
+                    puls      pc,u      return
+
+MakeOperand         pshs      u         save u
+                    ldu       8,s       load caller-provided slot
+                    bne       FillOperand branch if slot supplied
+                    bsr       AllocOperand allocate a new operand slot
+                    tfr       d,u       move result into u
+FillOperand         stu       -2,s      save the slot pointer
+                    beq       ReturnNull return null if allocation failed
+                    ldd       4,s       load field argument
+                    std       8,u       store into operand record
+                    ldx       6,s       load text pointer
+                    ldb       1,x       load first character
+                    cmpb      #'+      is it a plus sign
+                    beq       SetIncFlags branch to set increment flags
+                    ldx       6,s       load text pointer
+                    ldb       2,x       load second character
+                    cmpb      #'+      is it a plus sign
+                    bne       CheckRegType branch if no increment
+SetIncFlags         ldd       Flags,u     load operand flags
+                    orb       #$03      set auto-increment flag bits
+                    bra       StoreOperandFlags go store the flags
+
+CheckRegType        ldd       Flags,u     load operand flags
+                    pshs      d         push them
+                    ldb       [8,s]     load indirect text character
+                    cmpb      #'r      is it register r
+                    beq       RegTypeOne branch if r
+                    ldb       [8,s]     reload character
+                    cmpb      #'d      is it register d
+                    bne       RegTypeTwo branch if not d
+RegTypeOne          ldd       #1        select flag value one
+                    bra       MergeRegFlags go merge flags
+
+RegTypeTwo          ldd       #2        select flag value two
+MergeRegFlags       ora       ,s+       merge into flag high byte
+                    orb       ,s+       merge into flag low byte
+StoreOperandFlags   std       Flags,u     store the operand flags
+                    ldd       2,u       load operand base value
+                    addd      BufferSize,u     add operand length
+                    std       4,u       store end pointer
+                    std       ,u        store current pointer
+ReturnSlot          tfr       u,d       return the slot pointer
+                    puls      pc,u      return
+
+ReturnNull          clra                clear high byte for null
+                    clrb                clear low byte
+                    puls      pc,u      return
+
+OperandEntry        pshs      u         save u
+                    ldu       4,s       load operand argument pointer
+                    leas      -4,s       reserve local scratch for mode flags
+                    clra                clear high byte
+                    clrb                clear low byte
+                    std       ,s        initialize addressing-mode flags to zero
+                    ldx       10,s      load operand token pointer
+                    ldb       1,x       read second char of token
+                    sex                 widen char to word
+                    tfr       d,x       move char into x for compare
+                    bra       OperDispatchChar dispatch on first char
+
+OperIndexX          ldx       10,s      reload operand token pointer
+                    ldb       2,x       read third char of token
+                    cmpb      #'+      is it a plus
+                    bne       OperIndexXPlain no plus, use plain index flag
+                    ldd       #7        x index with post-increment flag
+                    bra       OperStoreMode store mode flag
+
+OperIndexXPlain     ldd       #4        plain x index flag
+                    bra       OperStoreMode store mode flag
+
+OperIndexPlus       ldd       #3        plus auto-increment flag
+OperStoreMode       std       ,s        save computed addressing-mode flag
+                    bra       OperReadRegChar read register letter next
+
+OperModeErr         leax      4,s       point past local frame for unwind
+                    lbra      OperUnwindErr take error path
+
+OperDispatchChar    stx       -2,s      save first char
+                    beq       OperReadRegChar empty falls through to register read
+                    cmpx      #120      is char 'x'
+                    beq       OperIndexX handle x index mode
+                    cmpx      #43       is char '+'
+                    beq       OperIndexPlus handle plus index mode
+                    bra       OperModeErr unknown mode, error
+
+OperReadRegChar     ldb       [10,s]    read register letter via token pointer
+                    sex                 widen to word
+                    tfr       d,x       move into x for compare
+                    lbra      OperRegDispatch dispatch register letter
+
+OperRegR            ldd       ,s        load mode flags
+                    orb       #$01      set 'r' register bit
+                    bra       OperEmitReg emit register operand
+
+OperRegA            ldd       ,s        load mode flags
+                    orb       #$02      set 'a' register bit
+                    pshs      d         push flags argument
+                    pshs      u         push node argument
+                    lbsr      open      build operand entry
+                    leas      4,s        drop call arguments
+                    std       2,s       save result pointer
+                    cmpd      #$FFFF    allocation failed
+                    beq       OperRegW  fall back on failure
+                    ldd       #2        push size two argument
+                    pshs      d         push it
+                    clra                clear
+                    clrb                clear
+                    pshs      d         push zero field
+                    clra                clear
+                    clrb                clear
+                    pshs      d         push zero field
+                    ldd       8,s       reload operand pointer
+                    pshs      d         push it
+                    lbsr      lseek     append operand fields
+                    leas      8,s        drop arguments
+                    bra       OperReturnEntry return built entry
+
+OperRegW            ldd       ,s        load mode flags
+                    orb       #$02      set 'a' register bit
+                    pshs      d         push flags argument
+                    pshs      u         push node argument
+                    lbsr      creat     build alternate operand entry
+                    bra       OperStoreEntry store result
+
+OperRegD            ldd       ,s        load mode flags
+                    orb       #$81      set 'd' double register bits
+OperEmitReg         pshs      d         push flags argument
+                    pshs      u         push node argument
+                    lbsr      open      build operand entry
+OperStoreEntry      leas      4,s        drop arguments
+                    std       2,s       save result pointer
+                    bra       OperReturnEntry return built entry
+
+OperUnwindErr       leas      -4,x      restore stack pointer for error
+OperSetError        ldd       #203      error code 203
+                    std       Errno,y   set compiler error
+                    clra                clear
+                    clrb                clear
+                    bra       OperExit  return null
+
+OperRegDispatch     cmpx      #114      is register 'r'
+                    lbeq      OperRegR  register operand
+                    cmpx      #97       is register 'a'
+                    lbeq      OperRegA  accumulator operand
+                    cmpx      #119      is register 'w'
+                    beq       OperRegW  word operand
+                    cmpx      #100      is register 'd'
+                    beq       OperRegD  double operand
+                    bra       OperSetError unknown register, error
+
+OperReturnEntry     ldd       2,s       load built operand pointer
+OperExit            leas      4,s        drop local frame
+                    puls      pc,u      return
+
+                    pshs      u         save the caller u register
+                    clra                clear
+                    clrb                clear
+                    pshs      d         push zero destination
+                    ldd       8,s       load operand argument
+                    pshs      d         push it
+                    ldd       8,s       load token argument
+                    pshs      d         push it
+                    lbra      OperandBuild tail into operand builder
+
+AssembleOperand     pshs      u         save the caller u register
+                    ldd       6,s       load token argument
+                    pshs      d         push it
+                    ldd       6,s       load context argument
+                    pshs      d         push it
+                    lbsr      OperandEntry parse operand token
+                    leas      4,s        drop arguments
+                    tfr       d,u       keep parsed node
+                    cmpu      #$FFFF    parse failed
+                    bne       OperandNoDest parse succeeded
+                    clra                clear
+                    clrb                clear
+                    bra       OperandRet return null
+
+OperandNoDest       clra                clear
+                    clrb                clear
+                    bra       OperandEmit emit with zero destination
+
+AssembleOperandAlloc pshs      u         save the caller u register
+                    ldd       8,s       load size argument
+                    pshs      d         push it
+                    lbsr      FcloseOne allocate result buffer
+                    leas      2,s        drop argument
+                    ldd       6,s       load token argument
+                    pshs      d         push it
+                    ldd       6,s       load context argument
+                    pshs      d         push it
+                    lbsr      OperandEntry parse operand token
+                    leas      4,s        drop arguments
+                    tfr       d,u       keep parsed node
+                    stu       -2,s      save node
+                    bge       OperandWithDest valid node, continue
+                    clra                clear
+                    clrb                clear
+                    bra       OperandRet return null
+
+OperandWithDest     ldd       8,s       load destination argument
+OperandEmit         pshs      d         push destination
+                    ldd       8,s       load node argument
+                    pshs      d         push it
+                    pshs      u         push parsed node
+OperandBuild        lbsr      MakeOperand build instruction from operand
+                    leas      6,s        drop arguments
+OperandRet          puls      pc,u      return result
+
+                    pshs      u,d       save u and destination arg
+                    ldu       6,s       load destination buffer pointer
+ReadLineLoop2       leax      InputPathBuffer,y   source line buffer address
+                    pshs      x         push it
+                    lbsr      Getc      read next char
+                    leas      2,s        drop argument
+                    std       ,s        save char
+                    cmpd      #13       is carriage return
+                    beq       ReadLineEnd end of line
+                    ldd       ,s        reload char
+                    cmpd      #$FFFF    read error
+                    beq       ReadLineEnd stop on error
+                    ldd       ,s        reload char
+                    stb       ,u+       store into destination buffer
+                    bra       ReadLineLoop2 next char
+
+ReadLineEnd         ldd       ,s        load last char
+                    cmpd      #$FFFF    was it a read error
+                    bne       ReadLineTerm no, terminate normally
+                    clra                clear
+                    clrb                clear
+                    puls      pc,u,x    return null
+
+ReadLineTerm        clra                clear
+                    clrb                clear
+                    stb       ,u        null-terminate buffer
+                    ldd       6,s       load destination buffer pointer
+                    puls      pc,u,x    return buffer
+
+ReadCountedChars    pshs      u         save the caller u register
+                    ldu       6,s       load remaining count
+                    leas      -4,s       reserve local cursor
+                    ldd       8,s       load destination pointer
+                    std       ,s        initialize cursor
+ReadCharsLoop       tfr       u,d       copy remaining count
+                    leau      -1,u      decrement count
+                    std       -2,s      save updated count
+                    ble       ReadCharsDone done when count exhausted
+                    ldd       12,s      load source argument
+                    pshs      d         push it
+                    lbsr      Getc      read next char
+                    leas      2,s        drop argument
+                    std       2,s       save char
+                    cmpd      #$FFFF    read error
+                    beq       ReadCharsDone stop on error
+                    ldd       2,s       reload char
+                    ldx       ,s        load cursor
+                    leax      1,x       advance cursor
+                    stx       ,s        save cursor
+                    stb       -1,x      store char at cursor
+                    cmpb      #C$CR      is carriage return
+                    bne       ReadCharsLoop continue reading
+ReadCharsDone       clra                clear
+                    clrb                clear
+                    stb       [,s]      null-terminate at cursor
+                    ldd       2,s       load last char
+                    cmpd      #$FFFF    was it read error
+                    bne       ReadCharsOk no, return buffer
+                    clra                clear
+                    clrb                clear
+                    bra       ReadCharsExit return null
+
+ReadCharsOk         ldd       8,s       load destination pointer
+ReadCharsExit       leas      4,s        drop locals
+                    puls      pc,u      return
+
+                    pshs      u         save the caller u register
+                    leax      OutputPathBuffer,y   internal output buffer address
+                    stx       OutputPointer,y   set output pointer
+                    leax      6,s       address of variadic arguments
+                    pshs      x         push it
+                    ldd       6,s       load format string
+                    bra       PrintfTail into formatter tail
+
+fprintf             pshs      u         save the caller u register
+                    ldd       4,s       load output stream argument
+                    std       OutputPointer,y   set output pointer
+                    leax      8,s       address of variadic arguments
+                    pshs      x         push it
+                    ldd       8,s       load format string
+PrintfTail          pshs      d         push format string
+                    leax      PutcStdout,pcr buffered putc routine
+                    pshs      x         push it
+                    bsr       doprnt    run formatter
+                    leas      6,s        drop arguments
+                    puls      pc,u      return
+
+Sprintf             pshs      u         save the caller u register
+                    ldd       4,s       load destination string pointer
+                    std       OutputPointer,y   set output pointer
+                    leax      8,s       address of variadic arguments
+                    pshs      x         push it
+                    ldd       8,s       load format string
+                    pshs      d         push it
+                    leax      BufAppendByte,pcr string putc routine
+                    pshs      x         push it
+                    bsr       doprnt    run formatter
+                    leas      6,s        drop arguments
+                    clra                clear
+                    clrb                clear
+                    stb       [OutputPointer,y] null-terminate output string
+                    ldd       4,s       return destination pointer
+                    puls      pc,u      return
+
+doprnt              pshs      u         save the caller u register
+                    ldu       6,s       load format string pointer
+                    leas      -11,s      reserve formatter locals
+DoprntLoop          ldb       ,u+       fetch next format char
+                    stb       8,s       save char
+                    cmpb      #'%      is it a percent
+                    beq       DoprntConv handle conversion
+                    ldb       8,s       reload char
+                    lbeq      FmtReturn null terminates format
+                    ldb       8,s       reload char
+                    sex                 widen to word
+                    pshs      d         push char argument
+                    jsr       [17,s]    call output routine
+                    leas      2,s        drop argument
+                    bra       DoprntLoop next char
+
+DoprntConv          ldb       ,u+       char after percent
+                    stb       8,s       save it
+                    clra                clear
+                    clrb                clear
+                    std       2,s       clear precision accumulator
+                    std       6,s       clear width accumulator
+                    ldb       8,s       reload char
+                    cmpb      #45       is left-justify flag
+                    bne       NoLeftFlag no flag present
+                    ldd       #1        mark left-justify
+                    std       LeftJustifyFlag,y   store flag
+                    ldb       ,u+       advance past flag
+                    stb       8,s       save char
+                    bra       AfterFlags continue after flag
+
+NoLeftFlag          clra                clear
+                    clrb                clear
+                    std       LeftJustifyFlag,y   clear left-justify flag
+AfterFlags          ldb       8,s       reload char
+                    cmpb      #48       is zero-pad flag
+                    bne       PadSpace  no zero pad
+                    ldd       #'0       pad character is zero
+                    bra       StorePadChar store pad char
+
+PadSpace            ldd       #'        pad character is space
+StorePadChar        std       PadCharacter,y   save chosen pad char
+WidthLoop           ldb       8,s       load current char
+                    sex                 widen to word
+                    leax      CtypeTab,y character class table base
+                    leax      d,x       index by char
+                    ldb       ,x        load class flags
+                    clra                clear high byte
+                    andb      #$08      is it a digit
+                    beq       CheckPrecision no more width digits
+                    ldd       6,s       load current width
+                    pshs      d         push it
+                    ldd       #10       multiply by ten
+                    lbsr      MulEntry  width times ten
+                    pshs      d         push product
+                    ldb       10,s      load digit char
+                    sex                 widen
+                    addd      #$FFD0    subtract ascii zero
+                    addd      ,s++      add to width times ten
+                    std       6,s       save width
+                    ldb       ,u+       fetch next char
+                    stb       8,s       save it
+                    bra       WidthLoop continue width digits
+
+CheckPrecision      ldb       8,s       load current char
+                    cmpb      #'.      is precision dot
+                    bne       NoPrecision no precision field
+                    ldd       #1        mark precision present
+                    std       4,s       store flag
+PrecisionLoop       ldb       ,u+       fetch next char
+                    stb       8,s       save it
+                    ldb       8,s       reload char
+                    sex                 widen
+                    leax      CtypeTab,y character class table base
+                    leax      d,x       index by char
+                    ldb       ,x        load class flags
+                    clra                clear high byte
+                    andb      #$08      is it a digit
+                    beq       GetConvChar precision digits done
+                    ldd       2,s       load current precision
+                    pshs      d         push it
+                    ldd       #10       multiply by ten
+                    lbsr      MulEntry  precision times ten
+                    pshs      d         push product
+                    ldb       10,s      load digit char
+                    sex                 widen
+                    addd      #$FFD0    subtract ascii zero
+                    addd      ,s++      add digit
+                    std       2,s       save precision
+                    bra       PrecisionLoop continue precision digits
+
+NoPrecision         clra                clear
+                    clrb                clear
+                    std       4,s       clear precision-present flag
+GetConvChar         ldb       8,s       load conversion specifier char
+                    sex                 widen to word
+                    tfr       d,x       move into x for dispatch
+                    lbra      ConvDispatch dispatch on conversion char
+
+ConvSignedDec       ldd       6,s       push field width
+                    pshs      d         push it
+                    ldx       21,s      load variadic argument pointer
+                    leax      2,x       advance past this argument
+                    stx       21,s      save argument pointer
+                    ldd       -2,x      fetch integer argument
+                    pshs      d         push it
+                    lbsr      SignedToStr format signed decimal
+                    bra       ConvIntEmit emit formatted integer
+
+ConvOctal           ldd       6,s       push field width
+                    pshs      d         push it
+                    ldx       21,s      load variadic argument pointer
+                    leax      2,x       advance past this argument
+                    stx       21,s      save argument pointer
+                    ldd       -2,x      fetch integer argument
+                    pshs      d         push it
+                    lbsr      UnsToOctStr format octal
+ConvIntEmit         std       ,s        save formatted string
+                    lbra      EmitConvStr emit and continue
+
+ConvHex             ldd       6,s       push field width
+                    pshs      d         push it
+                    ldb       10,s      load conversion char
+                    sex                 widen
+                    leax      CtypeTab,y character class table base
+                    leax      d,x       index by char
+                    ldb       ,x        load class flags
+                    clra                clear high byte
+                    andb      #$02      test uppercase-hex flag
+                    pshs      d         push case flag
+                    ldx       23,s      load variadic argument pointer
+                    leax      2,x       advance past this argument
+                    stx       23,s      save argument pointer
+                    ldd       -2,x      fetch integer argument
+                    pshs      d         push it
+                    lbsr      UnsToHexStr format hexadecimal
+                    lbra      DropArgs4 emit and continue
+
+ConvUnsigned        ldd       6,s       push field width
+                    pshs      d         push it
+                    ldx       21,s      load variadic argument pointer
+                    leax      2,x       advance past this argument
+                    stx       21,s      save argument pointer
+                    ldd       -2,x      fetch unsigned integer argument
+                    pshs      d         push value argument
+                    leax      OutputBuffer,y   point to output buffer
+                    pshs      x         push buffer pointer
+                    lbsr      UnsToDecStr convert number to decimal string
+                    lbra      DropArgs4 go emit the result
+
+FloatConv           ldd       4,s       precision flag set
+                    bne       FloatConvGo skip default if precision given
+                    ldd       #6        default float precision 6
+                    std       2,s       store precision
+FloatConvGo         ldd       6,s       load float value
+                    pshs      d         push value
+                    leax      21,s      point to work area
+                    pshs      x         push work pointer
+                    ldd       6,s       push value again
+                    pshs      d         push value
+                    ldb       14,s      load conversion char
+                    sex                 sign extend char
+                    pshs      d         push conversion char
+                    lbsr      StrlenThunk+1 call float format routine
+                    leas      6,s        clean call arguments
+                    lbra      PushConvStr go emit result
+
+CharConv            ldx       19,s      load va_arg pointer
+                    leax      2,x       advance past argument
+                    stx       19,s      store advanced pointer
+                    ldd       -2,x      fetch char argument
+                    lbra      EmitChar  emit single character
+
+StrConv             ldx       19,s      load va_arg pointer
+                    leax      2,x       advance past argument
+                    stx       19,s      store advanced pointer
+                    ldd       -2,x      fetch string pointer argument
+                    std       9,s       save string pointer
+                    ldd       4,s       precision specified
+                    beq       StrNoPrec branch if no precision
+                    ldd       9,s       reload string pointer
+                    std       4,s       set scan start
+StrPrecLoop         ldd       2,s       remaining precision count
+                    addd      #$FFFF    decrement count
+                    std       2,s       store count
+                    subd      #$FFFF    test original count
+                    beq       StrEmitField stop when count exhausted
+                    ldb       [9,s]     fetch string char
+                    beq       StrEmitField stop at null terminator
+                    ldd       9,s       load string pointer
+                    addd      #1        advance one char
+                    std       9,s       store pointer
+                    bra       StrPrecLoop continue scanning
+
+StrEmitField        ldd       6,s       load pointer
+                    pshs      d         push it
+                    ldd       11,s      load end pointer
+                    subd      6,s       compute measured length
+                    pshs      d         push length
+                    ldd       8,s       push field width
+                    pshs      d         push field width
+                    ldd       21,s      push output routine pointer
+                    pshs      d         push pointer
+                    lbsr      EmitPaddedField emit padded field
+                    leas      8,s        clean arguments
+                    bra       ConvDone  loop back to format loop
+
+StrNoPrec           ldd       6,s       load pointer
+                    pshs      d         push it
+                    ldd       11,s      load string pointer
+                    bra       PushConvStr emit string
+
+LongModifier        ldb       ,u+       fetch next format char for l flag
+                    stb       8,s       store size flag
+                    bra       IntFormat go format integer
+
+                    leas      -11,x     unreachable filler after branch
+IntFormat           ldd       6,s       load value
+                    pshs      d         push value
+                    leax      21,s      point to work area
+                    pshs      x         push work pointer
+                    ldb       12,s      load conversion char
+                    sex                 sign extend
+                    pshs      d         push char
+                    lbsr      FormatConv call integer format routine
+DropArgs4           leas      4,s        drop call arguments
+PushConvStr         pshs      d         push converted string pointer
+EmitConvStr         ldd       19,s      load output pointer
+                    pshs      d         push it
+                    lbsr      EmitStrField emit string field
+                    leas      6,s        clean arguments
+ConvDone            lbra      DoprntLoop back to main format loop
+
+LiteralChar         ldb       8,s       default: fetch char
+                    sex                 sign extend
+EmitChar            pshs      d         push char
+                    jsr       [17,s]    call output routine
+                    leas      2,s        clean argument
+                    lbra      DoprntLoop back to format loop
+
+ConvDispatch        cmpx      #100      is specifier 'd'
+                    lbeq      ConvSignedDec handle signed decimal
+                    cmpx      #111      is specifier 'o'
+                    lbeq      ConvOctal handle octal
+                    cmpx      #120      is specifier 'x'
+                    lbeq      ConvHex   handle lowercase hex
+                    cmpx      #88       is specifier 'X'
+                    lbeq      ConvHex   handle uppercase hex
+                    cmpx      #117      is specifier 'u'
+                    lbeq      ConvUnsigned handle unsigned decimal
+                    cmpx      #102      is specifier 'f'
+                    lbeq      FloatConv handle float
+                    cmpx      #101      is specifier 'e'
+                    lbeq      FloatConv handle float
+                    cmpx      #103      is specifier 'g'
+                    lbeq      FloatConv handle float
+                    cmpx      #69       is specifier 'E'
+                    lbeq      FloatConv handle float
+                    cmpx      #71       is specifier 'G'
+                    lbeq      FloatConv handle float
+                    cmpx      #99       is specifier 'c'
+                    lbeq      CharConv  handle char
+                    cmpx      #115      is specifier 's'
+                    lbeq      StrConv   handle string
+                    cmpx      #108      is specifier 'l'
+                    lbeq      LongModifier handle long modifier
+                    bra       LiteralChar unknown specifier emitted literally
+
+FmtReturn           leas      11,s       discard locals
+                    puls      pc,u      return to caller
+
+SignedToStr         pshs      u,d       save regs on entry
+                    leax      OutputBuffer,y   point to output buffer
+                    stx       ,s        store buffer pointer local
+                    ldd       6,s       load value
+                    bge       IntAbsToStr positive: skip negation
+                    ldd       6,s       load value
+                    nega                negate high byte
+                    negb                negate low byte
+                    sbca      #0        complete 16-bit negate
+                    std       6,s       store absolute value
+                    bge       EmitSign  emit sign if now positive
+                    leax      MsgIntMin,pcr point to most-negative-int string
+                    pshs      x         push string pointer
+                    leax      OutputBuffer,y   point to output buffer
+                    pshs      x         push destination
+                    lbsr      strcpy    copy literal string
+                    leas      4,s        clean arguments
+                    puls      pc,u,x    return
+
+EmitSign            ldd       #'-       minus sign character
+                    ldx       ,s        load buffer pointer
+                    leax      1,x       advance
+                    stx       ,s        store pointer
+                    stb       -1,x      store minus sign
+IntAbsToStr         ldd       6,s       load absolute value
+                    pshs      d         push value
+                    ldd       2,s       load buffer pointer
+                    pshs      d         push it
+                    bsr       UnsToDecStr convert unsigned to decimal
+                    leas      4,s        clean arguments
+                    leax      OutputBuffer,y   return buffer pointer
+                    tfr       x,d       into d
+                    puls      pc,u,x    return
+
+UnsToDecStr         pshs      u,y,x,d   entry: convert to decimal digits
+                    ldu       10,s      load output pointer
+                    clra                clear
+                    clrb                clear
+                    std       2,s       zero nonzero-seen flag
+                    clra                clear
+                    clrb                clear
+                    std       ,s        zero digit accumulator
+DecNormLoop         ldd       12,s      load value
+                    bge       DecDigitInit non-negative: proceed
+                    ldd       ,s        load overflow count
+                    addd      #1        increment for overflow
+                    std       ,s        store count
+                    ldd       12,s      load value
+                    subd      Pow10,y   subtract table base power
+                    std       12,s      store value
+                    bra       DecNormLoop repeat normalization
+
+DecDigitInit        leax      Pow10,y   point to power-of-ten table
+                    stx       4,s       store table pointer
+DecDigitLoop        ldd       4,s       load table pointer
+                    cmpd      TableEnd,y   reached table end
+                    beq       DecFinalDigit done: emit final digit
+DecSubLoop          ldd       12,s      load remaining value
+                    subd      [4,s]     subtract current power of ten
+                    std       12,s      store value
+                    blt       DecRestore went negative: digit done
+                    ldd       ,s        load digit count
+                    addd      #1        increment digit
+                    std       ,s        store count
+                    bra       DecSubLoop keep subtracting
+
+DecRestore          ldd       12,s      load value
+                    addd      [4,s]     restore last subtraction
+                    std       12,s      store value
+                    ldd       ,s        load digit value
+                    beq       DecStoreDigit zero digit: maybe suppress
+                    ldd       #1        nonzero found
+                    std       2,s       mark nonzero seen
+DecStoreDigit       ldd       2,s       any nonzero digit yet
+                    beq       DecNextPow skip leading zero
+                    ldd       ,s        load digit
+                    addd      #48       convert to ascii
+                    stb       ,u+       store digit
+DecNextPow          clra                clear
+                    clrb                clear
+                    std       ,s        reset digit count
+                    ldd       4,s       load table pointer
+                    addd      #2        advance to next power
+                    std       4,s       store pointer
+                    bra       DecDigitLoop next digit position
+
+DecFinalDigit       ldd       12,s      load final units digit
+                    addd      #48       convert to ascii
+                    stb       ,u+       store digit
+                    clra                clear
+                    clrb                clear
+                    stb       ,u        null terminate string
+                    ldd       10,s      return output pointer
+                    leas      6,s        discard locals
+                    puls      pc,u      return
+
+UnsToOctStr         pshs      u,d       entry: convert to octal
+                    leax      OutputBuffer,y   point to output buffer
+                    stx       ,s        store buffer pointer
+                    leau      ScratchBuffer,y   point to scratch buffer
+OctDivLoop          ldd       6,s       load value
+                    clra                clear high byte
+                    andb      #$07      low three bits octal digit
+                    addd      #48       convert to ascii
+                    stb       ,u+       store into scratch
+                    ldd       6,s       load value
+                    lsra                shift right
+                    rorb                rotate
+                    lsra                shift right
+                    rorb                rotate
+                    lsra                shift right
+                    rorb                divide value by eight
+                    std       6,s       store value
+                    bne       OctDivLoop repeat until zero
+OctReverseLoop      leau      -1,u      back up scratch pointer
+                    pshs      u         push it
+                    leax      ScratchBuffer,y   scratch start
+                    cmpx      ,s++      reached start of scratch
+                    bhi       OctDone   done reversing
+                    ldb       ,u        fetch digit
+                    ldx       ,s        load output pointer
+                    leax      1,x       advance
+                    stx       ,s        store pointer
+                    stb       -1,x      copy digit to output
+                    bra       OctReverseLoop continue reverse copy
+
+OctDone             clra                clear
+                    clrb                clear
+                    stb       [,s]      null terminate output
+                    leax      OutputBuffer,y   return buffer pointer
+                    tfr       x,d       into d
+                    puls      pc,u,x    return
+
+UnsToHexStr         pshs      u,x,d     entry: convert to hex
+                    leax      OutputBuffer,y   point to output buffer
+                    stx       2,s       store buffer pointer
+                    leau      ScratchBuffer,y   point to scratch buffer
+HexDivLoop          ldd       8,s       load value
+                    clra                clear high byte
+                    andb      #$0f      low nibble
+                    std       ,s        store nibble
+                    pshs      d         push nibble
+                    ldd       2,s       reload nibble
+                    cmpd      #9        digit greater than nine
+                    ble       HexDigitBase no: numeric digit
+                    ldd       12,s      uppercase flag
+                    beq       HexLowerBase lowercase letters
+                    ldd       #'A       uppercase A base
+                    bra       HexLetterAdj go adjust
+
+HexLowerBase        ldd       #'a       lowercase a base
+HexLetterAdj        addd      #$FFF6    adjust for a-f offset
+                    bra       HexStoreDigit go store
+
+HexDigitBase        ldd       #48       numeric zero base
+HexStoreDigit       addd      ,s++      add nibble value
+                    stb       ,u+       store hex digit
+                    ldd       8,s       load value
+                    lsra                shift right
+                    rorb                rotate
+                    lsra                shift right
+                    rorb                rotate
+                    lsra                shift right
+                    rorb                rotate
+                    lsra                shift right
+                    rorb                divide value by sixteen
+                    anda      #$0f      mask high nibble
+                    std       8,s       store value
+                    bne       HexDivLoop repeat until zero
+HexReverseLoop      leau      -1,u      back up scratch pointer
+                    pshs      u         push it
+                    leax      ScratchBuffer,y   scratch start
+                    cmpx      ,s++      reached start of scratch
+                    bhi       HexDone   done reversing
+                    ldb       ,u        fetch digit
+                    ldx       2,s       load output pointer
+                    leax      1,x       advance
+                    stx       2,s       store pointer
+                    stb       -1,x      copy digit to output
+                    bra       HexReverseLoop continue reverse copy
+
+HexDone             clra                clear
+                    clrb                clear
+                    stb       [2,s]     null terminate output
+                    leax      OutputBuffer,y   return buffer pointer
+                    tfr       x,d       into d
+                    lbra      PutcStdoutDone return
+
+EmitPaddedField     pshs      u         entry: emit padded field
+                    ldu       6,s       load source pointer
+                    ldd       10,s      load field width
+                    subd      8,s       subtract string length
+                    std       10,s      store pad count
+                    ldd       LeftJustifyFlag,y   left-justify flag
+                    bne       EmitCharsLoop left: skip leading pad
+PadLeadLoop         ldd       10,s      load pad count
+                    addd      #$FFFF    decrement
+                    std       10,s      store count
+                    subd      #$FFFF    test count
+                    ble       EmitCharsLoop done padding
+                    ldd       PadCharacter,y   load pad character
+                    pshs      d         push it
+                    jsr       [6,s]     output pad char
+                    leas      2,s        clean argument
+                    bra       PadLeadLoop continue padding
+
+EmitCharsLoop       ldd       8,s       load string length
+                    addd      #$FFFF    decrement
+                    std       8,s       store count
+                    subd      #$FFFF    test count
+                    beq       PadTrailCheck done emitting chars
+                    ldb       ,u+       next string char
+                    sex                 sign extend
+                    pshs      d         push char
+                    jsr       [6,s]     output char
+                    leas      2,s        clean argument
+                    bra       EmitCharsLoop continue emitting
+
+PadTrailCheck       ldd       LeftJustifyFlag,y   left-justify flag
+                    beq       EmitFieldRet no trailing pad
+PadTrailLoop        ldd       10,s      load remaining pad count
+                    addd      #$FFFF    decrement
+                    std       10,s      store count
+                    subd      #$FFFF    test count
+                    ble       EmitFieldRet done padding
+                    ldd       PadCharacter,y   load pad character
+                    pshs      d         push it
+                    jsr       [6,s]     output pad char
+                    leas      2,s        clean argument
+                    bra       PadTrailLoop continue padding
+
+EmitFieldRet        puls      pc,u      return
+
+EmitStrField        pshs      u         entry: emit string field
+                    ldu       6,s       load string pointer
+                    ldd       8,s       load field width
+                    pshs      d         push width
+                    pshs      u         push string pointer
+                    lbsr      strlen+1  compute string length
+                    leas      2,s        clean argument
+                    nega                negate high byte
+                    negb                negate low byte
+                    sbca      #0        complete negate of length
+                    addd      ,s++      width minus length equals pad
+                    std       8,s       store pad count
+                    ldd       LeftJustifyFlag,y   left-justify flag
+                    bne       StrCharLoop left: skip leading pad
+StrPadLeadLoop      ldd       8,s       load pad count
+                    addd      #$FFFF    decrement
+                    std       8,s       store count
+                    subd      #$FFFF    test count
+                    ble       StrCharLoop done padding
+                    ldd       PadCharacter,y   load pad character
+                    pshs      d         push it
+                    jsr       [6,s]     output pad char
+                    leas      2,s        clean argument
+                    bra       StrPadLeadLoop continue padding
+
+StrCharLoop         ldb       ,u        peek next char
+                    beq       StrPadTrailCheck end of string
+                    ldb       ,u+       fetch and advance
+                    sex                 sign extend
+                    pshs      d         push char
+                    jsr       [6,s]     output char
+                    leas      2,s        clean argument
+                    bra       StrCharLoop continue emitting
+
+StrPadTrailCheck    ldd       LeftJustifyFlag,y   left-justify flag
+                    beq       PutcRet   no trailing pad
+StrPadTrailLoop     ldd       8,s       load remaining pad count
+                    addd      #$FFFF    decrement
+                    std       8,s       store count
+                    subd      #$FFFF    test count
+                    ble       PutcRet   done padding
+                    ldd       PadCharacter,y   load pad character
+                    pshs      d         push it
+                    jsr       [6,s]     output pad char
+                    leas      2,s        clean argument
+                    bra       StrPadTrailLoop continue padding
+
+PutcRet             puls      pc,u      restore and return to caller
+
+PutcStdout          pshs      u         save the caller u register
+                    ldd       OutputPointer,y   load the default output stream pointer
+                    pshs      d         pass stream as first argument
+                    ldd       6,s       fetch the byte to write
+                    pshs      d         pass byte as second argument
+                    lbsr      Putc      call putc on the default stream
+PutcStdoutDone      leas      4,s        drop the two arguments
+                    puls      pc,u      restore and return
+
+BufAppendByte       pshs      u         save the caller u register
+                    ldd       4,s       load the byte to store
+                    ldx       OutputPointer,y   load the current buffer cursor
+                    leax      1,x       advance cursor one byte
+                    stx       OutputPointer,y   save the updated cursor
+                    stb       -1,x      store byte at the old cursor
+                    puls      pc,u      restore and return
+
+MsgIntMin           fcc       /-32768/
+                    fcb       C$NULL
+Putc                pshs      u         save the caller u register
+                    ldu       6,s       load the FILE stream pointer
+                    ldd       Flags,u     load the stream flags
+                    anda      #$80      isolate the high flag bit
+                    andb      #$22      isolate write and error bits
+                    cmpd      #$8002    test the special error-write state
+                    beq       PutcModeCheck skip buffer setup if already flagged
+                    ldd       Flags,u     reload the flags
+                    clra                keep only the low flag byte
+                    andb      #$22      isolate the write-mode bits
+                    cmpd      #2        check the stream is open for writing
+                    lbne      IoErr     fail if not writable
+                    pshs      u         pass the stream to the allocator
+                    lbsr      FillBuf   allocate the stream buffer
+                    leas      2,s        drop the argument
+PutcModeCheck       ldd       Flags,u     load the flags
+                    clra                keep the low byte
+                    andb      #$04      test the unbuffered bit
+                    beq       PutcBuffered branch to the buffered path
+                    ldd       #1        count of one byte
+                    pshs      d         push the byte count
+                    leax      7,s       point at the byte argument
+                    pshs      x         push the buffer address
+                    ldd       8,u       load the file descriptor
+                    pshs      d         push the descriptor
+                    ldd       Flags,u     load the flags
+                    clra                keep the low byte
+                    andb      #$40      test the text-translation bit
+                    beq       PutcSelectBin choose the binary writer
+                    leax      writeln,pcr select the text-mode write routine
+                    bra       PutcInvokeWrite go invoke it
+
+PutcSelectBin       leax      write,pcr select the binary write routine
+PutcInvokeWrite     tfr       x,d       move the routine address
+                    tfr       d,x       back into the pointer register
+                    jsr       ,x        call the write routine
+                    leas      6,s        drop the three arguments
+                    cmpd      #$FFFF    check for a write error
+                    bne       PutcReturn return the byte if written
+                    ldd       Flags,u     load the flags
+                    orb       #$20      mark the stream in error
+                    std       Flags,u     store the updated flags
+                    lbra      IoErr     return the error
+
+PutcBuffered        ldd       Flags,u     load the flags
+                    anda      #$01      isolate the read-active bit
+                    clrb                clear the low byte
+                    std       -2,s      save the test result
+                    bne       PutcStore skip init if already writing
+                    pshs      u         pass the stream
+                    lbsr      FlushBuf  flush to initialize the buffer
+                    leas      2,s        drop the argument
+PutcStore           ldd       ,u        load the buffer write pointer
+                    addd      #1        advance the pointer
+                    std       ,u        store the new pointer
+                    subd      #1        recover the old pointer
+                    tfr       d,x       into the index register
+                    ldd       4,s       load the byte
+                    stb       ,x        store byte into the buffer
+                    ldd       ,u        reload the write pointer
+                    cmpd      4,u       compare against the buffer end
+                    bcc       PutcFlush flush when the buffer is full
+                    ldd       Flags,u     load the flags
+                    clra                keep the low byte
+                    andb      #$40      test the line-buffer bit
+                    beq       PutcReturn done if not line buffered
+                    ldd       4,s       load the byte
+                    cmpd      #13       check for a carriage return
+                    bne       PutcReturn done unless newline
+PutcFlush           pshs      u         pass the stream
+                    lbsr      FlushBuf  flush the buffer
+                    std       ,s++      test the flush result
+                    lbne      IoErr     return error on flush failure
+PutcReturn          ldd       4,s       return the written byte
+                    puls      pc,u      restore and return
+
+                    pshs      u         save the caller u register for putw
+                    ldu       4,s       load the stream pointer
+                    ldd       6,s       load the word to write
+                    pshs      d         save the word for later
+                    pshs      u         push the stream argument
+                    ldd       #8        prepare a shift of eight bits
+                    lbsr      LsrEntry  extract the high byte
+                    pshs      d         push the high byte argument
+                    lbsr      Putc      write the high byte first
+                    leas      4,s        drop the arguments
+                    ldd       6,s       reload the word
+                    pshs      d         push the low byte argument
+                    pshs      u         push the stream argument
+                    lbsr      Putc      write the low byte
+                    lbra      FlushBufDone return through the common exit
+
+FlushAll            pshs      u,d       save registers for flush-all
+                    leau      InputPathBuffer,y   point at the stream table
+                    clra                zero the index
+                    clrb                zero the index
+                    std       ,s        initialize the loop counter
+FlushAllLoop        ldd       ,s        load the loop index
+                    addd      #1        increment the index
+                    std       ,s        store the index
+                    subd      #1        recover the index value
+                    cmpd      #16       compare against the stream count
+                    bge       FlushAllDone exit when all streams done
+                    tfr       u,d       copy the current stream pointer
+                    leau      13,u      advance to the next stream entry
+                    pshs      d         pass this stream
+                    bsr       FcloseOne close and flush the stream
+                    leas      2,s        drop the argument
+                    bra       FlushAllLoop loop to the next stream
+
+FlushAllDone        puls      pc,u,x    restore and return
+
+FcloseOne           pshs      u         save the caller u register for fclose
+                    ldu       4,s       load the stream pointer
+                    leas      -2,s       reserve a local
+                    cmpu      #0        check for a null stream
+                    beq       FcloseNull fail if null
+                    ldd       Flags,u     load the flags
+                    bne       FcloseFlush proceed if the stream is in use
+FcloseNull          ldd       #$FFFF    return failure
+                    puls      pc,u,x    restore and return
+
+FcloseFlush         ldd       Flags,u     load the flags
+                    clra                keep the low byte
+                    andb      #$02      test the write-mode bit
+                    beq       FcloseNoFlush skip flush if not writing
+                    pshs      u         pass the stream
+                    bsr       fflush    flush pending output
+                    leas      2,s        drop the argument
+                    bra       FcloseCallClose continue to the close
+
+FcloseNoFlush       clra                no flush result
+                    clrb                no flush result
+FcloseCallClose     std       ,s        save the flush result
+                    ldd       8,u       load the file descriptor
+                    pshs      d         pass the descriptor
+                    lbsr      close     close the file
+                    leas      2,s        drop the argument
+                    clra                clear the flags
+                    clrb                clear the flags
+                    std       Flags,u     mark the stream free
+                    ldd       ,s        return the flush result
+                    puls      pc,u,x    restore and return
+
+                    use       lib/fflush.asm
+GetBuf              equ       FillBuf this module's helper name
+
+FlushBuf            pshs      u         save the caller u register for flush
+                    ldu       4,s       load the stream pointer
+                    leas      -4,s       reserve locals
+                    ldd       Flags,u     load the flags
+                    anda      #$01      isolate the read bit
+                    clrb                clear the low byte
+                    std       -2,s      save the test result
+                    bne       FlushBufCount skip if a read stream
+                    ldd       ,u        load the write pointer
+                    cmpd      4,u       compare with the buffer base
+                    beq       FlushBufCount skip if the buffer is empty
+                    clra                zero the value
+                    clrb                zero the value
+                    pshs      d         push a null argument
+                    pshs      u         push the stream
+                    lbsr      TellPos   compute the buffer position
+                    leas      2,s        drop the argument
+                    ldd       2,x       load the end pointer from result
+                    pshs      d         push the end pointer
+                    ldd       ,x        load the start pointer
+                    pshs      d         push the start pointer
+                    ldd       8,u       load the file descriptor
+                    pshs      d         push the descriptor
+                    lbsr      lseek     seek to the file position
+                    leas      8,s        drop the arguments
+FlushBufCount       ldd       ,u        load the write pointer
+                    subd      2,u       compute the bytes buffered
+                    std       2,s       save the byte count
+                    lbeq      FlushResetPtr reset if nothing to write
+                    ldd       Flags,u     load the flags
+                    anda      #$01      isolate the read bit
+                    clrb                clear the low byte
+                    std       -2,s      save the test result
+                    lbeq      FlushResetPtr reset if a read stream
+                    ldd       Flags,u     load the flags
+                    clra                keep the low byte
+                    andb      #$40      test the text-mode bit
+                    beq       FlushWriteBlock block write if binary
+                    ldd       2,u       load the buffer base pointer
+FlushWriteLoop      std       ,u        reset write pointer to base
+                    ldd       2,s       load the remaining count
+                    lbeq      FlushResetPtr done when all written
+                    ldd       2,s       load the remaining count
+                    pshs      d         push the count
+                    ldd       ,u        load the current pointer
+                    pshs      d         push the buffer pointer
+                    ldd       8,u       load the descriptor
+                    pshs      d         push the descriptor
+                    lbsr      writeln   write chunk in text mode
+                    leas      6,s        drop the arguments
+                    std       ,s        save the bytes written
+                    cmpd      #$FFFF    check for a write error
+                    bne       FlushLoopAdvance continue if written
+                    leax      4,s       point at the error result
+                    bra       FlushErrAdjust handle the write error
+
+FlushLoopAdvance    ldd       2,s       load the remaining count
+                    subd      ,s        subtract the bytes written
+                    std       2,s       update the remaining count
+                    ldd       ,u        load the current pointer
+                    addd      ,s        advance by the bytes written
+                    bra       FlushWriteLoop loop for the remaining bytes
+
+FlushWriteBlock     ldd       2,s       load the byte count
+                    pshs      d         push the count
+                    ldd       2,u       load the buffer base
+                    pshs      d         push the buffer pointer
+                    ldd       8,u       load the descriptor
+                    pshs      d         push the descriptor
+                    lbsr      write     write the whole buffer binary
+                    leas      6,s        drop the arguments
+                    cmpd      2,s       check all bytes written
+                    beq       FlushResetPtr reset on a full write
+                    bra       FlushSetErr otherwise flag an error
+
+FlushErrAdjust      leas      -4,x      restore stack after the error
+FlushSetErr         ldd       Flags,u     load the flags
+                    orb       #$20      mark the stream in error
+                    std       Flags,u     store the flags
+                    ldd       4,u       load the buffer limit
+                    std       ,u        reset the write pointer
+                    ldd       #$FFFF    return the error
+                    bra       FlushBufDone exit through the common tail
+
+FlushResetPtr       ldd       Flags,u     load the flags
+                    ora       #$01      mark the empty/read state
+                    std       Flags,u     store the flags
+                    ldd       2,u       load the buffer base
+                    std       ,u        reset the current pointer
+                    addd      BufferSize,u     add the buffer size
+                    std       4,u       set the buffer end pointer
+                    clra                return success zero
+                    clrb                return success zero
+FlushBufDone        leas      4,s        drop the locals
+                    puls      pc,u      restore and return
+
+TellPos             pshs      u         save the caller u register
+                    puls      pc,u      return the position pointer
+
+Getc                pshs      u         save the caller u register for getc
+                    ldu       4,s       load the stream pointer
+                    beq       GetcEof   eof if null stream
+                    ldd       Flags,u     load the flags
+                    anda      #$01      isolate the error bit
+                    clrb                clear the low byte
+                    std       -2,s      save the test result
+                    bne       GetcEof   eof if flagged
+                    ldd       ,u        load the read pointer
+                    cmpd      4,u       compare with the buffer end
+                    bcc       GetcFill  refill when the buffer is empty
+                    ldd       ,u        load the read pointer
+                    addd      #1        advance the pointer
+                    std       ,u        store the new pointer
+                    subd      #1        recover the old pointer
+                    tfr       d,x       into the index register
+                    ldb       ,x        read the byte from the buffer
+                    clra                widen to a word
+                    bra       GetcRet   return the byte
+
+GetcFill            pshs      u         pass the stream
+                    lbsr      Filbuf    refill from the file
+                    leas      2,s        drop the argument
+GetcRet             puls      pc,u      restore and return
+
+                    pshs      u         save the caller u register for ungetc
+                    ldu       6,s       load the stream pointer
+                    beq       GetcEof   fail if null stream
+                    ldd       Flags,u     load the flags
+                    clra                keep the low byte
+                    andb      #$01      test the read-mode bit
+                    beq       GetcEof   fail if not reading
+                    ldd       4,s       load the pushback byte
+                    cmpd      #$FFFF    reject an eof pushback
+                    beq       GetcEof   fail on eof
+                    ldd       ,u        load the read pointer
+                    cmpd      2,u       check room before buffer start
+                    bhi       UngetcStore store if space is available
+GetcEof             ldd       #$FFFF    return eof
+                    puls      pc,u      restore and return
+
+UngetcStore         ldd       ,u        load the read pointer
+                    addd      #$FFFF    back up one byte
+                    std       ,u        store the new pointer
+                    tfr       d,x       into the index register
+                    ldd       4,s       load the pushback byte
+                    stb       ,x        store byte back in the buffer
+                    ldd       4,s       return the byte
+                    puls      pc,u      restore and return
+
+                    pshs      u         save the caller u register for getw
+                    ldu       4,s       load the stream pointer
+                    leas      -4,s       reserve locals
+                    pshs      u         push the stream
+                    lbsr      Getc      read the high byte
+                    leas      2,s        drop the argument
+                    std       2,s       save the high byte
+                    cmpd      #$FFFF    check for eof
+                    beq       GetwEof   fail on eof
+                    pshs      u         push the stream
+                    lbsr      Getc      read the low byte
+                    leas      2,s        drop the argument
+                    std       ,s        save the low byte
+                    cmpd      #$FFFF    check for eof
+                    bne       GetwCombine combine if valid
+GetwEof             ldd       #$FFFF    return eof
+                    bra       GetwDone  exit
+
+GetwCombine         ldd       2,s       load the high byte
+                    pshs      d         push the high byte
+                    ldd       #8        shift amount of eight
+                    lbsr      AslEntry  shift high byte into place
+                    addd      ,s        combine with the low byte
+GetwDone            leas      4,s        drop the locals
+                    puls      pc,u      restore and return
+
+Filbuf              pshs      u         save the caller u register for fill
+                    ldu       4,s       load the stream pointer
+                    leas      -2,s       reserve a local
+                    ldd       Flags,u     load the flags
+                    anda      #$80      isolate the high flag bit
+                    andb      #$31      isolate read and mode bits
+                    cmpd      #$8001    test an uninitialized read stream
+                    beq       FilbufSyncStdin initialize the buffer if so
+                    ldd       Flags,u     load the flags
+                    clra                keep the low byte
+                    andb      #$31      isolate the read-mode bits
+                    cmpd      #1        check open for reading
+                    beq       FilbufRead proceed if readable
+                    ldd       #$FFFF    return eof
+                    puls      pc,u,x    restore and return
+
+FilbufRead          pshs      u         pass the stream
+                    lbsr      FillBuf   allocate the read buffer
+                    leas      2,s        drop the argument
+FilbufSyncStdin     leax      InputPathBuffer,y   point at the standard input entry
+                    pshs      x         push it for comparison
+                    cmpu      ,s++      is this the console input
+                    bne       FilbufSeek skip sync if not stdin
+                    ldd       Flags,u     load the flags
+                    clra                keep the low byte
+                    andb      #$40      test the line-buffer bit
+                    beq       FilbufSeek skip if not line buffered
+                    leax      OutputPathBuffer,y   point at the standard output entry
+                    pshs      x         push stdout
+                    lbsr      fflush    flush stdout before reading
+                    leas      2,s        drop the argument
+FilbufSeek          ldd       Flags,u     load the flags
+                    clra                keep the low byte
+                    andb      #$08      test the seek-required bit
+                    beq       GetcReadOne skip seek if not needed
+                    ldd       BufferSize,u     load the buffer size
+                    pshs      d         push the size
+                    ldd       2,u       load the buffer base
+                    pshs      d         push the base pointer
+                    ldd       8,u       load the descriptor
+                    pshs      d         push the descriptor
+                    ldd       Flags,u     load the flags
+                    clra                keep the low byte
+                    andb      #$40      test the text-mode bit
+                    beq       FilbufSelectBin choose the binary reader
+                    leax      readln,pcr select the text-mode read routine
+                    bra       FilbufInvokeRead go invoke it
+
+FilbufSelectBin     leax      read,pcr  select the binary read routine
+FilbufInvokeRead    tfr       x,d       move the routine address
+                    tfr       d,x       into the pointer register
+                    jsr       ,x        call the read routine
+                    bra       GetcCheckRead continue after the read
+
+GetcReadOne         ldd       #1        request a single byte
+                    pshs      d         push the length argument
+                    leax      10,u      point at the inline one-byte buffer
+                    stx       2,u       set current pointer to that buffer
+                    pshs      x         push the buffer argument
+                    ldd       8,u       load the file descriptor
+                    pshs      d         push the path argument
+                    lbsr      read      call the low-level read helper
+GetcCheckRead       leas      6,s        drop the three arguments
+                    std       ,s        save the bytes-read count
+                    ldd       ,s        reload the count
+                    bgt       GetcReturnByte branch if a byte was read
+                    ldd       Flags,u     load the stream flags
+                    pshs      d         save the flags
+                    ldd       2,s       test the returned count
+                    beq       GetcSetEof zero means end of file
+                    ldd       #32       error flag bit
+                    bra       GetcOrFlags go merge the flag
+
+GetcSetEof          ldd       #16       end-of-file flag bit
+GetcOrFlags         ora       ,s+       merge the flag into the stream flags
+                    orb       ,s+       low byte too
+                    std       Flags,u     store the updated flags
+                    ldd       #$FFFF    return -1 for eof
+                    puls      pc,u,x    return
+
+GetcReturnByte      ldd       2,u       load the current buffer pointer
+                    addd      #1        advance past the byte
+                    std       ,u        store the new base pointer
+                    ldd       2,u       reload the pointer
+                    addd      ,s        add the count to get the end
+                    std       4,u       store the end pointer
+                    ldb       [2,u]     fetch the byte just read
+                    clra                zero-extend to a word
+                    puls      pc,u,x    return the byte
+
+FillBuf             pshs      u         save the caller u register
+                    ldu       4,s       load the stream pointer argument
+                    ldd       Flags,u     load the stream flags
+                    clra                isolate the low byte
+                    andb      #$C0      test the buffering bits
+                    bne       FillBufMarkActive already set up, skip allocation
+                    leas      -32,s      reserve a local scratch buffer
+                    leax      ,s        point at it
+                    pshs      x         push its address
+                    ldd       8,u       load the file descriptor
+                    pshs      d         push it
+                    clra                clear the high byte
+                    clrb                clear the low byte
+                    pshs      d         push a zero argument
+                    lbsr      QueryOperand query the device information
+                    leas      6,s        drop the arguments
+                    ldd       Flags,u     reload the flags
+                    pshs      d         save them
+                    ldb       2,s       test the device-type result
+                    bne       FillBufFully nonzero selects block buffering
+                    ldd       #64       line-buffered flag
+                    bra       FillBufOrMode go merge it
+
+FillBufFully        ldd       #128      fully-buffered flag
+FillBufOrMode       ora       ,s+       merge the buffering-mode flag
+                    orb       ,s+       low byte too
+                    std       Flags,u     store the flags
+                    leas      32,s       release the local buffer
+FillBufMarkActive   ldd       Flags,u     load the flags
+                    ora       #$80      mark the stream active
+                    std       Flags,u     store back
+                    clra                isolate the low byte
+                    andb      #$0C      test the eof/error bits
+                    beq       FillBufSize none set, continue
+                    puls      pc,u      abort on eof or error
+
+FillBufSize         ldd       BufferSize,u     load the buffer size
+                    bne       FillBufAlloc already sized, skip default
+                    ldd       Flags,u     load the flags
+                    clra                isolate the low byte
+                    andb      #$40      test line-buffered
+                    beq       FillBufDefSize not line-buffered
+                    ldd       #128      small buffer size
+                    bra       FillBufStoreSize go store it
+
+FillBufDefSize      ldd       #256      default buffer size
+FillBufStoreSize    std       BufferSize,u     store the buffer size
+FillBufAlloc        ldd       2,u       load the current pointer
+                    bne       FillBufAllocOk buffer already allocated
+                    ldd       BufferSize,u     load the buffer size
+                    pshs      d         push it
+                    lbsr      MemExtend allocate the buffer
+                    leas      2,s        drop the argument
+                    std       2,u       store the buffer pointer
+                    cmpd      #$FFFF    check the allocation result
+                    beq       FillBufAllocFail allocation failed
+FillBufAllocOk      ldd       Flags,u     load the flags
+                    orb       #$08      mark heap-allocated buffer
+                    std       Flags,u     store back
+                    bra       FillBufSetPtrs go finish setup
+
+FillBufAllocFail    ldd       Flags,u     load the flags
+                    orb       #$04      mark use of the inline buffer
+                    std       Flags,u     store back
+                    leax      10,u      point at the inline buffer
+                    stx       2,u       use it as the buffer
+                    ldd       #1        size of one byte
+                    std       BufferSize,u     store the size
+FillBufSetPtrs      ldd       2,u       load the buffer base
+                    addd      BufferSize,u     add the size
+                    std       4,u       set the end pointer
+                    std       ,u        set the current pointer
+                    puls      pc,u      return
+
+FormatConv          pshs      u         save the caller u register
+                    ldb       5,s       load the format character
+                    sex                 sign-extend it
+                    tfr       d,x       move into X for dispatch
+                    bra       ConvSwitch jump to the switch
+
+ConvNumeric         ldd       [6,s]     load the varargs pointer
+                    addd      #4        advance by one argument
+                    std       [6,s]     store it back
+                    leax      >StrlenThunk,pcr point at the numeric handler
+                    bra       ConvReturn return that pointer
+
+ConvChar            ldb       5,s       reload the character
+                    stb       WorkArea2,y   store it in the work area
+                    leax      WorkArea,y   point at the work area
+ConvReturn          tfr       x,d       move the result pointer to D
+                    puls      pc,u      return
+
+ConvSwitch          cmpx      #100      is it the d conversion
+                    beq       ConvNumeric handle it as numeric
+                    cmpx      #111      is it the o conversion
+                    lbeq      ConvNumeric handle it as numeric
+                    cmpx      #120      is it the x conversion
+                    lbeq      ConvNumeric handle it as numeric
+                    bra       ConvChar  default character copy
+
+                    puls      pc,u      unreachable return
+
+* ------------------------------------------------------------------
+* StrlenThunk/StrLen - reached ONLY via leax,pcr data pointers (never
+* branched or called), so the linear sweep decoded them as code.  They
+* read as a pair of function-pointer thunks: StrlenThunk returns &StrLen
+* in D; StrLen is strlen(4,s) - scan ldb,u+/bne for the NUL, length =
+* (end - start - 1).  But the leading "neg $34 / nega" ($00 $34 $40)
+* prologue would clobber DP $34 and A, which makes no sense as code, so
+* these may instead be data the sweep mis-framed.  Left as code: byte-
+* exact either way and the body reads as a genuine strlen.
+* ------------------------------------------------------------------
+StrlenThunk         neg       $0034     thunk prologue decoded from data
+                    nega                thunk prologue continued
+                    leax      >strlen,pcr point at the strlen routine
+                    tfr       x,d       return its address
+                    puls      pc,u      return
+
+* StrLen - strlen routine (entered via the &StrLen pointer returned above):
+                    use       lib/strlen.asm
+
+                    use       lib/strcpy.asm
+
+                    use       lib/strcat.asm
+
+strcmp              pshs      u         save the caller u register
+                    ldu       4,s       load the first string pointer
+StrCmpLoop          ldb       ,u        byte of the first string
+                    sex                 sign-extend
+                    pshs      d         save it
+                    ldb       [8,s]     byte of the second string
+                    sex                 sign-extend
+                    cmpd      ,s++      compare the two bytes
+                    bne       StrCmpDiff they differ, compute the result
+                    ldx       6,s       load the second pointer
+                    leax      1,x       advance it
+                    stx       6,s       store it
+                    ldb       -1,x      the compared byte
+                    bne       StrCmpNext not NUL, keep comparing
+                    clra                strings are equal
+                    clrb                return zero
+                    puls      pc,u      return
+
+StrCmpNext          leau      1,u       advance the first pointer
+                    bra       StrCmpLoop loop
+
+StrCmpDiff          ldb       [6,s]     second byte
+                    sex                 sign-extend
+                    pshs      d         save it
+                    ldb       ,u        first byte
+                    sex                 sign-extend
+                    subd      ,s++      compute the difference
+                    puls      pc,u      return the signed difference
+
+                    use       lib/imul.asm
+
+                    use       lib/divide.asm
+SendSignal          equ       RaiseSignal module signal raiser for divide by zero
+                    use       lib/shift.asm
+
+RaiseSignal         std       Errno,y   save the signal code
+                    pshs      y,b       preserve registers
+                    os9       F$ID      get our process id
+                    puls      y,b       restore registers
+                    os9       F$Send    send the signal to ourself
+                    rts                 return
+
+QueryOperand        lda       5,s       load the path number
+                    ldb       3,s       load the operand type
+                    beq       QueryCaseZero type 0 case
+                    cmpb      #1        type 1
+                    beq       SsGetStt  handle it
+                    cmpb      #6        type 6
+                    beq       SsGetStt  handle it
+                    cmpb      #2        type 2
+                    beq       GetStatXU handle it
+                    cmpb      #5        type 5
+                    beq       GetStatXU handle it
+                    ldb       #208      bad-type error code
+                    lbra      SyscallErr report the error
+
+                    use       lib/getstat.asm
+
+QueryCaseZero       ldx       6,s       load the type-0 operand pointer
+SsGetStt            os9       I$GetStt  get file status
+                    lbra      SyscallRet return status
+
+                    lda       5,s       load status code argument
+                    ldb       3,s       select set-status function
+                    beq       SsSetStt  function 0 does plain setstat
+                    cmpb      #2        check for function 2
+                    beq       SetStatXU function 2 setstat with parameters
+                    ldb       #208      unknown function error
+                    lbra      SyscallErr return error
+
+SsSetStt            ldx       6,s       load parameter pointer
+                    os9       I$SetStt  set file status
+                    lbra      SyscallRet return status
+
+                    use       lib/setstat.asm
+
+                    use       lib/access.asm
+
+                    use       lib/openpath.asm
+
+                    use       lib/closepath.asm
+
+                    ldx       2,s       load directory name pointer
+                    ldb       5,s       load access mode
+                    os9       I$MakDir  make the directory
+                    lbra      SyscallRet return status
+
+                    use       lib/createheadb.asm
+                    use       lib/createtail.asm
+
+                    use       lib/deletepath.asm
+
+                    lda       3,s       load path number
+                    os9       I$Dup     duplicate the path
+                    lbcs      SyscallErr error returns -1
+                    tfr       a,b       move new path number
+                    clra                clear high byte
+                    rts                 return new path number
+
+                    use       lib/readpath.asm
+
+                    use       lib/writepath.asm
+
+                    use       lib/seek.asm
+HighResultWord      equ       SeekBuffer this module's long-value high cell
+LowResultWord       equ       ResultLowWord this module's long-value low cell
+
+Sbrk                ldd       BreakPointer,y   load current break pointer
+                    pshs      d         save current break
+                    ldd       4,s       requested block size
+                    cmpd      UpdateFreeCount,y   compare with free space
+                    bcs       AllocBlock enough free skips grow
+                    addd      BreakPointer,y   new break needed
+                    pshs      y         save y
+                    subd      ,s        bytes to request
+                    os9       F$Mem     request more memory
+                    tfr       y,d       new memory size
+                    puls      y         restore y
+                    bcc       SbrkOk    allocation succeeded
+                    ldd       #$FFFF    return failure
+                    leas      2,s        clean stack
+                    rts                 return failure
+
+SbrkOk              std       BreakPointer,y   store new break
+                    addd      UpdateFreeCount,y   add old free space
+                    subd      ,s        less old break
+                    std       UpdateFreeCount,y   update free count
+AllocBlock          leas      2,s        drop saved break
+                    ldd       UpdateFreeCount,y   free byte count
+                    pshs      d         save it
+                    subd      4,s       subtract request
+                    std       UpdateFreeCount,y   update free count
+                    ldd       BreakPointer,y   current break
+                    subd      ,s++      compute block start
+                    pshs      d         save block pointer
+                    clra                zero fill value
+                    ldx       ,s        block start pointer
+AllocFillLoop       sta       ,x+       zero-fill a byte
+                    cmpx      BreakPointer,y   reached break yet
+                    bcs       AllocFillLoop continue filling
+                    puls      pc,d      return block pointer
+
+MemExtend           ldd       2,s       requested size
+                    addd      OldRegionPointer,y   add to region pointer
+                    bcs       ExtendFail overflow fails
+                    cmpd      RegionLimit,y   compare region limit
+                    bcc       ExtendFail beyond limit fails
+                    pshs      d         save new pointer
+                    ldx       OldRegionPointer,y   old region pointer
+                    clra                zero fill value
+ExtendFillLoop      cmpx      ,s        reached new pointer
+                    bcc       ExtendOk  done filling
+                    sta       ,x+       zero-fill a byte
+                    bra       ExtendFillLoop continue filling
+
+ExtendOk            ldd       OldRegionPointer,y   old region pointer
+                    puls      x         new region pointer
+                    stx       OldRegionPointer,y   update region pointer
+                    rts                 return old pointer
+
+ExtendFail          ldd       #$FFFF    return failure
+                    rts                 return failure
+
+                    use       lib/syscallerr.asm
+
+exit                lbsr      RtsStub   call termination stub
+                    lbsr      FlushAll  flush and clean up
+_exit               ldd       2,s       load exit code
+                    os9       F$Exit    terminate process
+RtsStub             rts                 return stub
+
+* ------------------------------------------------------------------
+* WorkBlockImage - cc1-style init image for the work block (see _start):
+* rts stub + count/block table + relocation dirs + module-name string.
+* ------------------------------------------------------------------
+                    * ============ WorkBlockImage: cstart init/relocation tables ============
+
+                    * ---- count1: DP-data length (bytes copied to the DP base)
+WorkBlockImage      fdb       WBIcount2-WBIblock1
+
+                    * ---- block1: DP data image  ->  data base
+WBIblock1           fcb       0,$00,$00,$00,$00,$00
+                    fcb       $00
+
+                    * ---- count2: non-DP-data length (bytes copied to base+HDRADV)
+WBIcount2           fdb       WBIblk2End-WBIblock2
+
+                    * ---- block2: non-DP data image  ->  data base + HDRADV
+WBIblock2           fcb       0,$00,$01,$2C
+WBIp0027            fdb       Otxt_1052
+WBIp0029            fdb       Otxt_1055
+WBIp002B            fdb       Otxt_1058
+WBIp002D            fdb       Otxt_105B
+WBIp002F            fdb       Otxt_105E
+WBIp0031            fdb       Otxt_1061
+WBIp0033            fdb       Otxt_1064
+WBIp0035            fdb       Otxt_1067
+WBIp0037            fdb       Otxt_106A
+WBIp0039            fdb       Otxt_106D
+WBIp003B            fdb       Otxt_1070
+WBIp003D            fdb       BraCondHi
+WBIp003F            fdb       Otxt_1076
+WBIp0041            fdb       BraCondMi
+WBIp0043            fdb       Otxt_107C
+WBIp0045            fdb       BraCondCs
+WBIp0047            fdb       Otxt_1082
+WBIp0049            fdb       Otxt_1085
+                    fcb       100,$00,$78,$00,$79,$00,$75,$00
+                    fcb       100,$2C,$78,$00,$64,$2C,$79,$00
+                    fcb       100,$2C,$75,$00,$64,$2C,$78,$2C
+                    fcb       117,$00,$64,$2C,$78,$2C,$79,$2C
+                    fcb       117,$00,$78,$2C,$75,$2C,$70,$63
+                    fcb       0,$79,$2C,$64,$00,$79,$2C,$75
+                    fcb       0,$75,$2C,$64,$00,$75,$2C,$70
+                    fcb       99,$00,$63,$6C,$72,$61,$00,$63
+                    fcb       109,$70,$62,$00,$63,$6D,$70,$64
+                    fcb       0,$63,$6D,$70,$78,$00,$63,$6D
+                    fcb       112,$79,$00,$63,$6D,$70,$75,$00
+                    fcb       108,$64,$62,$00,$6C,$64,$64,$00
+                    fcb       108,$64,$78,$00,$6C,$64,$79,$00
+                    fcb       108,$64,$75,$00,$73,$74,$62,$00
+                    fcb       115,$74,$64,$00,$73,$74,$78,$00
+                    fcb       115,$74,$79,$00,$73,$74,$75,$00
+                    fcb       112,$73,$68,$73,$00,$70,$75,$6C
+                    fcb       115,$00,$6C,$65,$61,$78,$00,$6C
+                    fcb       101,$61,$79,$00,$6C,$65,$61,$75
+                    fcb       0,$6C,$65,$61,$73,$00,$73,$65
+                    fcb       120,$00,$74,$66,$72,$00,$23,$30
+                    fcb       0,$32,$2C,$78,$00,$31,$2C,$78
+                    fcb       0,$30,$2C,$78,$00,$2D,$31,$2C
+                    fcb       120,$00,$2D,$32,$2C,$78,$00,$32
+                    fcb       44,$79,$00,$31,$2C,$79,$00,$30
+                    fcb       44,$79,$00,$2D,$31,$2C,$79,$00
+                    fcb       45,$32,$2C,$79,$00,$32,$2C,$75
+                    fcb       0,$31,$2C,$75,$00,$30,$2C,$75
+                    fcb       0,$2D,$31,$2C,$75,$00,$2D,$32
+                    fcb       44,$75,$00,$32,$2C,$73,$00,$30
+                    fcb       44,$73,$00,$2D,$32,$2C,$73,$00
+                    fcb       35,$3C,$00,$00,$02
+WBIp0148            fdb       StringArgument2+$70
+                    fcb       0,$00
+WBIp014C            fdb       StringArgument2+$5C
+                    fcb       0,$01,$00,$01,$00,$01,$00,$00
+                    fcb       0,$02
+WBIp0158            fdb       StringArgument2+$74
+                    fcb       0,$00
+WBIp015C            fdb       StringArgument2+$60
+                    fcb       0,$01,$00,$01,$00,$01,$00,$00
+                    fcb       0,$02
+WBIp0168            fdb       StringArgument2+$6C
+                    fcb       0,$00
+WBIp016C            fdb       StringArgument2+$58
+                    fcb       0,$01,$00,$01,$00,$01,$00,$00
+                    fcb       0,$02
+WBIp0178            fdb       StringArgument2+$5C
+                    fcb       0,$00
+WBIp017C            fdb       StringArgument2+$70
+                    fcb       0,$01,$00,$01,$00,$01,$00,$00
+                    fcb       0,$02
+WBIp0188            fdb       StringArgument2+$60
+                    fcb       0,$00
+WBIp018C            fdb       StringArgument2+$74
+                    fcb       0,$01,$00,$01,$00,$01,$00,$00
+                    fcb       0,$01
+WBIp0198            fdb       StringArgument2+$A2
+WBIp019A            fdb       StringArgument2+$29
+WBIp019C            fdb       StringArgument2+$80
+WBIp019E            fdb       StringArgument2
+                    fcb       0,$02
+WBIp01A2            fdb       StringArgument2+$4
+                    fcb       0,$00,$00,$01
+WBIp01A8            fdb       StringArgument2+$A2
+WBIp01AA            fdb       StringArgument2+$31
+WBIp01AC            fdb       StringArgument2+$80
+WBIp01AE            fdb       StringArgument2
+                    fcb       0,$02
+WBIp01B2            fdb       StringArgument2+$6
+                    fcb       0,$00,$00,$02
+WBIp01B8            fdb       StringArgument2+$80
+WBIp01BA            fdb       StringArgument2+$2
+WBIp01BC            fdb       StringArgument2+$80
+WBIp01BE            fdb       StringArgument2
+                    fcb       0,$01
+WBIp01C2            fdb       StringArgument2+$8
+                    fcb       0,$00,$00,$02
+WBIp01C8            fdb       StringArgument2+$80
+WBIp01CA            fdb       StringArgument2+$6
+WBIp01CC            fdb       StringArgument2+$80
+WBIp01CE            fdb       StringArgument2
+                    fcb       0,$01
+WBIp01D2            fdb       StringArgument2+$10
+                    fcb       0,$00,$00,$02
+WBIp01D8            fdb       StringArgument2+$80
+WBIp01DA            fdb       StringArgument2+$4
+WBIp01DC            fdb       StringArgument2+$80
+WBIp01DE            fdb       StringArgument2
+                    fcb       0,$01
+WBIp01E2            fdb       StringArgument2+$C
+                    fcb       0,$00,$00,$02
+WBIp01E8            fdb       StringArgument2+$80
+WBIp01EA            fdb       StringArgument2+$6
+WBIp01EC            fdb       StringArgument2+$80
+WBIp01EE            fdb       StringArgument2+$4
+                    fcb       0,$01
+WBIp01F2            fdb       StringArgument2+$2D
+                    fcb       0,$00,$00,$02
+WBIp01F8            fdb       StringArgument2+$5C
+                    fcb       0,$00
+WBIp01FC            fdb       StringArgument2+$44
+WBIp01FE            fdb       StringArgument2+$A6
+                    fcb       0,$01,$00,$01,$00,$00,$00,$02
+WBIp0208            fdb       StringArgument2+$60
+                    fcb       0,$00
+WBIp020C            fdb       StringArgument2+$49
+WBIp020E            fdb       StringArgument2+$A6
+                    fcb       0,$01,$00,$01,$00,$00,$00,$02
+WBIp0218            fdb       StringArgument2+$64
+                    fcb       0,$00
+WBIp021C            fdb       StringArgument2+$4E
+WBIp021E            fdb       StringArgument2+$A6
+                    fcb       0,$01,$00,$01,$00,$00,$00,$02
+WBIp0228            fdb       StringArgument2+$68
+                    fcb       0,$00
+WBIp022C            fdb       StringArgument2+$53
+WBIp022E            fdb       StringArgument2+$A6
+                    fcb       0,$01,$00,$01,$00,$00,$00,$02
+WBIp0238            fdb       StringArgument2+$78
+                    fcb       0,$00
+WBIp023C            fdb       StringArgument2+$4E
+WBIp023E            fdb       StringArgument2+$A6
+                    fcb       0,$01,$00,$01,$00,$00,$00,$02
+WBIp0248            fdb       StringArgument2+$7C
+                    fcb       0,$00
+WBIp024C            fdb       StringArgument2+$53
+WBIp024E            fdb       StringArgument2+$A6
+                    fcb       0,$01,$00,$01,$00,$00,$00,$02
+WBIp0258            fdb       StringArgument2+$58
+                    fcb       0,$00
+WBIp025C            fdb       StringArgument2+$6C
+                    fcb       0,$01,$00,$01,$00,$01,$00,$00
+                    fcb       0,$01
+WBIp0268            fdb       StringArgument2+$9E
+                    fcb       0,$00
+WBIp026C            fdb       StringArgument2+$3A
+                    fcb       0,$00,$00,$02,$00,$00,$00,$00
+                    fcb       0,$02
+WBIp0278            fdb       StringArgument2+$8A
+WBIp027A            fdb       StringArgument2+$AD
+                    fcb       0,$00
+WBIp027E            fdb       StringArgument2+$B5
+                    fcb       0,$02
+WBIp0282            fdb       Otxt_17A9
+                    fcb       0,$00,$00,$02
+WBIp0288            fdb       StringArgument2+$8F
+WBIp028A            fdb       StringArgument2+$C3
+                    fcb       0,$00
+WBIp028E            fdb       StringArgument2+$CB
+                    fcb       0,$02
+WBIp0292            fdb       Otxt_17AD
+                    fcb       0,$00,$00,$02
+WBIp0298            fdb       StringArgument2+$94
+WBIp029A            fdb       StringArgument2+$D9
+                    fcb       0,$00
+WBIp029E            fdb       StringArgument2+$E1
+                    fcb       0,$02
+WBIp02A2            fdb       Otxt_17B1
+                    fcb       0,$00,$00,$02
+WBIp02A8            fdb       StringArgument2+$8A
+WBIp02AA            fdb       StringArgument2+$B5
+                    fcb       0,$00
+WBIp02AE            fdb       StringArgument2+$B1
+                    fcb       0,$02
+WBIp02B2            fdb       Otxt_17B5
+                    fcb       0,$00,$00,$02
+WBIp02B8            fdb       StringArgument2+$8F
+WBIp02BA            fdb       StringArgument2+$CB
+                    fcb       0,$00
+WBIp02BE            fdb       StringArgument2+$C7
+                    fcb       0,$02
+WBIp02C2            fdb       Otxt_17B9
+                    fcb       0,$00,$00,$02
+WBIp02C8            fdb       StringArgument2+$94
+WBIp02CA            fdb       StringArgument2+$E1
+                    fcb       0,$00
+WBIp02CE            fdb       StringArgument2+$DD
+                    fcb       0,$02
+WBIp02D2            fdb       Otxt_17BD
+                    fcb       0,$00,$00,$02
+WBIp02D8            fdb       StringArgument2+$8A
+WBIp02DA            fdb       StringArgument2+$A9
+                    fcb       0,$00
+WBIp02DE            fdb       StringArgument2+$BA
+                    fcb       0,$02
+WBIp02E2            fdb       Otxt_17C1
+                    fcb       0,$00,$00,$02
+WBIp02E8            fdb       StringArgument2+$8F
+WBIp02EA            fdb       StringArgument2+$BF
+                    fcb       0,$00
+WBIp02EE            fdb       StringArgument2+$D0
+                    fcb       0,$02
+WBIp02F2            fdb       Otxt_17C6
+                    fcb       0,$00,$00,$02
+WBIp02F8            fdb       StringArgument2+$94
+WBIp02FA            fdb       StringArgument2+$D5
+                    fcb       0,$00
+WBIp02FE            fdb       StringArgument2+$E6
+                    fcb       0,$02
+WBIp0302            fdb       Otxt_17CB
+                    fcb       0,$00,$00,$02
+WBIp0308            fdb       StringArgument2+$8A
+WBIp030A            fdb       StringArgument2+$BA
+                    fcb       0,$00
+WBIp030E            fdb       StringArgument2+$B1
+                    fcb       0,$02
+WBIp0312            fdb       Otxt_17D0
+                    fcb       0,$00,$00,$02
+WBIp0318            fdb       StringArgument2+$8F
+WBIp031A            fdb       StringArgument2+$D0
+                    fcb       0,$00
+WBIp031E            fdb       StringArgument2+$C7
+                    fcb       0,$02
+WBIp0322            fdb       Otxt_17D5
+                    fcb       0,$00,$00,$02
+WBIp0328            fdb       StringArgument2+$94
+WBIp032A            fdb       StringArgument2+$E6
+                    fcb       0,$00
+WBIp032E            fdb       StringArgument2+$DD
+                    fcb       0,$02
+WBIp0332            fdb       Otxt_17DA
+                    fcb       0,$00,$00,$02
+WBIp0338            fdb       StringArgument2+$9E
+                    fcb       0,$00
+WBIp033C            fdb       StringArgument2+$44
+WBIp033E            fdb       StringArgument2+$F8
+WBIp0340            fdb       StringArgument2+$3F
+                    fcb       0,$02,$00,$00,$00,$02
+WBIp0348            fdb       StringArgument2+$3A
+                    fcb       0,$00
+WBIp034C            fdb       StringArgument2+$44
+WBIp034E            fdb       StringArgument2+$F8
+WBIp0350            fdb       StringArgument2+$3F
+                    fcb       0,$02,$00,$00,$00,$02
+WBIp0358            fdb       StringArgument2+$99
+WBIp035A            fdb       StringArgument2+$EB
+WBIp035C            fdb       StringArgument2+$70
+WBIp035E            fdb       StringArgument2+$F3
+                    fcb       0,$02
+WBIp0362            fdb       Otxt_17DF
+                    fcb       0,$00,$00,$02
+WBIp0368            fdb       StringArgument2+$99
+WBIp036A            fdb       StringArgument2+$EB
+WBIp036C            fdb       StringArgument2+$80
+WBIp036E            fdb       StringArgument2
+WBIp0370            fdb       StringArgument2+$70
+WBIp0372            fdb       StringArgument2+$EF
+                    fcb       0,$00,$00,$02
+WBIp0378            fdb       StringArgument2+$80
+WBIp037A            fdb       StringArgument2+$6
+WBIp037C            fdb       StringArgument2+$99
+WBIp037E            fdb       StringArgument2+$F3
+                    fcb       0,$01
+WBIp0382            fdb       StringArgument2+$10
+                    fcb       0,$00,$00,$02
+WBIp0388            fdb       StringArgument2+$80
+WBIp038A            fdb       StringArgument2+$6
+WBIp038C            fdb       StringArgument2+$99
+WBIp038E            fdb       Otxt_17E4
+                    fcb       0,$01
+WBIp0392            fdb       StringArgument2+$14
+                    fcb       0,$00,$00,$02
+WBIp0398            fdb       StringArgument2+$80
+WBIp039A            fdb       StringArgument2+$6
+WBIp039C            fdb       StringArgument2+$99
+WBIp039E            fdb       Otxt_17E9
+                    fcb       0,$01
+WBIp03A2            fdb       StringArgument2+$1A
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00
+CtypeTabImg         fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$01,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$02,$00
+                    fcb       56,$38,$28,$28,$28,$28,$28,$28
+                    fcb       40,$28,$00,$00,$00,$00,$00,$00
+                    fcb       2,$22,$22,$22,$22,$22,$22,$02
+                    fcb       2,$02,$02,$02,$02,$02,$02,$02
+                    fcb       2,$02,$02,$02,$02,$02,$02,$02
+                    fcb       2,$02,$02,$00,$00,$00,$00,$02
+                    fcb       0,$04,$04,$04,$04,$04,$04,$04
+                    fcb       4,$04,$04,$04,$04,$04,$04,$04
+                    fcb       4,$04,$04,$04,$04,$04,$04,$04
+                    fcb       4,$04,$04,$00,$00,$00,$00,$00
+Pow10Img            fcb       39,$10,$03,$E8,$00,$64,$00,$0A
+WBIp0440            fdb       TableEnd
+                    fcb       108,$78,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$01,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$02
+                    fcb       0,$01,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$42,$00,$02,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00,$00,$00,$00,$00,$00
+                    fcb       0,$00,$00
+
+                    * ---- nreloc1: text-relocation count  (each offset patched by +module base)
+WBIblk2End          fdb       (reloc1End-reloc1Start)/2
+
+                    * ---- reloc1: text relocation offsets
+reloc1Start         fdb       HDRADV+WBIp02C2-WBIblock2,HDRADV+WBIp02B2-WBIblock2,HDRADV+WBIp02A2-WBIblock2,HDRADV+WBIp0292-WBIblock2
+                    fdb       HDRADV+WBIp0282-WBIblock2,HDRADV+WBIp0332-WBIblock2,HDRADV+WBIp0322-WBIblock2,HDRADV+WBIp0312-WBIblock2
+                    fdb       HDRADV+WBIp0302-WBIblock2,HDRADV+WBIp02F2-WBIblock2,HDRADV+WBIp02E2-WBIblock2,HDRADV+WBIp02D2-WBIblock2
+                    fdb       HDRADV+WBIp002D-WBIblock2,HDRADV+WBIp002B-WBIblock2,HDRADV+WBIp0029-WBIblock2,HDRADV+WBIp0027-WBIblock2
+                    fdb       HDRADV+WBIp039E-WBIblock2,HDRADV+WBIp038E-WBIblock2,HDRADV+WBIp0362-WBIblock2,HDRADV+WBIp003B-WBIblock2
+                    fdb       HDRADV+WBIp0039-WBIblock2,HDRADV+WBIp0037-WBIblock2,HDRADV+WBIp0035-WBIblock2,HDRADV+WBIp0033-WBIblock2
+                    fdb       HDRADV+WBIp0031-WBIblock2,HDRADV+WBIp002F-WBIblock2,HDRADV+WBIp0049-WBIblock2,HDRADV+WBIp0047-WBIblock2
+                    fdb       HDRADV+WBIp0045-WBIblock2,HDRADV+WBIp0043-WBIblock2,HDRADV+WBIp0041-WBIblock2,HDRADV+WBIp003F-WBIblock2
+                    fdb       HDRADV+WBIp003D-WBIblock2
+reloc1End           equ       *
+
+                    * ---- nreloc2: data-relocation count  (each offset patched by +work base)
+                    fdb       (reloc2End-reloc2Start)/2
+
+                    * ---- reloc2: data relocation offsets
+reloc2Start         fdb       HDRADV+WBIp0158-WBIblock2,HDRADV+WBIp014C-WBIblock2,HDRADV+WBIp0148-WBIblock2,HDRADV+WBIp0440-WBIblock2
+                    fdb       HDRADV+WBIp018C-WBIblock2,HDRADV+WBIp0188-WBIblock2,HDRADV+WBIp017C-WBIblock2,HDRADV+WBIp0178-WBIblock2
+                    fdb       HDRADV+WBIp016C-WBIblock2,HDRADV+WBIp0168-WBIblock2,HDRADV+WBIp015C-WBIblock2,HDRADV+WBIp01AA-WBIblock2
+                    fdb       HDRADV+WBIp01A8-WBIblock2,HDRADV+WBIp01A2-WBIblock2,HDRADV+WBIp019E-WBIblock2,HDRADV+WBIp019C-WBIblock2
+                    fdb       HDRADV+WBIp019A-WBIblock2,HDRADV+WBIp0198-WBIblock2,HDRADV+WBIp01BE-WBIblock2,HDRADV+WBIp01BC-WBIblock2
+                    fdb       HDRADV+WBIp01BA-WBIblock2,HDRADV+WBIp01B8-WBIblock2,HDRADV+WBIp01B2-WBIblock2,HDRADV+WBIp01AE-WBIblock2
+                    fdb       HDRADV+WBIp01AC-WBIblock2,HDRADV+WBIp01D8-WBIblock2,HDRADV+WBIp01D2-WBIblock2,HDRADV+WBIp01CE-WBIblock2
+                    fdb       HDRADV+WBIp01CC-WBIblock2,HDRADV+WBIp01CA-WBIblock2,HDRADV+WBIp01C8-WBIblock2,HDRADV+WBIp01C2-WBIblock2
+                    fdb       HDRADV+WBIp01EC-WBIblock2,HDRADV+WBIp01EA-WBIblock2,HDRADV+WBIp01E8-WBIblock2,HDRADV+WBIp01E2-WBIblock2
+                    fdb       HDRADV+WBIp01DE-WBIblock2,HDRADV+WBIp01DC-WBIblock2,HDRADV+WBIp01DA-WBIblock2,HDRADV+WBIp020C-WBIblock2
+                    fdb       HDRADV+WBIp0208-WBIblock2,HDRADV+WBIp01FE-WBIblock2,HDRADV+WBIp01FC-WBIblock2,HDRADV+WBIp01F8-WBIblock2
+                    fdb       HDRADV+WBIp01F2-WBIblock2,HDRADV+WBIp01EE-WBIblock2,HDRADV+WBIp022E-WBIblock2,HDRADV+WBIp022C-WBIblock2
+                    fdb       HDRADV+WBIp0228-WBIblock2,HDRADV+WBIp021E-WBIblock2,HDRADV+WBIp021C-WBIblock2,HDRADV+WBIp0218-WBIblock2
+                    fdb       HDRADV+WBIp020E-WBIblock2,HDRADV+WBIp0258-WBIblock2,HDRADV+WBIp024E-WBIblock2,HDRADV+WBIp024C-WBIblock2
+                    fdb       HDRADV+WBIp0248-WBIblock2,HDRADV+WBIp023E-WBIblock2,HDRADV+WBIp023C-WBIblock2,HDRADV+WBIp0238-WBIblock2
+                    fdb       HDRADV+WBIp0288-WBIblock2,HDRADV+WBIp027E-WBIblock2,HDRADV+WBIp027A-WBIblock2,HDRADV+WBIp0278-WBIblock2
+                    fdb       HDRADV+WBIp026C-WBIblock2,HDRADV+WBIp0268-WBIblock2,HDRADV+WBIp025C-WBIblock2,HDRADV+WBIp02AA-WBIblock2
+                    fdb       HDRADV+WBIp02A8-WBIblock2,HDRADV+WBIp029E-WBIblock2,HDRADV+WBIp029A-WBIblock2,HDRADV+WBIp0298-WBIblock2
+                    fdb       HDRADV+WBIp028E-WBIblock2,HDRADV+WBIp028A-WBIblock2,HDRADV+WBIp02CE-WBIblock2,HDRADV+WBIp02CA-WBIblock2
+                    fdb       HDRADV+WBIp02C8-WBIblock2,HDRADV+WBIp02BE-WBIblock2,HDRADV+WBIp02BA-WBIblock2,HDRADV+WBIp02B8-WBIblock2
+                    fdb       HDRADV+WBIp02AE-WBIblock2,HDRADV+WBIp02F8-WBIblock2,HDRADV+WBIp02EE-WBIblock2,HDRADV+WBIp02EA-WBIblock2
+                    fdb       HDRADV+WBIp02E8-WBIblock2,HDRADV+WBIp02DE-WBIblock2,HDRADV+WBIp02DA-WBIblock2,HDRADV+WBIp02D8-WBIblock2
+                    fdb       HDRADV+WBIp031A-WBIblock2,HDRADV+WBIp0318-WBIblock2,HDRADV+WBIp030E-WBIblock2,HDRADV+WBIp030A-WBIblock2
+                    fdb       HDRADV+WBIp0308-WBIblock2,HDRADV+WBIp02FE-WBIblock2,HDRADV+WBIp02FA-WBIblock2,HDRADV+WBIp033E-WBIblock2
+                    fdb       HDRADV+WBIp033C-WBIblock2,HDRADV+WBIp0338-WBIblock2,HDRADV+WBIp032E-WBIblock2,HDRADV+WBIp032A-WBIblock2
+                    fdb       HDRADV+WBIp0328-WBIblock2,HDRADV+WBIp031E-WBIblock2,HDRADV+WBIp035A-WBIblock2,HDRADV+WBIp0358-WBIblock2
+                    fdb       HDRADV+WBIp0350-WBIblock2,HDRADV+WBIp034E-WBIblock2,HDRADV+WBIp034C-WBIblock2,HDRADV+WBIp0348-WBIblock2
+                    fdb       HDRADV+WBIp0340-WBIblock2,HDRADV+WBIp0370-WBIblock2,HDRADV+WBIp036E-WBIblock2,HDRADV+WBIp036C-WBIblock2
+                    fdb       HDRADV+WBIp036A-WBIblock2,HDRADV+WBIp0368-WBIblock2,HDRADV+WBIp035E-WBIblock2,HDRADV+WBIp035C-WBIblock2
+                    fdb       HDRADV+WBIp0388-WBIblock2,HDRADV+WBIp0382-WBIblock2,HDRADV+WBIp037E-WBIblock2,HDRADV+WBIp037C-WBIblock2
+                    fdb       HDRADV+WBIp037A-WBIblock2,HDRADV+WBIp0378-WBIblock2,HDRADV+WBIp0372-WBIblock2,HDRADV+WBIp03A2-WBIblock2
+                    fdb       HDRADV+WBIp039C-WBIblock2,HDRADV+WBIp039A-WBIblock2,HDRADV+WBIp0398-WBIblock2,HDRADV+WBIp0392-WBIblock2
+                    fdb       HDRADV+WBIp038C-WBIblock2,HDRADV+WBIp038A-WBIblock2
+reloc2End           equ       *
+
+                    * ---- name: trailing module-name string
+                    fcc       /c.opt/
+                    fcb       C$NULL
+                    emod
+eom                 equ       *
+                    end
