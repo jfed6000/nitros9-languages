@@ -98,6 +98,10 @@ done
 # the lwasm-flavoured defs files (which it cannot assemble).
 STRIP='/^[ \t]*[Ii][Ff][Pp]1/,/^[ \t]*[Ee][Nn][Dd][Cc]/d;/^[ \t]*[Uu][Ss][Ee][ \t]/d'
 ppa() { sed -e "$STRIP" "$1" | sed -f "$c3/lwbackend/os9defs.sed" | sed -f "$c3/lwbackend/libdefs.sed"; }
+# The back-end standalones use no stdio names, so like buildlibc.sh they skip
+# libdefs.sed: its substitutions are not word-bounded (_fd would turn
+# fpwrap's _fdec into a label rma rejects).
+ppb() { sed -e "$STRIP" "$1" | sed -f "$c3/lwbackend/os9defs.sed"; }
 for d in lib.a sys.a; do
 	mkdir -p "$stage/src/lib/$d"
 	for f in "$c3/lib/$d"/*.a; do ppa "$f" > "$stage/src/lib/$d/$(basename "$f")"; done
@@ -117,7 +121,7 @@ done
 # and fpinit for the opt-in fp.l), plus a minimal valid ROF for sys.l
 mkdir -p "$stage/src/back"
 for f in getpid attach getenv mkstemp fpwrap fpdummy fpinit; do
-	ppa "$c3/lwbackend/$f.a" > "$stage/src/back/$f.a"
+	ppb "$c3/lwbackend/$f.a" > "$stage/src/back/$f.a"
 done
 printf ' psect sysstub_a,0,0,0,0,0\n endsect\n' > "$stage/src/sysstub.a"
 

@@ -58,9 +58,9 @@ fpfail:
 
 * OS-9 name strings end with the high bit set on the last character
 fpname fcc "FPO"
- fcb '9'+$80
+ fcb '9+$80
 fppath fcc "/DD/Modules/FPO"
- fcb '9'+$80
+ fcb '9+$80
 
 
 _fpterm:
