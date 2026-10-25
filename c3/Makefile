@@ -38,7 +38,7 @@ DSK		= c3.dsk
 COCOC		?=
 NFP09		?=
 
-.PHONY: all banner host runtime os9 dsk install clean
+.PHONY: all banner host runtime os9 dsk ontarget install clean
 
 # Make all components
 all:	banner os9
@@ -70,6 +70,13 @@ dsk:	$(DSK)
 $(DSK): os9
 	DSK="$(CURDIR)/$@" DSKNAME="C3" COCOC="$(COCOC)" NFP09="$(NFP09)" \
 	    sh $(OS9DIR)/mkdsk.sh
+
+# Check the disk self-hosts: boot NitrOS-9 under usim09pt, build the C
+# libraries on the target, then compile and run a program there.  See
+# build/os9/ontarget.sh for what it needs (usim09pt and a built Pico-Thing
+# Level 2 boot disk in the NitrOS-9 checkout).
+ontarget: $(DSK)
+	C3DSK="$(CURDIR)/$(DSK)" NITROS9DIR="$(NITROS9DIR)" sh $(OS9DIR)/ontarget.sh
 
 # Install the host cross compiler.  The driver is re-linked first so its
 # compiled-in header path matches this PREFIX, whatever it was built with.

@@ -45,6 +45,11 @@ tools are still built but the disk is skipped:
 make COCOC=/path/to/CoCoC
 ```
 
+`make -C c3 ontarget COCOC=/path/to/CoCoC` checks that the disk self-hosts:
+it boots NitrOS-9 under the `usim09pt` emulator, builds c3's C libraries on
+the target, and compiles and runs a program there. `c3/build/os9/ontarget.sh`
+lists what it needs.
+
 The Pascal material is retained for reference and is not part of the
 aggregate build.
 
