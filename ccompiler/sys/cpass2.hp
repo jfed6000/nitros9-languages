@@ -1,0 +1,9 @@
+@C.PASS2
+Syntax: C.Pass2 [<opts>] <file>
+Usage : C compiler second pass - generate 6809 assembler source
+Opts  :
+  -o=<file>  write output to <file> (default: standard output)
+  -s         strip symbol information from the output
+  -p         emit profiling information
+Note  : reads intermediate code from c.pass1 and writes 6809 assembler
+        source for c.opt / c.asm.  Normally run by CC1, not directly.

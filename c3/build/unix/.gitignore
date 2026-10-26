@@ -1,0 +1,11 @@
+# build artifacts (host executables)
+exec/c3
+prep/c3prep
+comp/c3comp
+comp1/c3comp1
+comp2/c3comp2
+compx/c3compx
+optx/c3optx
+lorder/lorder
+lsplit/lsplit
+make/make

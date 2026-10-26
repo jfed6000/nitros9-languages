@@ -1,0 +1,4 @@
+* Test B: macro expansion
+GREETING=hi there world
+all:
+	echo $(GREETING)

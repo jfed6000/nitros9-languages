@@ -1,0 +1,9 @@
+@C.PASS1
+Syntax: C.Pass1 [<opts>] <file>
+Usage : C compiler first pass - parse and build intermediate code
+Opts  :
+  -o=<file>  write output to <file> (default: standard output)
+  -s         strip symbol information from the output
+  -p         emit profiling information
+Note  : reads preprocessed C from c.prep and writes intermediate code
+        for c.pass2.  Normally run by CC1, not directly.

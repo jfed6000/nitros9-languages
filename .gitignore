@@ -25,10 +25,15 @@ basic09/microware/runb_6309
 bf/bf
 ccompiler/c.asm
 ccompiler/cc1
+ccompiler/cc2
 ccompiler/c.prep
 ccompiler/c.pass1
 ccompiler/c.pass2
+ccompiler/c.comp
 ccompiler/c.opt
 ccompiler/c_asm
 ccompiler/c.link
 ccompiler/make
+ccompiler/rd
+ccompiler/helpmsg
+ccompiler/lib/*_check
