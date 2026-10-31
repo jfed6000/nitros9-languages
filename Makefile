@@ -9,7 +9,7 @@ export NITROS9_LANGUAGES_DIR
 
 include $(NITROS9DIR)/rules.mak
 
-dirs = basic09 bf ccompiler c3
+dirs = basic09 bf ccompiler wildbits
 clean_dirs = $(addprefix clean-,$(dirs))
 
 all: $(dirs)

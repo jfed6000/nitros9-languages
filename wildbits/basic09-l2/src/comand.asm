@@ -1,0 +1,3460 @@
+
+ nam BASIC09
+
+***************
+* Edition History (started with edition 18)
+
+*   Edition      Problem Fixed                            By
+* -----------  ----------------------------------------- -----
+* 18 82/10/13  "PROGRAM" literal changed to "Program"    (RFD)
+* 18 82/10/13  Formatted strings could exceed field size (RFD)
+* 18 82/10/13  Formatted boolean output phrases reversed (RFD)
+* 18 82/10/18  Assembly subroutine errors now recognized (RFD)
+* 18 82/10/19  Mem directive fixed to take more than 32k (RFD)
+* 19 82/11/02  Default USING field size 1 if unspecified (RFD)
+* 19 82/11/02  Prevent death on out of range input       (RFD)
+* 19 82/11/16  Compiler var "CNTASS" initialized to fix
+*             random crash if T.CXAS inserted by mistake.(RFD)
+* 19 82/11/16  Mem comand made to request 1 less byte.   (RFD)
+* 20 83/01/12  Changed string terminator from $FF to $00,
+*               allowing 8-bit data in string functions  (RFD)
+* 20 83/01/17  General clean up
+* 20 83/01/19  Changed string terminator from $00 to $FF
+*              to maintain I-Code compatability.         (RFD)
+* 20 83/01/21  Fixed problem in USING with Real Zero.    (RFD)
+* 20 83/01/24  Struct assignment of exaclty 256 crashed. (RFD)
+* 20 83/01/24  Rename any Proc to number crashed system  (RFD)
+* 20 83/01/25  Startup now clears all DP Globals.        (RFD)
+* 20 83/01/25  IOBuff could overflow into system stack.  (RFD)
+* 20 83/02/10  Added conditional asm for Tandy ^N.       (RFD)
+* 20 83/02/10  Prevented DEBUG mode from recursive entry.(RFD)
+* 20 83/02/07  Kept Opstack from going crazy, killing system
+*               when exponentiation overflow occurred.   (LC)
+* 20 83/02/15  Made aborted RunB return error to Shell.  (RFD)
+* 20 83/02/17  Added Microware to copyright notice.      (RFD)
+* 20 82/02/17  CTL-Q was ignored in asm subroutines.     (RFD)
+* 20 83/02/17  RunB ON ERROR now intercepts CTL-C, CTL-Q.(RFD)
+* 21 83/03/16  Fixed bug in TRON caused in edition 20.   (RFD)
+* 22 83/04/27  Added conditionals for Basic09 minus trig.(RFD)
+* 22 83/05/26  Changed message printed on tandy version. (MGH)
+* 22 83/06/28  Added conditionals for dragon startup msg.(MGH)
+
+Edition equ 22 Current edition
+
+ ttl Runtime Stack Description
+ pag
+***************
+* During I-Code interpretation, the Basic09 workspace
+* is used more or less as described below:
+
+*      ----------- <--(Y) initially
+*      | params  |    absorbed after startup
+*      |---------| <--(U) initially
+*      |         | <--I.OPBG, I.OPSP
+*      |         |    operand stack (expands downward)
+*      |         |                        |
+*      |  free   |                        V
+*      |  space  |                        
+*      |         |                        ^
+*      |         |                        |
+*      |         |    string stack (expands upward)
+*      |---------| <--I.STBG, I.STSP
+*      |         |
+*      | program |
+*      |---------|    I-Code procedure area
+*      | program |    (expands upward, moving String
+*      |---------|         Stack as necessary)
+*      | program |
+*      |         |
+* 0500 |---------| <--G.PRCA
+*      |directory|
+* 0400 |---------| <--G.DIRA I-Code procedure directory
+*      | hardware| <--(SP) Hardware stack ptr
+*      |  stack  |
+*      |         |  (output buffer is allowed to expand if required
+* 0200 |---------|    as long as it stays below stack pointer)
+*      |I/O buff |
+* 0100 |---------| <--I.IOBG, I.IOPT
+*      | globals |     direct page variables
+* 0000 ----------- <--G.WSPA
+* 
+*      The total workspace size is kept in G.WSPS, while G.VARS 
+* contains the free space available (I.OPBG - I.STBG usually).  The
+* key places where variables are initialized are START (initialization),
+* SETUP (resets Op stack between commands), and INTERP (moves Op stack 
+* to top of workspace, and adjusts SP for I-Code interpretation.)
+
+ pag
+ use defs
+BASEZERO mod 0000,B09NAM,PRGRM+OBJCT,REENT+0,START,$2000
+
+O.COMAND fdb ENTRYPT offset of self
+ fdb BYEBYE offset of Compile module
+ fdb BYEBYE offset of Binder
+ fdb BYEBYE offset of Statement Interpreter
+ fdb BYEBYE offset of Expression Interpreter
+ fdb BYEBYE offset of Conversion & I/O
+ fdb 0 end of table
+
+ ifne INCLUDED&EDITOR
+ ifne L2B09CC
+B09NAM fcs "l2b09cc"
+ else
+B09NAM fcs "l2b09run"
+ endc
+ else
+B09NAM fcs "RunB"
+ endc
+ fcb Edition edition number
+ fcb INCLUDED Conditional Assembly options
+
+***************
+* Basic09 was written by Microware Systems Corp.
+
+*  The primary contributors to it's design and implementation
+* were Ken Kaplan, Larry Crane, and Robert Doggett at Microware;
+* and Terry Ritter at Motorola.
+
+CPYRIT
+* (l2b09run's banner is in l2b09ovl: L2OPTS prints it at start-up)
+
+***************
+
+ ttl External Linkage Section
+ pag
+ use linkage
+
+***************
+* Global Entry Points
+
+CMDENT equ *
+ fdb DIRLNK-CMDENT Directory search & link if not found
+ fdb PRTERR-CMDENT Print errmsg & return (J$erex)
+ fdb SETEXT-CMDENT Set exit trap
+ fdb EXIT-CMDENT   exit via exit trap
+ fdb SUBST-CMDENT  Substring search
+ fdb KILLEX-CMDENT Kill external procedure
+ fdb BYEBYE-CMDENT Exit Basic09  give up workspace
+ fdb KILALL-CMDENT Kill all external procedures
+ fdb NXTSTM-CMDENT Skip to next (logical) stmt beginning
+ ifne INCLUDED&EDITOR
+ fdb LKTOKE-CMDENT Lookup token
+ fdb REPLAC-CMDENT Replace icode
+ fdb LSTBLN-CMDENT List a bound icode line
+ fdb DEBUG-CMDENT  Enter debug mode
+ fdb TRCEXP-CMDENT Trace expression
+ fdb PRTEXP-CMDENT Print (opstack) expression
+ fdb L2EVNT-CMDENT Write a protocol event line
+* for the overlay module l2b09ovl (PACK)
+ fdb L2BPZ-CMDENT  Clear all breakpoints
+ fdb DEFILE-CMDENT Procedure list and pathname
+ fdb OPNCH0-CMDENT Open the command output path
+ fdb CLSCHL-CMDENT Close it again
+ fdb UNBIND-CMDENT Unbind a procedure
+ fdb NXTVAR-CMDENT Next variable reference in I-code
+* (the banner)
+ fdb NEWLIN-CMDENT Reset the I/O buffer
+ fdb STREOL-CMDENT Put a string in it and print it
+ endc
+
+***************
+* External Subroutine References
+
+J$SRCH jsr M.COMPIL
+ fcb X$SRCH Table search subroutine
+J$NAME jsr M.COMPIL
+ fcb X$NAME Look for a name subroutine
+J$CPRM jsr M.COMPIL
+ fcb X$CPRM Compile parameter list
+J$BPRM jsr M.BINDER
+ fcb X$BPRM Bind parameters
+J$INTI jsr M.STMTS
+ fcb X$INTI  initialize interpreter
+J$IPRM jsr M.STMTS
+ fcb X$IPRM  interpret parameters
+J$INTX jsr M.STMTS
+ fcb X$INTX  Execute Interpreter
+J$CVIO jsr M.CNVIO
+ fcb X$CVIO  call cnvio
+J$L2RS jsr M.STMTS
+ fcb X$L2RS resolve procedure ptr
+J$L2MW jsr M.STMTS
+ fcb X$L2MW map far block into the code window
+J$FALL jsr M.STMTS
+ fcb X$FALL free all far arrays
+
+ ifne INCLUDED&EDITOR
+J$CMPL jsr M.COMPIL
+ fcb X$CMPL Line compiler
+J$MVDN jsr M.COMPIL
+ fcb X$MVDN Block move down subroutine
+J$BIND jsr M.BINDER
+ fcb X$BIND Bind procedure
+J$PHEX jsr M.BINDER
+ fcb X$PHEX Print hex number
+J$BSTM jsr M.BINDER
+ fcb X$BSTM Bind statement
+J$TROF jsr M.STMTS
+ fcb X$TROF  turn off trace mode
+J$ISTM jsr M.STMTS
+ fcb X$ISTM  interpret single statement
+J$ASNM jsr M.CNVIO
+ fcb X$ASNM  cnv ASCII > numeric
+
+ ttl KEYWORD Table
+ pag
+***************
+* Compiler equates
+
+STMBEG equ 1
+RESRVD equ 3
+FNCREF equ 4
+OPRTR equ 5
+
+***************
+* Keyword Table
+*   Sorted by name (tools/kwsort.py): every name in the source is
+*   looked up here first.  l2b09cc has KWIDX, a first-letter index:
+*   each letter's first entry (from KEYTAB) and how many there are.
+
+ ifne L2B09CC
+KWIDX equ *
+ fdb KW.A-KEYTAB
+ fcb 7 A
+ fdb KW.B-KEYTAB
+ fcb 4 B
+ fdb KW.C-KEYTAB
+ fcb 7 C
+ fdb KW.D-KEYTAB
+ fcb 7 D
+ fdb KW.E-KEYTAB
+ fcb 12 E
+ fdb KW.F-KEYTAB
+ fcb 5 F
+ fdb KW.G-KEYTAB
+ fcb 3 G
+ fdb 0
+ fcb 0 H
+ fdb KW.I-KEYTAB
+ fcb 4 I
+ fdb 0
+ fcb 0 J
+ fdb KW.K-KEYTAB
+ fcb 1 K
+ fdb KW.L-KEYTAB
+ fcb 10 L
+ fdb KW.M-KEYTAB
+ fcb 2 M
+ fdb KW.N-KEYTAB
+ fcb 2 N
+ fdb KW.O-KEYTAB
+ fcb 3 O
+ fdb KW.P-KEYTAB
+ fcb 9 P
+ fdb 0
+ fcb 0 Q
+ fdb KW.R-KEYTAB
+ fcb 10 R
+ fdb KW.S-KEYTAB
+ fcb 13 S
+ fdb KW.T-KEYTAB
+ fcb 9 T
+ fdb KW.U-KEYTAB
+ fcb 3 U
+ fdb KW.V-KEYTAB
+ fcb 1 V
+ fdb KW.W-KEYTAB
+ fcb 2 W
+ fdb KW.X-KEYTAB
+ fcb 1 X
+ fdb 0
+ fcb 0 Y
+ fdb 0
+ fcb 0 Z
+KWISZ equ *-KWIDX
+ ifne KWISZ-26*3
+ error KWIDX must be 26*3 bytes (compil's KWSRCH)
+ endc
+ endc
+ fdb 115 Number of entries in keytab
+ fcb 2 number of skip bytes per entry
+
+KEYTAB equ *
+KW.A equ *
+ fcb T.ABS,FNCREF
+ABS fcs "ABS"
+ fcb T.ACS,FNCREF
+ACS fcs "ACS"
+ fcb T.ADDR,FNCREF
+ADDR fcs "ADDR"
+ fcb T.AND,OPRTR
+AND fcs "AND"
+ fcb T.ASC,FNCREF
+ASC fcs "ASC"
+ fcb T.ASN,FNCREF
+ASN fcs "ASN"
+ fcb T.ATN,FNCREF
+ATN fcs "ATN"
+KW.B equ *
+ fcb T.BAS0,STMBEG
+BASE fcs "BASE"
+ fcb T.BOOL,RESRVD
+BOOL fcs "BOOLEAN"
+ fcb T.BYE,STMBEG
+BYE fcs "BYE"
+ fcb T.BYTE,RESRVD
+BYTE fcs "BYTE"
+KW.C equ *
+ fcb T.CHIN,STMBEG
+CHAIN fcs "CHAIN"
+ fcb T.CHD,STMBEG
+CHD fcs "CHD"
+ fcb T.CHR,FNCREF
+CHR$ fcs "CHR$"
+ fcb T.CHX,STMBEG
+CHX fcs "CHX"
+ fcb T.CLOS,STMBEG
+CLOSE fcs "CLOSE"
+ fcb T.COS,FNCREF
+COS fcs "COS"
+ fcb T.CRET,STMBEG
+CREATE fcs "CREATE"
+KW.D equ *
+ fcb T.DATA,STMBEG
+DATAA fcs "DATA"
+ fcb T.DATE,FNCREF
+DATE$ fcs "DATE$"
+ fcb T.DEG,STMBEG
+DEG fcs "DEG"
+ fcb T.DELT,STMBEG
+DELETE fcs "DELETE"
+ fcb T.DIM,STMBEG
+DIM fcs "DIM"
+ fcb T.DIR,RESRVD
+DIRECT fcs "DIR"
+ fcb T.DO,RESRVD
+DO fcs "DO"
+KW.E equ *
+ fcb T.ELSE,STMBEG
+ELSE fcs "ELSE"
+ fcb T.END,STMBEG
+END fcs "END"
+ fcb T.EEXT,STMBEG
+ENDEXT fcs "ENDEXIT"
+ fcb T.EIF,STMBEG
+ENDIF fcs "ENDIF"
+ fcb T.ELOP,STMBEG
+ENDLUP fcs "ENDLOOP"
+ fcb T.EWHL,STMBEG
+ENDWHL fcs "ENDWHILE"
+ fcb T.EOF,FNCREF
+EOF fcs "EOF"
+ fcb T.ERR,FNCREF
+ERRR fcs "ERR"
+ fcb T.EROR,STMBEG
+ERROR fcs "ERROR"
+ fcb T.EXEC,RESRVD
+EXEC fcs "EXEC"
+ fcb T.EXIF,STMBEG
+EXITIF fcs "EXITIF"
+ fcb T.EXP,FNCREF
+EXP fcs "EXP"
+KW.F equ *
+ fcb T.FALS,FNCREF
+FALSELit fcs "FALSE"
+ fcb T.FAR,RESRVD
+FARKW fcs "FAR"
+ fcb T.FIX,FNCREF
+FIX fcs "FIX"
+ fcb T.FLOT,FNCREF
+FLOAT fcs "FLOAT"
+ fcb T.FOR,STMBEG
+FOR fcs "FOR"
+KW.G equ *
+ fcb T.GET,STMBEG
+GET fcs "GET"
+ fcb T.GOSB,STMBEG
+GOSUB fcs "GOSUB"
+ fcb T.GOTO,STMBEG
+GOTO fcs "GOTO"
+KW.I equ *
+ fcb T.IF,STMBEG
+IF fcs "IF"
+ fcb T.INPT,STMBEG
+INPUT fcs "INPUT"
+ fcb T.INTF,FNCREF
+INTF fcs "INT"
+ fcb T.INT,RESRVD
+INTGER fcs "INTEGER"
+KW.K equ *
+ fcb T.KILL,STMBEG
+KILL fcs "KILL"
+KW.L equ *
+ fcb T.NAND,FNCREF
+NUMAND fcs "LAND"
+ fcb T.LEFT,FNCREF
+LEFT$ fcs "LEFT$"
+ fcb T.LEN,FNCREF
+LEN fcs "LEN"
+ fcb T.LET,STMBEG
+LET fcs "LET"
+ fcb T.NNOT,FNCREF
+NUMNOT fcs "LNOT"
+ fcb T.LN,FNCREF
+LOG fcs "LOG"
+ fcb T.LOG,FNCREF
+LOG10 fcs "LOG10"
+ fcb T.LOOP,STMBEG
+LOOP fcs "LOOP"
+ fcb T.NOR,FNCREF
+NUMOR fcs "LOR"
+ fcb T.NXOR,FNCREF
+NUMXOR fcs "LXOR"
+KW.M equ *
+ fcb T.MID,FNCREF
+MID$ fcs "MID$"
+ fcb T.MOD,FNCREF
+MOD fcs "MOD"
+KW.N equ *
+ fcb T.NEXT,STMBEG
+NEXT fcs "NEXT"
+ fcb T.NOT,OPRTR
+NOT fcs "NOT"
+KW.O equ *
+ fcb T.ON,STMBEG
+ON fcs "ON"
+ fcb T.OPEN,STMBEG
+OPEN fcs "OPEN"
+ fcb T.OR,OPRTR
+OR fcs "OR"
+KW.P equ *
+ fcb T.PRAM,STMBEG
+PARAM fcs "PARAM"
+ fcb T.PAUS,STMBEG
+PAUSE fcs "PAUSE"
+ fcb T.PEEK,FNCREF
+PEEK fcs "PEEK"
+ fcb T.PI,FNCREF
+PI fcs "PI"
+ fcb T.POKE,STMBEG
+POKE fcs "POKE"
+ fcb T.POS,FNCREF
+POS fcs "POS"
+ fcb T.PRNT,STMBEG
+PRINT fcs "PRINT"
+ fcb T.ERRL,RESRVD
+ fcs "PROCEDURE"
+ fcb T.PUT,STMBEG
+PUT fcs "PUT"
+KW.R equ *
+ fcb T.RAD,STMBEG
+RAD fcs "RAD"
+ fcb T.READ,STMBEG
+READ fcs "READ"
+ fcb T.REAL,RESRVD
+REAL fcs "REAL"
+ fcb T.REM1,STMBEG
+REM fcs "REM"
+ fcb T.REPT,STMBEG
+REPEAT fcs "REPEAT"
+ fcb T.REST,STMBEG
+RESTOR fcs "RESTORE"
+ fcb T.RETN,STMBEG
+RETURN fcs "RETURN"
+ fcb T.RGHT,FNCREF
+RIGHT$ fcs "RIGHT$"
+ fcb T.RND,FNCREF
+RND fcs "RND"
+ fcb T.RUN,STMBEG
+RUN fcs "RUN"
+KW.S equ *
+ fcb T.SEEK,STMBEG
+SEEK fcs "SEEK"
+ fcb T.SGN,FNCREF
+SGN fcs "SGN"
+ fcb T.SYS,STMBEG
+SHELL fcs "SHELL"
+ fcb T.SIN,FNCREF
+SIN fcs "SIN"
+ fcb T.LENG,FNCREF
+LENG fcs "SIZE"
+ fcb T.SQ,FNCREF
+SQ fcs "SQ"
+ fcb T.SQR,FNCREF
+SQR fcs "SQR"
+ fcb T.SQR,FNCREF
+SQRT fcs "SQRT"
+ fcb T.STEP,RESRVD
+STEP fcs "STEP"
+ fcb T.STOP,STMBEG
+STOP fcs "STOP"
+ fcb T.STRF,FNCREF
+STR$ fcs "STR$"
+ fcb T.STR,RESRVD
+STRING fcs "STRING"
+ fcb T.SUBS,FNCREF
+SUBSTR fcs "SUBSTR"
+KW.T equ *
+ fcb T.TAB,FNCREF
+TAB fcs "TAB"
+ fcb T.TAN,FNCREF
+TAN fcs "TAN"
+ fcb T.THEN,RESRVD
+THEN fcs "THEN"
+ fcb T.TO,RESRVD
+TO fcs "TO"
+ fcb T.TRIM,FNCREF
+TRIM$ fcs "TRIM$"
+ fcb T.TROF,STMBEG
+TROF fcs "TROFF"
+ fcb T.TRON,STMBEG
+TRON fcs "TRON"
+ fcb T.TRUE,FNCREF
+TRUELit fcs "TRUE"
+ fcb T.TYPE,STMBEG
+TYP fcs "TYPE"
+KW.U equ *
+ fcb T.UNTL,STMBEG
+UNTIL fcs "UNTIL"
+ fcb T.UPDT,RESRVD
+UPDATE fcs "UPDATE"
+ fcb T.USNG,RESRVD
+USING fcs "USING"
+KW.V equ *
+ fcb T.VAL,FNCREF
+VAL fcs "VAL"
+KW.W equ *
+ fcb T.WHIL,STMBEG
+WHILE fcs "WHILE"
+ fcb T.WRIT,STMBEG
+WRITE fcs "WRITE"
+KW.X equ *
+ fcb T.XOR,OPRTR
+XOR fcs "XOR"
+
+ ttl DECOMPILE Table
+ pag
+Z$GARB equ %10000000 Garbage element (fix,float,addr2)
+
+Z$STR equ %00000000 Keyword str ptr
+Z$SUB equ %00100000 Special subroutine handler
+Z$1CH equ %01000000 One character literal
+Z$2CH equ %01000000 Two character literal
+Z$STSK equ %01100000 String+2 byte offset
+
+Z$BCTL equ %00000001 Begin control struct (indent)
+Z$ECTL equ %00000010 End control struct (un-indent)
+Z$CCTL equ %00000011 Continued ctl strct (else)
+
+Z$FREF equ %00010000 Token is a function reference
+
+Z$OPTR equ %00001000 Token is an operator
+Z$1PRC equ %00000001 1 precedence
+Z$2PRC equ %00000010 2
+Z$3PRC equ %00000011 3
+Z$4PRC equ %00000100 4
+Z$5PRC equ %00000101 5
+Z$6PRC equ %00000110 6
+Z$NULL equ %11111111 Null operator
+
+Z$LIT equ %00000100 Token is a literal
+Z$2BYT equ %00000010 2 byte literal (byte)
+Z$3BYT equ %00000011 3 byte literal (integer)
+Z$6BYT equ %00000000 6 byte literal (real)
+
+Z$1DIM equ %00000001 1 dim or arg
+Z$2DIM equ %00000010 2 dims or args
+Z$3DIM equ %00000011 3 dims or args
+ pag
+* Decompiler Token Lookup Table
+*
+DCMTBL equ *
+ fcb Z$1CH Global
+ fdb 0
+ fcb Z$STR
+ fdb PARAM-*
+ fcb Z$STR
+ fdb TYP-*
+ fcb Z$STR
+ fdb DIM-*
+ fcb Z$STR
+ fdb DATAA-*
+ fcb Z$STR
+ fdb STOP-*
+ fcb Z$STR
+ fdb BYE-*
+ fcb Z$STR
+ fdb TRON-*
+ fcb Z$STR
+ fdb TROF-*
+ fcb Z$STR
+ fdb PAUSE-*
+ fcb Z$STR
+ fdb DEG-*
+ fcb Z$STR
+ fdb RAD-*
+ fcb Z$STR
+ fdb RETURN-*
+ fcb Z$STR
+ fdb LET-*
+ fcb Z$1CH
+ fdb 0 Complex assignment
+ fcb Z$STR
+ fdb POKE-*
+ fcb Z$STR
+ fdb IF-*
+ fcb Z$STSK+Z$CCTL
+ fdb ELSE-*
+ fcb Z$STR+Z$ECTL
+ fdb ENDIF-*
+ fcb Z$STR+Z$BCTL
+ fdb FOR-*
+ fcb Z$SUB+Z$ECTL
+ fdb DCNEXT-*
+ fcb Z$STR+Z$BCTL
+ fdb WHILE-*
+ fcb Z$STSK+Z$ECTL
+ fdb ENDWHL-*
+ fcb Z$STR+Z$BCTL
+ fdb REPEAT-*
+ fcb Z$STR+Z$ECTL
+ fdb UNTIL-*
+ fcb Z$STR+Z$BCTL
+ fdb LOOP-*
+ fcb Z$STSK+Z$ECTL
+ fdb ENDLUP-*
+ fcb Z$STR+Z$ECTL
+ fdb EXITIF-*
+ fcb Z$STSK+Z$CCTL
+ fdb ENDEXT-*
+ fcb Z$STR
+ fdb ON-*
+ fcb Z$STR
+ fdb ERROR-*
+ fcb Z$SUB
+ fdb DCGOTO-*
+ fcb Z$SUB
+ fdb DCGOTO-* (dup)
+ fcb Z$SUB
+ fdb DCGOSB-*
+ fcb Z$SUB
+ fdb DCGOSB-* (dup)
+ fcb Z$SUB
+ fdb DCRUN-*
+ fcb Z$STR
+ fdb KILL-*
+ fcb Z$STR
+ fdb INPUT-*
+ fcb Z$STR
+ fdb PRINT-*
+ fcb Z$STR
+ fdb CHD-*
+ fcb Z$STR
+ fdb CHX-*
+ fcb Z$STR
+ fdb CREATE-*
+ fcb Z$STR
+ fdb OPEN-*
+ fcb Z$STR
+ fdb SEEK-*
+ fcb Z$STR
+ fdb READ-*
+ fcb Z$STR
+ fdb WRITE-*
+ fcb Z$STR
+ fdb GET-*
+ fcb Z$STR
+ fdb PUT-*
+ fcb Z$STR
+ fdb CLOSE-*
+ fcb Z$STR
+ fdb RESTOR-*
+ fcb Z$STR
+ fdb DELETE-*
+ fcb Z$STR
+ fdb CHAIN-*
+ fcb Z$STR
+ fdb SHELL-*
+ fcb Z$SUB
+ fdb DCBASE-* Base 0
+ fcb Z$SUB
+ fdb DCBASE-* Base 1
+ fcb Z$SUB
+ fdb DCREM-* Rem
+ fcb Z$SUB
+ fdb DCSREM-* Rem2 '(*'
+ fcb Z$STR
+ fdb END-*
+ fcb Z$SUB
+ fdb DCLREF-* Line reference
+ fcb Z$SUB
+ fdb DCLREF-* Line reference (dup)
+ fcb Z$1CH
+ fdb 0 Direct execution
+ fcb Z$SUB
+ fdb DCERLN-* Error line
+ fcb Z$2CH
+ fdb $205C T.bksl
+ fcb Z$SUB
+ fdb DCEOL-* Eol carriage return
+
+* Secondary Keyword/Misc. Symbol Tokens
+
+ fcb Z$STR+Z$FREF
+ fdb BYTE-* (Z$FREF inhibits spaces around literals)
+ fcb Z$STR+Z$FREF
+ fdb INTGER-*
+ fcb Z$STR+Z$FREF
+ fdb REAL-*
+ fcb Z$STR+Z$FREF
+ fdb BOOL-*
+ fcb Z$STR+Z$FREF
+ fdb STRING-*
+ fcb Z$SUB
+ fdb DCTHEN-*
+ fcb Z$STSK
+ fdb TO-*
+ fcb Z$STSK
+ fdb STEP-*
+ fcb Z$STR
+ fdb DO-*
+ fcb Z$STR
+ fdb USING-*
+ fcb Z$SUB
+ fdb DCMODE-*
+ fcb Z$1CH
+ fdb $2C00 Coma ','
+ fcb Z$1CH
+ fdb ':*256 Col ':'
+ fcb Z$1CH
+ fdb $2800 Lpar '('
+ fcb Z$1CH
+ fdb $2900 Rpar ')'
+ fcb Z$1CH
+ fdb '[*256 Lbkt '['
+ fcb Z$1CH
+ fdb ']*256 Rbkt ']'
+ fcb Z$2CH
+ fdb $3B20 Scol semicolon
+ fcb Z$2CH
+ fdb $3A3D  asgn ':='
+ fcb Z$1CH
+ fdb '=*256 Asg1 '='
+ fcb Z$1CH
+ fdb '#*256 Cnum '#'
+ fcb Z$SUB
+ fdb SK2-* Lbne invisible goto
+ fcb Z$SUB
+ fdb DCFAR-* Far
+
+* Operand Tokens
+
+ fcb Z$SUB
+ fdb DCVREF-* Simple byte variable
+ fcb Z$SUB
+ fdb DCVREF-* Simple integer variable
+ fcb Z$SUB
+ fdb DCVREF-* Simple real variable
+ fcb Z$SUB
+ fdb DCVREF-* Simple boolean variable
+ fcb Z$SUB
+ fdb DCVREF-* Simple string variable
+ fcb Z$SUB
+ fdb DCVREF-* Variable ref.
+ fcb Z$SUB+Z$1DIM
+ fdb DCVREF-* One dim var.
+ fcb Z$SUB+Z$2DIM
+ fdb DCVREF-* Two dim var.
+ fcb Z$SUB+Z$3DIM
+ fdb DCVREF-* Three dim var.
+ fcb Z$SUB
+ fdb DCRREF-* Field ref.
+ fcb Z$SUB+Z$1DIM
+ fdb DCRREF-* One dim field ref.
+ fcb Z$SUB+Z$2DIM
+ fdb DCRREF-* Two dim field ref.
+ fcb Z$SUB+Z$3DIM
+ fdb DCRREF-* Three dim field ref.
+ fcb Z$SUB+Z$LIT+Z$2BYT
+ fdb DBYTLT-* Byte lit.
+ fcb Z$SUB+Z$LIT+Z$3BYT
+ fdb CNVINT-* Integer lit.
+ fcb Z$SUB+Z$LIT+Z$6BYT
+ fdb DRLLIT-* Real lit.
+ fcb Z$SUB+Z$LIT
+ fdb DCSTLT-* String lit.
+ fcb Z$SUB+Z$LIT+Z$3BYT
+ fdb DHXLIT-* Hex lit.
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb ADDR-*
+ fcb Z$GARB
+ fdb 0 Prefix addr
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb LENG-*
+ fcb Z$GARB
+ fdb 0 Prefix leng
+ fcb Z$STR+Z$FREF
+ fdb POS-*
+ fcb Z$STR+Z$FREF
+ fdb ERRR-*
+ fcb Z$STR+Z$FREF+Z$2DIM
+ fdb MOD-*
+ fcb Z$STR+Z$FREF+Z$2DIM
+ fdb MOD-* (dup)
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb RND-*
+ fcb Z$STR+Z$FREF
+ fdb PI-*
+ fcb Z$STR+Z$FREF+Z$2DIM
+ fdb SUBSTR-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb SGN-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb SGN-* (dup)
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb SIN-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb COS-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb TAN-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb ASN-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb ACS-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb ATN-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb EXP-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb ABS-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb ABS-* (dup)
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb LOG-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb LOG10-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb SQRT-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb SQRT-* (dup)
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb INTF-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb INTF-* (dup)
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb FIX-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb FIX-* (dup)
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb FLOAT-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb FLOAT-* (dup)
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb SQ-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb SQ-* (dup)
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb PEEK-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb NUMNOT-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb VAL-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb LEN-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb ASC-*
+ fcb Z$STR+Z$FREF+Z$2DIM
+ fdb NUMAND-*
+ fcb Z$STR+Z$FREF+Z$2DIM
+ fdb NUMOR-*
+ fcb Z$STR+Z$FREF+Z$2DIM
+ fdb NUMXOR-*
+ fcb Z$STR+Z$FREF
+ fdb TRUELit-*
+ fcb Z$STR+Z$FREF
+ fdb FALSELit-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb EOF-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb TRIM$-*
+ fcb Z$STR+Z$FREF+Z$3DIM
+ fdb MID$-*
+ fcb Z$STR+Z$FREF+Z$2DIM
+ fdb LEFT$-*
+ fcb Z$STR+Z$FREF+Z$2DIM
+ fdb RIGHT$-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb CHR$-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb STR$-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb STR$-* (dup)
+ fcb Z$STR+Z$FREF
+ fdb DATE$-*
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb TAB-*
+ fcb Z$GARB
+ fdb 0 Fix1
+ fcb Z$GARB
+ fdb 0 Fix2
+ fcb Z$GARB
+ fdb 0 Fix3
+ fcb Z$GARB
+ fdb 0 Fl1
+ fcb Z$GARB
+ fdb 0 Flt2
+
+* Operator Tokens
+
+ fcb Z$STR+Z$FREF+Z$1DIM
+ fdb NOT-*
+ fcb Z$1CH+Z$FREF+Z$1DIM
+ fdb '-*256 '-' (monadic)
+ fcb Z$1CH+Z$FREF+Z$1DIM
+ fdb '-*256 '-' (monadic) (dup)
+ fcb Z$STR+Z$OPTR+Z$2PRC
+ fdb AND-*
+ fcb Z$STR+Z$OPTR+Z$1PRC
+ fdb OR-*
+ fcb Z$STR+Z$OPTR+Z$1PRC
+ fdb XOR-*
+ARROW equ *+1
+ fcb Z$1CH+Z$OPTR+Z$3PRC
+ fdb '>*256 Gt '>'
+ fcb Z$1CH+Z$OPTR+Z$3PRC
+ fdb '>*256 Gt '>' (dup)
+ fcb Z$1CH+Z$OPTR+Z$3PRC
+ fdb '>*256 Gt '>' (dup)
+ fcb Z$1CH+Z$OPTR+Z$3PRC
+ fdb '<*256 LT '<'
+ fcb Z$1CH+Z$OPTR+Z$3PRC
+ fdb '<*256 LT '<' (dup)
+ fcb Z$1CH+Z$OPTR+Z$3PRC
+ fdb '<*256 LT '<' (dup)
+ fcb Z$2CH+Z$OPTR+Z$3PRC
+ fdb '<*256+'> NE '<>' or '><'
+ fcb Z$2CH+Z$OPTR+Z$3PRC
+ fdb '<*256+'> NE '<>' or '><' (dup)
+ fcb Z$2CH+Z$OPTR+Z$3PRC
+ fdb '<*256+'> NE '<>' or '><' (dup)
+ fcb Z$2CH+Z$OPTR+Z$3PRC
+ fdb '<*256+'> NE '<>' or '><' (dup)
+ fcb Z$1CH+Z$OPTR+Z$3PRC
+ fdb '=*256 Eq '='
+ fcb Z$1CH+Z$OPTR+Z$3PRC
+ fdb '=*256 Eq '=' (dup)
+ fcb Z$1CH+Z$OPTR+Z$3PRC
+ fdb '=*256 Eq '=' (dup)
+ fcb Z$1CH+Z$OPTR+Z$3PRC
+ fdb '=*256 Eq '=' (dup)
+ fcb Z$2CH+Z$OPTR+Z$3PRC
+ fdb '>*256+'= GE '>=' or '=>'
+ fcb Z$2CH+Z$OPTR+Z$3PRC
+ fdb '>*256+'= GE '>=' or '=>' (dup)
+ fcb Z$2CH+Z$OPTR+Z$3PRC
+ fdb '>*256+'= GE '>=' or '=>' (dup)
+ fcb Z$2CH+Z$OPTR+Z$3PRC
+ fdb '<*256+'= LE '<=' or '=<'
+ fcb Z$2CH+Z$OPTR+Z$3PRC
+ fdb '<*256+'= LE '<=' or '=<' (dup)
+ fcb Z$2CH+Z$OPTR+Z$3PRC
+ fdb '<*256+'= LE '<=' or '=<' (dup)
+ fcb Z$1CH+Z$OPTR+Z$4PRC
+ fdb '+*256 Plus '+'
+ fcb Z$1CH+Z$OPTR+Z$4PRC
+ fdb '+*256 Plus '+' (dup)
+ fcb Z$1CH+Z$OPTR+Z$4PRC
+ fdb '+*256 Plus '+' (dup)
+ fcb Z$1CH+Z$OPTR+Z$4PRC
+ fdb '-*256 Mins '-' (dyadic)
+ fcb Z$1CH+Z$OPTR+Z$4PRC
+ fdb '-*256 Mins '-' (dyadic) (dup)
+ fcb Z$1CH+Z$OPTR+Z$5PRC
+ fdb '**256 Mul '*'
+ fcb Z$1CH+Z$OPTR+Z$5PRC
+ fdb '**256 Mul '*' (dup)
+ fcb Z$1CH+Z$OPTR+Z$5PRC
+ fdb '/*256 Div '/'
+ fcb Z$1CH+Z$OPTR+Z$5PRC
+ fdb '/*256 Div '/' (dup)
+ fcb Z$1CH+Z$OPTR+Z$6PRC
+ fdb '^*256 Powr '^'
+ fcb Z$2CH+Z$OPTR+Z$6PRC
+ fdb $2A2A Powr '**'
+
+* Address Reference Tokens
+
+ fcb Z$SUB
+ fdb DCVREF-* Address ref
+ fcb Z$SUB+Z$1DIM
+ fdb DCVREF-* One dim address
+ fcb Z$SUB+Z$2DIM
+ fdb DCVREF-* Two dim address
+ fcb Z$SUB+Z$3DIM
+ fdb DCVREF-* Three dim address
+ fcb Z$SUB
+ fdb DCRREF-* Field address ref
+ fcb Z$SUB+Z$1DIM
+ fdb DCRREF-* One dim field address
+ fcb Z$SUB+Z$2DIM
+ fdb DCRREF-* Two dim field address
+ fcb Z$SUB+Z$3DIM
+ fdb DCRREF-* Three dim field addr
+
+ ttl SYSTEM Command verb tables
+ pag
+
+***************
+* Basic09 System Commands
+*
+ fdb 2 number of non-alphabetic entries
+ fcb 2 number of skip bytes per entry
+CMDVRB equ *
+ fdb INVOKE-*
+ fcs "$"
+ fdb CMDNOP-* an empty line: nothing (no DIR)
+ fcb V$CR+$80
+
+ ifne L2B09CC
+ fdb 15 number of alphabetic entries (no EDIT/E, DIR, RENAME; BP, BC, STEP, CCPRM, CCSTM)
+ else
+ fdb 13 number of alphabetic entries (no EDIT/E, DIR, RENAME; BP, BC, STEP)
+ endc
+ fcb 2 number of skip bytes per entry
+ fdb BYEBYE-*
+ fcs "BYE"
+ ifne L2B09CC
+ fdb CCPRM-*
+ fcs "CCPRM"
+ fdb CCSTM-*
+ fcs "CCSTM"
+ endc
+ fdb LIST-*
+ fcs "LIST"
+ fdb INTERP-*
+ fcs "RUN"
+ ifne L2B09RT (done here, then passed on to l2b09cc)
+ fdb L2KILL-*
+ else
+ fdb KILLER-*
+ endc
+ fcs "KILL"
+ fdb SAVE-*
+ fcs "SAVE"
+ fdb LOAD-*
+ fcs "LOAD"
+ fdb DUMP-*
+ fcs "PACK"
+ ifne L2B09RT (done here, then passed on to l2b09cc)
+ fdb L2MEM-*
+ else
+ fdb CHGMEM-*
+ endc
+ fcs "MEM"
+ ifne L2B09RT (done here, then passed on to l2b09cc)
+ fdb L2CHD-*
+ else
+ fdb CHDDIR-*
+ endc
+ fcs "CHD"
+ ifne L2B09RT (done here, then passed on to l2b09cc)
+ fdb L2CHX-*
+ else
+ fdb CHXDIR-*
+ endc
+ fcs "CHX"
+ fdb BPSET-*
+ fcs "BP"
+ fdb BPCLR-*
+ fcs "BC"
+ fdb STEPRN-*
+ fcs "STEP"
+
+***************
+* Debug Mode Commands
+*
+ fdb 2 number of debug symbol commands
+ fcb 2 number of skip bytes per entry
+DBGVRB equ *
+ fdb INVOKE-*
+ fcs "$"
+ fdb STEP0-*
+ fcb V$CR+$80
+
+ fdb 16 number of alphabetic debug commands (BP, BC, OVER; no DIR)
+ fcb 2 number of skip bytes per entry
+ fdb CONTIN-*
+ fcs "CONT"
+ fdb HALT-*
+ fcs "Q"
+ fdb LSTBND-*
+ fcs "LIST"
+ fdb DIREXQ-*
+ fcs "PRINT"
+ fdb STATE-*
+ fcs "STATE"
+ fdb DIREXQ-*
+ fcs "TRON"
+ fdb DIREXQ-*
+ fcs "TROFF"
+ fdb DIREXQ-*
+ fcs "DEG"
+ fdb DIREXQ-*
+ fcs "RAD"
+ fdb DIREXQ-*
+ fcs "LET"
+ fdb STEPM-*
+ fcs "STEP"
+ fdb BREAK-*
+ fcs "BREAK"
+ fdb BPSET-*
+ fcs "BP"
+ fdb BPCLR-*
+ fcs "BC"
+ fdb OVER-*
+ fcs "OVER"
+
+ endc
+
+ ttl CHARACTER String constants
+ pag
+READY equ *
+ ifne Tandy-0
+ fcb C$Alpha change to alpha screen
+ endc
+ fcs "Ready"
+WHAT fcs "What?"
+DEFNAM fcs "Program"
+PRCEDR fcs "PROCEDURE"
+
+OVWRIT fcc "%ASK Rewrite?"
+ fcb V$CR
+OVWLEN equ *-OVWRIT
+DBGMSG equ *
+ ifne Tandy-0
+ fcb C$Alpha change to alpha screen
+ endc
+ fcs "BREAK: "
+CALLBY fcs "called by"
+OKMSG fcs "ok"
+CMDPMT fcs "%READY"
+
+ ttl Basic09 Command module
+ pag
+***************
+* Intercept Vector
+*   System Passes Non-Fatal Signals Here
+
+INTCPT lda R$DP,S
+ tfr A,DP reset Basic09's direct page
+ cmpb #S$Abort keyboard abort (RUN/STOP on the K2): a break,
+ bne INTCP1 as ^C, so the program stops in the debugger
+ ldb #S$Intrpt (^P in the editor, Q here, ends it)
+INTCP1 equ *
+ stb G.SIGN Save signal
+ ifne H6309
+ oim #$80,I.RUNM Set high bit (flag signal was received)
+ else
+ lsl I.RUNM
+ coma set Break flag
+ ror I.RUNM
+ endc
+ rti
+
+***************
+* Basic09 Entry Point
+
+ ifne H6309
+START tfr U,D Save start of data mem into D
+ ldw #$100 Size of DP area to clear
+ clr ,-S Clear byte on stack
+ tfm S,U+ Clear out DP
+ else
+START pshs U bottom of workspace
+ leau $100,U
+ clra
+ clrb
+START0 std ,--U clear DP Globals
+ cmpu  ,S
+ bhi START0
+ puls D bottom of workspace
+ endc
+ leau  ,X top of workspace (below params)
+ std G.WSPA
+ inca
+ sta SMASH Set binder for non-compil mode (non-zero)
+ std I.IOBG
+ std I.IOPT
+ adda #2
+ std I.OPBG Set initial opstack
+ std I.OPSP
+ inca
+ tfr D,S
+ std G.DIRA
+ inca
+ addd #L2BPSZ breakpoint table between directory and procedures
+ ifne L2B09CC
+ addd #L2SXSZ and below it the symbol index (compil's SYMSRC)
+ endc
+ std G.PRCA
+ std I.STBG
+ tfr U,D
+ subd G.WSPA
+ std G.WSPS
+ clra
+ ldb #1
+ std I.IPTH Stdin=0, stdout=1 (interpreter)
+ sta BASINP Stdin=0, stdout=2 (comand)
+***************
+* Kluge to prevent chain from eating paths
+ lda #3
+START05 OS9 I$Close close all non-std paths
+ inca
+ cmpa #NumPaths
+ blo START05
+***************
+ lda #CMDOUT Save std error path
+ OS9 I$Dup
+ sta BASOUT All command output through path #2
+ clr G.SIGN No signals recieved
+ pshs X Save command line ptr
+ leax <INTCPT,PCR Set up intercept vector
+ OS9 F$ICPT
+ ldx G.PRCA
+ ifne H6309
+ clrd
+ else
+ clra
+ clrb
+ endc
+START1 std ,--X Clear out directory
+ cmpx G.DIRA
+ bhi START1
+
+***************
+* Build Inter-Module Linkages
+
+ leax BASEZERO,PCR get module load addr
+ ifne H6309
+ tfr x,w Move it to W
+ else
+ pshs x save BASE 0
+ endc
+ ldx G.WSPA
+ leax M.COMAND,x get addr of Jump tbl
+ leay O.COMAND,PCR get offset table addr
+START15 lda #$7E JMP Opcode
+ sta ,X+
+ ldd ,Y++ get offset of module
+ ifne H6309
+ addr w,d make absolute
+ else
+ addd  ,S make absolute
+ endc
+ std ,X++ fill in jump table
+ ldd  ,Y End of table?
+ bne START15 ..No; no; repeat
+ ifne H6309
+ else
+ leas 2,S discard scratch
+ endc
+* end of Inter module linkages
+
+ lbsr J$INTI Initialize interpreter
+ puls Y get initial shell params
+
+ ifne INCLUDED&EDITOR
+ lbsr L2OPTS Parse l2b09run options
+ endc
+ lbsr L2GARD keep the data window out of the top slot
+ ifne L2B09RT
+ pshs Y (the rest of our parameters)
+ lbsr L2CCST start the compiler, l2b09cc
+ puls Y
+ endc
+ lda CMDIN
+ sta BASINP Command input from home path
+ ifne INCLUDED&EDITOR
+ leax KEYTAB,PCR
+ stx KEYWORDS save Keyword Table addr for compiler
+ ldb  ,Y
+ cmpb #V$CR End of command line?
+ ifne wildbits
+ lbeq BannerGo ..yes; print WildBits logo, then enter Basic09 command
+ else
+ beq COMAND ..yes; enter Basic09 command
+ endc
+ leax <START2,PCR
+ pshs y Save param ptr
+ bsr SETUP1
+ lbsr DIRLNK try to find packed module
+ bcc EXIT ..If found; don't do auto-load
+ lbsr LOAD Auto-load file if specified
+ bra EXIT cleanup stack
+
+START2 puls Y get shell param ptr
+START25 lda ,Y+ skip the file name; a procedure name may follow
+ cmpa #V$SPAC
+ bhi START25
+ leay -1,Y
+ endc
+
+ bsr SETUP
+ ldx G.DIRA
+ ldd  ,X get first procedure loaded
+ std I.APRC make it ACTIVE
+ lbsr INTERP (will exit to COMAN0)
+
+***************
+* Subroutine SETUP
+*   Set up for command invocation
+
+SETUP leax <COMAN0,PCR
+SETUP1 puls U get return addr
+ bsr SETEXT Set exit address
+ pshs U Restore return addr
+ clr I.RUNM
+ ldd G.WSPA
+ addd G.WSPS
+ subd G.PRCA
+ subd G.PRCS
+ std G.VARS Reset free space size
+ leau 2,S Set up default opstack ptr in (U)
+ stu I.OPBG
+ stu I.OPSP
+ leas -254,S Chop out opstack space
+ jmp [-2,U] Return
+
+***************
+* Subroutine EXIT
+
+EXIT lds SP.ERR restore stack ptr
+ puls D pop previous exit trap
+ std SP.ERR reset it
+EXNLIN lbra NEWLIN clear I/O buffer; return
+
+***************
+* Subroutine SETEXT
+*   Set (Error) exit trap
+
+* Passed: (X)=exit addr
+* Destroys: D,Sp
+
+SETEXT ldd SP.ERR previous exit ptr
+ pshs D
+ sts SP.ERR set up new exit ptr
+ ldd 2,S return addr
+ stx 2,S set up exit return addr
+ tfr D,PC return to caller
+
+
+ ifne INCLUDED&EDITOR
+***************
+* Subroutine COMAND
+*   Top level Basic09 executive.  Given control by
+*   initialization routine, calls routines as directed
+*   by user.  Expects one command per line, terminated
+*   with carriage-return.
+
+COMAND equ *
+ ifeq L2B09CC (l2b09cc: its stderr is the editor's)
+ leax B09NAM,PCR Basic09 message
+ bsr CMDER1 print "Basic09"
+ endc
+COMAN0 equ *
+ lbsr J$FALL no program is running any more
+ ifne L2B09CC
+ lbsr L2DONE ready for a command: %DONE on stdout
+ endc
+ bsr SETUP
+ ifne L2B09CC
+ ldx #0 no prompt: %DONE is on stdout
+ else
+ leax CMDPMT,PCR command mode prompt
+ endc
+ leay CMDVRB,PCR command verb table
+ clr PRTCTL
+ bsr RUNCMD process command
+ bcc EXIT
+ bsr CMDERR command error; print 'what?'
+ bra EXIT
+
+CMDERR leax WHAT,PCR ptr to "What?"
+CMDER1 lbra PRTLIN print message
+ else
+COMAND equ *
+COMAN0 bsr SETUP reserve opstack
+ lbra BYEBYE
+ endc
+ ifne INCLUDED&EDITOR
+
+***************
+* Subroutine RUNCMD
+*   Find and execute command
+
+* Passed: (X)=Command Prompt String
+*         (Y)=Command Verb Table
+* Returns: Carry Set If Command Not Found
+*          (Y)=Address of Input Line If Not Found
+* Destroys: All
+
+RUNCMD pshs X,Y Save regs
+ clr G.SIGN any signal now is ignored
+ leax ,X no prompt (caller wrote an event line)?
+ beq RUNCMD02
+ lbsr PRTLIN prompt is a whole line
+RUNCMD02 equ *
+ bsr EXNLIN reset I/O buffer
+ lda BASINP get working path number
+ cmpa CMDIN home command path?
+ beq RUNCMD05
+ OS9 I$Close Close input path
+RUNCMD05 lda CMDIN Default back to home command input
+ sta BASINP
+ lbsr INLINE read input line
+ bcc RUNC10 ..continue if no error
+ cmpb #E$EOF End of file?
+ bne RUNC90 ..no; reprompt
+ leax DBGVRB,PCR
+ cmpx 2,S in the debugger?
+ lbeq HALT ..yes; quit to command mode (where EOF means BYE)
+ ifne H6309
+ ldq #'b*$1000000+'y*$10000+'e*$100+V$CR default to "BYE" command
+ stq  ,Y
+ else
+ ldd #"by default to "BYE" command
+ std  ,Y
+ ldd #'e*256+V$CR
+ std 2,Y
+ endc
+
+RUNC10 ldx 2,S command verb tbl addr
+ lda #$80 ignore high order bit
+ lbsr J$SRCH search for command symbol
+ bne RUNC20 ..found
+ lbsr J$NAME name in command line?
+ beq RUNC90 ..no; return carry set
+ leax 3,X skip to alphabetic command tbl
+ lda #'a-'A match upper/lower case
+ lbsr J$SRCH command word found?
+ beq RUNC90 ..no; return carry set
+RUNC20 ldd  ,X
+ leas 4,S
+ jmp D,X execute command
+
+RUNC90 coma return carry set
+ puls X,Y,PC
+
+ use mem
+
+***************
+* Subroutine ItoA
+*   convert Integer to ASCII in I/O buffer
+
+* Passed: (D)=number to print
+* Returns: ASCII representation in I/O buffer
+* Destroys: cc
+
+ItoA pshs D,X,Y save regs
+ pshs D
+ leay <Ten.Tbl,PCR ptr to 10's power table
+ItoA.A ldx #$2F00 ASCII zero - 1
+ItoA.B puls D restore remainder
+ItoA.C leax $100,X build ASCII digit
+ subd  ,Y
+ bhs ItoA.C repeat until overflow
+ addd ,Y++ skip to next table entry
+ pshs D save remainder
+ ldd  ,Y Is this the units digit?
+ tfr X,D  prime (A)=ASCII digit
+ beq ItoA.Z ..Yes; print it and exit
+ cmpd #$3000 suppressed high-order digit?
+ beq ItoA.A ..Yes; print nothing
+ lbsr PUTCHR output digit
+ ldx #$2F01 end zero suppression
+ bra ItoA.B
+
+ItoA.Z lbsr PUTCHR output Units Digit
+ leas 2,S discard remainder
+ puls D,X,Y,PC return
+
+Ten.Tbl fdb 10000
+ fdb 1000
+ fdb 100
+ fdb 10
+ fdb 1
+ fdb 0 end of tbl
+
+***************
+* Subroutine INVOKE
+*   Execute OS-9 Shell command
+
+INVOKE lbsr CMDSEP Skip any spaces in command line
+ leau  ,Y Parameter string ptr
+ clrb
+INVK10 incb COUNT Parameter size
+ lda ,Y+
+ cmpa #V$CR End of line?
+ bne INVK10 ..no; keep looking
+ clra
+ tfr D,Y Size of parameter area
+ leax SHELL,PCR ptr to "SHELL"
+ lda #OBJCT
+ clrb
+ OS9 F$Fork Fork to shell
+ bcs ERREXT Report error, exit
+ pshs A save child process ID
+INVK20 OS9 F$Wait Wait for command to finish
+ cmpa  ,S proper child dead?
+ bne INVK20 ..No; wait again
+ leas 1,S
+ tstb
+ bne ERREXT Report error, exit
+ rts
+
+***************
+* Subroutine Chddir
+*   Chd <dir name> or Chx <dir name>
+
+CHDDIR lda #DIR.+UPDAT. change data directory
+ bra CHXD10
+
+CHXDIR lda #DIR.+EXEC. change execution directory
+CHXD10 leax  ,Y (x)=pathname ptr
+ OS9 I$ChgDir change directory
+ bcs ERREXT if error; report it
+ rts else return carry clear
+
+RBIND1 lbra REBIND Rebind the procedure and return carry clear
+ endc
+
+ERREXT lbsr PRTERR
+EXIT1 lbra EXIT
+
+ERUPRC ldb #M$UPRC Error - unknown procedure name
+ bra ERREXT
+
+***************
+* Cmdsep
+*   Skip a command separator
+
+* Passed: (Y)=Command Line
+* Returns: (Y)=Updated Past Separator
+* Destroys: B,CC
+
+CMDSEP ldb ,Y+
+ cmpb #', Comma?
+ beq CMDSE9 ..yes; return
+ cmpb #V$SPAC Space?
+ beq CMDSE9
+ leay -1,Y
+CMDSE9 rts
+
+ pag
+***************
+* Subroutine Prcref
+*   get A Procedure Reference From The Command Line
+
+* Passed: (Y)=Command Line Where A Proc. Name Should Be
+* Returns: (Y) Pointing to A Proc. Name With Last Byte Set
+* Destroys: A,B,X,CC
+
+PRCREF lbsr J$NAME Is there a name in the command line?
+ bne PRCRE9 ..yes; good - return
+DEFPRC ldy I.APRC
+ beq PRCRE1
+ ldd M$NAME,Y
+ leay D,Y get "current" PROCEDURE NAME
+ rts
+PRCRE1 leay DEFNAM,PCR get default name
+PRCRE9 rts RETURN
+
+ ifne INCLUDED&EDITOR
+ ifeq L2B09RT (l2b09run: LOAD is done by l2b09cc)
+***************
+* Subroutine Load
+*   Load A "Save" File
+
+* Passed: (Y)=Command Ptr (After Save)
+
+LODERR ldb #M$UPRC Error-unknown procedure
+ bra LODER1
+
+LODABT ldb #M$MFUL Error; memory full
+LODEOF pshs B Save error code
+ bsr RBIND1 Bind erroneous procedure
+ lbsr L2BANK
+ puls B Restore error code
+LODER1 cmpb #E$EOF End of File?
+ beq EXIT1 ..yes; return
+ bra ERREXT Print error message & return
+
+LOAD equ *
+ lbsr L2BPZ procedures move: breakpoints go
+ leax  ,Y get path name ptr
+ lda #READ. Open for input
+ OS9 I$Open Open the input file
+ bcs LODER1 Exit if error
+ sta BASINP Save working path
+ bsr INLINE Read next line
+ bsr PRCLIT Does it contain a 'procedure' literal?
+ bne LODERR ..no; error exit (dump file?)
+LOAD1 lbsr J$NAME get procedure name
+ beq LODERR No name found; error - path is open
+ pshs Y Save procedure name ptr
+ lbsr DIRSCH Is name in directory?
+ bcs LOAD15 ..no; don't try kill
+ ldy  ,S
+ leay -1,Y Must have a preceeding space
+ lbsr KILLER Destroy any old version that may have existed
+LOAD15 ldy  ,S get ptr to procedure name
+ lbsr DIRADD Add it to the directory
+ lbsr UNBIND Unbind the new procedure
+ puls X Restore proc name ptr
+ lbsr PRTLIN Print it
+LOAD2 ldb G.SIGN (abort) signal?
+ bne LODEOF ..yes; return signal as error
+ bsr INLINE Loop :get (next) source line
+ bcs LODEOF I/O error ..end of file?
+ lda G.VARS Enough memory to compile?
+ cmpa #2 (at least 2 pages required)
+ blo LODABT ..no; abort
+ bsr PRCLIT Is it a procedure header?
+ beq LOAD3 ..yes; exit
+ ldy I.IOBG
+ ldd I.ICLM
+ std I.ICPT At end of icode-
+ lbsr L2INSR -insert this line; report a compile error
+ bra LOAD2 Endloop
+LOAD3 ldx I.IOBG
+ pshs X,Y Save next procedure name ptr
+LOAD35 lda ,X+
+ cmpa #V$CR End of input line?
+ bne LOAD35 ..no; skip to end of line
+ stx I.IOBG Move I/O buffer up (binding errors wipe out)
+ stx I.IOPT
+ lbsr J$BIND Bind current procedure
+ lbsr L2BANK
+ puls X,Y Restore next procedure name
+ stx I.IOBG Reset I/O buffer addr
+ stx I.IOPT
+ bra LOAD1 Go load the new procedure
+ endc
+
+INLINE lda BASINP get Basic09's working path
+ ldx I.IOBG
+ ldy #256 Length of I/O buffer
+ OS9 I$ReadLn Call OS9 to do the I/O
+ ldy I.IOBG
+ rts
+
+PRCLIT lbsr J$NAME get a name in the source line
+ leax PRCEDR,PCR get addr of PROCEDURE string
+PRCLI1 lda ,X+
+ eora ,Y+
+ anda #^('a-'A) match upper or lower case
+ bne PRCLI9 Exit if not equal
+ tst -1,X
+ bpl PRCLI1 Loop until all characters are checked
+CMDNOP clra (l2b09run: an empty command line)
+PRCLI9 rts RETURN to user
+
+***************
+* Cold commands
+*   PACK lives in the overlay module l2b09ovl (src/overlay.asm,
+*   which assembles src/pack); L2OVLY loads it and calls the entry.
+*   l2b09run has no DIR or RENAME (the editor does not use them).
+
+ ifeq L2B09RT (l2b09run: PACK is done by l2b09cc)
+DUMP ldb #0 entry 0: PACK
+*     (Fall Through to L2OVLY)
+ endc
+
+***************
+* Subroutine L2OVLY
+*   Run a cold command from the overlay module l2b09ovl.  Link it
+*   (or load it from the execution directory), call entry B with
+*   the command line in (Y), and unlink it again.  The command's
+*   carry comes back (set: "What?").  An error exits through our
+*   trap, which unlinks it and goes on to the previous trap.
+
+L2OVLY pshs B,Y
+ bsr L2OVLK
+ lbcs ERREXT
+ ldb ,S+ entry number
+ lda #3 (each entry is a LBRA)
+ mul
+ leay D,Y entry addr
+ ldx ,S command line
+ stu ,S module, for the unlink
+ pshs X,Y
+ leax L2OVL8,PCR
+ lbsr SETEXT
+ ldy 4,S command line
+ jsr [6,S] run the command
+ puls D
+ std SP.ERR remove our trap
+ leas 6,S
+ puls U
+ pshs CC the command's carry
+ OS9 F$UnLink
+ puls CC,PC
+L2OVL8 leas 4,S error: the command line and entry go
+ puls U
+ OS9 F$UnLink
+ lbra EXIT on to the previous trap
+
+* L2OVLK: link l2b09ovl, or load it from the execution directory:
+* (Y)=entry, (U)=module; carry set, (B)=error on failure
+L2OVLK leax L2OVNM,PCR
+ clra any type
+ OS9 F$Link
+ bcc L2OVK9
+ leax L2OVNM,PCR
+ clra
+ OS9 F$Load
+L2OVK9 rts
+L2OVNM fcs /l2b09ovl/
+
+***************
+* Defile
+*   get list of procedure names and (possibly default) pathname
+
+DEFILE bsr PCDLST get list of procedures
+ lda  ,Y
+ cmpa #V$CR End of line?
+ bne DEFIL1 ..no; exit
+ ldx I.OPBG get list of procedure names
+ ldx [-2,X] get 1st procedure in list
+ ldd M$NAME,X
+ leax D,X Point to it's name
+ lbsr STRSPC Put it in the I/O buffer
+ lbsr CPYEOL Followed by a carriage return
+DEFIL1 leax  ,Y Copy I.IOPT (ptr to pathname)
+ rts
+ endc
+
+***************
+* Subroutine Pcdlst
+*   get list of procedure names from command line
+
+* Passed: (Y)=Ptr to ASCII <Proc Name> [,<Proc Name>..]
+* Returns: (Y)=Updated to Terminating Char+1
+*          List of Directory Entry Ptrs on Opstack
+*          Terminated By A $0000 Entry
+
+PCDLST ldu I.OPBG
+ stu I.OPSP reset opstack
+
+ ifne INCLUDED&EDITOR
+ lbsr CMDSEP Is there a comma or space in command line?
+ beq PCDLS3 ..yes; go get name(s)
+ cmpb #'* Entire directory?
+ bne PCDL35 ..no; use default name
+ endc
+
+ ldx G.DIRA get directory addr
+PCDLS1 ldd  ,X End of directory?
+ beq PCDLS2 ..yes, exit
+ tfr X,D get addr of directory entry
+ leax 2,X Update directory ptr
+PCDLS2 std ,--U Push directory addr on opstack
+ bne PCDLS1 Repeat if not end marker
+ stu I.OPSP Save updated opstack ptr
+ lda  ,Y
+ cmpa #V$CR End of line?
+ beq PCDL25 ..yes; dont update icode ptr
+ leay 1,Y Skip separator preceeding pathlist
+PCDL25 sty I.IOPT
+ rts RETURN
+
+ ifne INCLUDED&EDITOR
+PCDLS3 lbsr J$NAME Any procedure names given?
+ bne PCDLS4 ..yes; go get em
+PCDL35 sty I.IOPT Save I/O ptr
+ lbsr DEFPRC get default procedure name
+ lbsr DIRSCH Is it in directory?
+ bcc PCDLS5 ..yes; good
+PCDLSR lbra ERUPRC
+
+PCDLS4 lbsr DIRSCH Is the procedure name known?
+ bcs PCDLSR ..no; error
+ sty I.IOPT Save I/O ptr
+PCDLS5 stx ,--U Push directory addr
+ ldy I.IOPT
+ lbsr CMDSEP Is it followed by a command separater?
+ bne PCDLS6 ..no; done
+ lbsr J$NAME Another procedure name in source?
+ bne PCDLS4 ..yes; repeat
+PCDLS6
+ ifne H6309
+ clrd Make End mark on opstack
+ else
+ clra
+ clrb Make End mark on opstack
+ endc
+ bra PCDLS2 Push it and return
+
+***************
+* Subroutine Save
+*   Save <Procedure List>;<File Spec>
+* Saves Procedure(S) In Source Format
+
+* Passed: (Y)=Ptr to Command Line Following "Save"
+
+SAVE tst G.VARS At least one page of free memory?
+ lbeq ERMFUL ..no; give up
+ lda #$80
+ sta PRTCTL
+ bsr DEFILE get procedure list, pathname
+ bra LIST0
+
+***************
+* Subroutine List
+*   List Procedure(S)
+
+LIST bsr PCDLST Parse list of procedure names
+ leax  ,Y get I/O ptr (pathname)
+LIST0 stx I.ICPT out of range to KILL "*" on current
+ bsr OPNCHL Open output path
+ ldy I.OPBG get top of list
+ stu I.OPBG Carve out opstack space used
+ bra LIST2
+LIST1 pshs Y Save proc list ptr
+ ldy [,Y] get procedure addr
+ tfr Y,X
+ lbsr J$L2RS banked? map it
+ bcs LIST15
+ tfr X,Y
+ sty I.APRC set active procedure
+ ldd P.PGMB,Y set icode beginning offset
+ addd I.APRC
+ std I.ICBG
+ ldd P.DSCB,Y compute icode limit
+ addd I.APRC
+ std I.ICLM
+ ldd P.SYMB,Y compute symbol tbl addr
+ addd I.APRC
+ std I.SYMT
+ tst M$TYPE,Y internal (type-less) procedure?
+ bne LIST15 ..no, silence is golden
+ leax <LIST12,PCR
+ lbsr SETEXT
+ lbsr LSTBND List it
+LSEXIT lbra EXIT (this will fall through)
+LIST12 tst PRTCTL doing a save?
+ bmi LIST15 ..yes; don't produce error list
+ ldx [,S] restore directory ptr
+ ldy  ,X
+ lda P.STAT,Y
+ bita #P.BANK never rebind a banked procedure in place
+ bne LIST15
+ ifeq L2B09RT (l2b09cc showed them)
+ lbsr UNBIND Unbind procedure
+ lbsr J$BIND Rebind it (show errors)
+ endc
+LIST15 puls Y Restore proc list ptr
+ ldx [,Y] the current procedure is the stub, not the window
+ stx I.APRC
+LIST2 ldx ,--Y get next directory addr
+ bne LIST1
+
+OPEXIT bsr CLSCHL reset comand output path
+ bra LSEXIT then exit (no error)
+
+CLSCHL pshs B save possible error code
+ lda #CMDOUT close current command path
+ OS9 I$Close
+ lda BASOUT get initial command path
+ OS9 I$Dup reset it
+ puls B,PC return
+
+***************
+* Opnchl
+*   Open Output Path
+
+* Passed: (X)=Pathname Ptr
+
+OPNCHL lbsr CMDSEP
+ cmpb #V$CR End of line?
+ beq OPNC99 (rts) no re-direction desired
+ stx I.IOPT Save file name ptr
+ ldd #WRITE.*256+UPDAT.+PREAD. Mode, attributes
+
+OPNCH0 pshs D,X,U save regs
+ lda #CMDOUT
+ OS9 I$Close eliminate output path
+OPNCH1 ldd  ,S get mode
+ OS9 I$Create Open new file
+ bcc OPNC90 Opened ok, return
+ cmpb #E$CEF Creating existing file?
+ bne ERRST Error; reset command output path
+ ldd  ,S mode
+ ldx 2,S pathname ptr
+ OS9 I$Open open existing file
+ bcs ERRST ..error; reset comand output
+ leax OVWRIT,PCR
+ ldy #OVWLEN
+ lda BASOUT to 'normal' command path
+ OS9 I$WritLn File exists, rewrite?:
+ ifne L2B09CC
+ leax L2ASTX,PCR and to l2b09run, which passes the answer on
+ ldy #5
+ lda #1
+ OS9 I$Write
+ endc
+ lda CMDIN from home command input
+ leax ,--S Input buffer
+ ldy #2 Read one byte
+ OS9 I$ReadLn
+ puls D get byte read
+ eora #'Y Yes?
+ anda #^('a-'A) (match lower case, too)
+ bne OPEXIT ..no; reset comand path
+ lda #CMDOUT
+ ldb #SS.Size
+ ldx #0
+ leau  ,X
+ OS9 I$SetStt set file size to zero
+ bcs ERRST ..error; reset command path
+OPNC90 puls D,Y,U,PC return, output redirected
+OPNC99 rts
+
+ERRST bsr CLSCHL Close the path
+ lbra ERREXT Print error number
+ endc
+
+***************
+NEWLIN clr I.IOCT
+ inc I.IOCT
+ pshs X
+ ldx I.IOBG
+ stx I.IOPT
+ puls X,PC
+
+***************
+* Subroutine Interp
+
+INTERP lbsr J$NAME Is a procedure name given?
+ bne INTER1 ..yes; continue
+INTE05 pshs Y Save command line ptr
+ lbsr PRCREF get default procedure name
+ ldx  ,S
+INTER0 lda ,Y+
+ sta ,X+ Copy the default name into command line
+ bpl INTER0
+ lda #V$CR
+ sta  ,X
+ puls Y Restore command line ptr
+INTER1 lbsr DIRLNK Try to find procedure
+ lbcs ERUPRC Not found - error
+ ldx  ,X get active procedure addr
+ stx I.APRC Set active procedure
+ stx L2APRC
+ clr L2OVRU no step over pending
+ lda M$TYPE,X external or bound?
+ beq INTE30 ..Yes; check type
+ anda #LangMask check language
+ cmpa #ICODE Basic09 Icode?
+ bne ERABRT ..No; "Procedure Errors"
+ bra INTE40 execute external
+INTE30 lda P.STAT,X
+ rora ANY Errors in procedure?
+ bcs ERABRT Run aborted - procedure errors
+INTE40 equ *
+ ifne L2B09RT
+ lbsr L2PRM the arguments, from l2b09cc
+ bcs ERABRT ..errors
+ else
+ lbsr J$CPRM Call parameter list
+ ldy I.STBG get ptr to parameter list
+ ldb  ,Y test parameter
+ cmpb #T.ERRL Error?
+ beq ERABRT ..Yes; abort
+ sty I.ICBG
+ sty I.ICPT
+ ldx ICDPTR
+ stx I.ICLM
+ stx I.STBG
+ ldd G.VARS
+ pshs D,Y
+ lbsr J$BPRM Bind parameters
+ puls D,Y
+ std G.VARS
+ sty I.STBG
+ ldx I.APRC
+ lda P.STAT,X
+ rora ANY Errors in run stmt?
+ bcs ERABRT Syntax errors - abort
+ endc
+ leas 258,S Discard opstack area
+ ldd G.WSPA get workspace beginning
+ addd G.WSPS Add workspace size
+ tfr D,Y Top of free space
+ std I.OPBG
+ std I.OPSP
+ ldu #0
+ stu I.ASTR
+ stu STEPS
+ inc STEPS+1
+ clr I.ERR
+ ldd I.STBG
+ ldx G.VARS
+ pshs D,X
+ leax INTRTS,PCR
+ lbsr SETEXT
+ ldx I.STBG Parameter list
+ lbsr J$IPRM Interpret parameters
+ lbsr NEWLIN Reset I/O ptrs
+ ldx I.APRC
+ lbsr J$INTX Execute interpreter
+ bra INTER9 Return
+INTRTS puls D,X
+ std I.STBG
+ stx G.VARS
+INTER9 equ *
+ ldx L2APRC current procedure is the stub again, not the window
+ stx I.APRC
+ lbra EXIT Return
+
+ERABRT ldb #M$ERST
+ lbra ERREXT
+
+***************
+* Subroutine BYEBYE
+*   Return nicely to OS-9
+
+BYEBYE bsr KILALL kill all external procedures
+ lbsr J$FALL give back far arrays
+ lbsr L2FREE give back the far procedure store
+ clrb
+ OS9 F$Exit
+
+***************
+* Subroutine KILLEX
+*   Runtime Kill command - must be external
+
+KILLEX lbsr J$NAME name given?
+ beq KILERR ..no; error
+ lbsr DIRSCH
+ bcs KILERR ..error; return it
+ ldu I.OPBG
+ ifne H6309
+ clrd
+ else
+ clra
+ clrb
+ endc
+ pshu D,X build procedure list stack
+ inca
+ sta G.SIGN signal killer: external only
+ bsr KILL0
+ clr G.SIGN
+ rts
+KILERR comb
+ ldb #M$UPRC Error: unknown procedure
+ rts
+
+***************
+* Subroutine KILLER
+*   Kill a procedure leaving no residue
+
+* Passed: (Y)=Command Line Ptr Following 'Kill'
+* Returns: CC=Set If (Not Found) Error
+*          (Returns Y Unharmed In Case of Error)
+* Destroys D,X,Y
+
+KILALL ldy I.IOPT build "All" name in I/O buffer
+ lda #'*
+ sta  ,Y (kill all)
+ sta G.SIGN
+
+KILLER equ *
+ ifne INCLUDED&EDITOR
+ lbsr L2BPZ procedures move: breakpoints go
+ endc
+ lbsr PCDLST get list of procedures to kill
+ clr I.APRC no active procedure
+ clr I.APRC+1
+KILL0 ldu I.OPBG
+ stu I.OPSP Reset opstack ptr
+ bra KILL2 For each member of list, do
+KILL1 ldx  ,X get procedure addr
+ ifne INCLUDED&EDITOR
+ ldb M$TYPE,X internal (un typed) procedure?
+ beq KILL15 ..yes; delete from workspace
+ cmpb #SBRTN+ICODE Basic09 icode variety?
+ bne KILL12 ..no; unlink external module
+ ldb P.STAT,X
+ aslb INTERNAL Procedure?
+ bmi KILL15 ..yes; delete from workspace
+ endc
+KILL12 pshs U
+ leau  ,X
+ OS9 F$Unlink Unlink external modules
+ puls U
+ ifne INCLUDED&EDITOR
+ bra KILL18 Zap directory entry
+KILL15 tst G.SIGN Signal set?
+ bne KILL2 ..yes; don't kill internal procs
+ ldx  ,U Restore directory addr
+ lbsr SHUFLE Shuffle it to the top
+ ldy  ,X get procedure addr
+ ldd G.PRCS
+ subd P.SIZE,Y
+ std G.PRCS Decrement procedure workspace size
+ ldd P.SIZE,Y
+ addd G.VARS Give procedure's area back to free space
+ std G.VARS
+ ldd I.STBG
+ subd P.SIZE,Y
+ std I.STBG
+ endc
+KILL18 ldd #-1
+ std [,U] Zap directory addr
+KILL2 ldx ,--U get next proc in list
+ bne KILL1 Until there are no more
+ ldx G.DIRA
+ tfr X,Y
+KILL3 ldd ,X++ Compress deleted entries
+ cmpd #-1 Zapped?
+ beq KILL3
+KILL4 std ,Y++
+ bne KILL3 Gotta check the whole list
+ cmpd  ,Y
+ bne KILL4 Wipe out tail end of directory
+ rts
+
+ ttl DIRECTORY Routines
+ pag
+ ifne INCLUDED&EDITOR
+***************
+* Subroutine DIRADD
+*   Search procedure directory for procedure
+*   Add it to directory if not found
+
+* Passed: (Y)=Addr of Proc Name to Add
+* Returns: (Y)=Updated Past Procedure Name
+*          (X)=Addr of Directory Entry
+* Destroys: A,CC
+
+DIRADD bsr DIRSCH Search directory for proc. name
+ bcs DIRA00 Return if found
+ rts
+DIRA00 pshs X,U Save registers
+ tfr X,D get directory entry
+ cmpb #-2 Is it the last
+ beq ERMFUL ..yes; error - memory full
+DIRAD0 ldx G.VARS get free memory size
+ cmpx #$FF Is there enough room?
+ blo ERMFUL ..no; error - memory full
+ leax -(P.NAME+3),X
+ ldu I.STBG get bottom of free space ptr
+ ldb #-1
+DIRAD1 incb
+ clr B,U Clear out new procedure's p.stuff
+ cmpb #P.NAMS
+ bne DIRAD1 Loop until all clear except name
+DIRAD2 incb
+ leax -1,X Decrement free space size
+ beq ERMFUL Exit if there isn't enough room
+ inc P.NAMS,U Increment procedure name size
+ lda ,Y+ get (next) procedure name character
+ sta B,U Save it in the procedure's workspace
+ bpl DIRAD2 Loop until the last name byte has been moved
+ incb
+ stx G.VARS Update free space count
+ clra
+ std P.EXEC,U First executable stmt
+ std P.PGMB,U Icode beginning
+ std P.DSCB,U Description tbl beginning
+ stu [,S] Store addr of new procedure there
+ pshs B Temp save b
+ addd #3 Form actual size of new (null) procedure
+ std P.SIZE,U Procedure size
+ std P.SYMB,U Symbol table beginning
+ addd G.PRCS
+ std G.PRCS Update total procedure area size
+ ldd #M$ID12 Build module header
+ std M$ID,U
+ ldd #P.NAME
+ std M$NAME,U
+ ldd #REENT+1 un-typed; attr/rev
+ std M$TYPE,U
+ ldd #U.SIZE
+ std P.VARC,U Set initial variable size
+ puls B
+ leax D,U Form addr of new symbol table
+ ldb #3 Number of skip bytes per entry
+ sta ,X+
+ std ,X++ Initialize procedure's symbol table
+ stx I.STBG Update bottom of free space
+ puls X,U,PC Return to caller
+ endc
+
+ERMFUL ldb #M$MFUL
+ lbra ERREXT
+
+***************
+* Subroutine DIRSCH
+*   Search procedure directory for procedure
+
+* Passed: (Y)=Name
+* Returns: (X)=Addr of Directory Entry
+*          (Y)=Updated Past Procedure Name
+*          CC=Set If Not Found
+* Destroys: D
+
+DIRSCH pshs Y,U Save registers
+ ldx G.DIRA get directory addr
+DIRSC0 ldy  ,S Reset proc name string
+ ldu ,X++ get (next) procedure addr
+ beq DIRSC9 End of directory - not found exit
+ ldd M$NAME,U
+ leau D,U get addr of name
+DIRSC2 lda ,Y+ get (next) source char
+ eora ,U+ Is it the same as that in the directory?
+ anda #^('a-'A) (upper or lower case)
+ bne DIRSC0 ..no; skip to the next entry
+ clra insure carry clear
+ tst -1,U
+ bpl DIRSC2 Loop if this isnt the last char in the name
+DIRSC3 leax -2,X
+ puls D,U,PC Return
+
+DIRSC9 coma set Carry (not found)
+ bra DIRSC3 Return not found
+
+***************
+* Subroutine DIRLNK
+*   Search For Icode Procedure, If Not Internal Try to Link
+
+* Passed: (Y)=Name
+* Returns: (X)=Addr of Directory Entry (If Found)
+*          (Y)=Updated Past Name
+*          CC=Set If Not Found
+* Destroys: D
+
+DIRLNK bsr DIRSCH Search internal directory
+ bcs DIRLN1 ..not found,try to find in system
+ rts
+
+DIRLN1 pshs X,Y,U Save directory entry ptr (x)
+ ldb 1,S
+ cmpb #-2 Last entry?
+ beq ERMFUL ..too bad
+ leax  ,Y get proc name ptr
+ ifne H6309
+ clrd any revision
+ else
+ clra
+ clrb any revision
+ endc
+ OS9 F$Link Try to find
+ bcc DIRLN2 ..good
+ ldx 2,S Restore proc name ptr
+ ifne H6309
+ clrd any revision
+ else
+ clra
+ clrb any revision
+ endc
+ OS9 F$Load Try to load module
+ bcs DIRLN9 ..not found; sorry
+DIRLN2 stx 2,S Return updated module name ptr in (y)
+ stu [,S] Module (procedure) addr goes in directory
+DIRLN9 puls X,Y,U,PC Return
+
+ ifne INCLUDED&EDITOR
+***************
+* Subroutine SHUFLE
+*   Move a procedure to the top of workspace
+
+* Passed: (X)=Directory Addr
+* Returns: (X)=Unaltered
+* Destroys: D,CC
+
+SHUFLE pshs X,Y Save regs
+ ldd G.PRCA
+ addd G.PRCS
+ tfr D,Y ..high addr
+ ldx  ,X ..low addr
+ sty [,S] Reset procedure addr in directory
+ ldd P.SIZE,X get procedure size
+ bsr FLOTUP "FLOAT" it up to bottom of free space
+ pshs D,X,Y
+ ldx G.DIRA
+ bra SHUFL2
+SHUFL1 cmpd 2,S Below affected addres?
+ blo SHUFL2
+ cmpd 4,S Above the one just shuffled up (external)?
+ bhi SHUFL2 ..yes
+ subd  ,S Adjust directory entry of each procedure that was moved down
+ std -2,X
+SHUFL2 ldd ,X++
+ bne SHUFL1
+ leas 6,S
+ puls X,Y,PC Restore regs and return
+
+***************
+* Subroutine FLOTUP
+
+* Passed: (D)=Size of Area to "Float" to Top
+*         (X)=Low Memory of Move (Addr of Thing to Float Up)
+*         (Y)=High Memory of Move (Bottom of Freespace Usually)
+* Destroys: None
+
+FLOTUP pshs D,X,Y,U Save parameters
+ ldu #0 Bytecnt=0
+ tfr X,D
+ subd 4,S Size of memory involved in move
+ pshs D,X
+ addd 4,S Already at top?
+ beq FLOTU9 ..yes, return
+FLOTU1 lda  ,X
+ pshs A Savebyte=[low memory]
+ bra FLOTU3
+FLOTU2 lda  ,Y [moveto]=[movefrom]
+ sta  ,X
+ leau 1,U Bytecnt=bytecnt+1
+ tfr Y,X Moveto=movefrom
+FLOTU3 tfr X,D
+ addd 5,S Movefrom=moveto+size
+ cmpd 9,S
+ blo FLOTU4
+ addd 1,S
+FLOTU4 tfr D,Y
+ cmpd 3,S Movefrom=lowmem?
+ bne FLOTU2
+ puls A
+ sta  ,X [moveto]=savebyte
+ leax 1,Y
+ stx 2,S Update lowmem
+ leau 1,U Bytecnt=bytecnt+1
+ tfr U,D
+ addd  ,S Total number of bytes moved?
+ bne FLOTU1 ..no; keep moving
+FLOTU9 leas 4,S
+ puls D,X,Y,U,PC
+
+ endc
+				ifne		wildbits
+BannerGo            leax      NEWLN,pcr
+                    ldy       #NEWLNLEN
+                    lda       #1
+                    os9       I$Writln
+                    bcs       BNRERR
+                    leax      OUTSTR,pcr
+                    ldy       #STRLEN
+                    lda       #1
+                    os9       I$Write
+                    bcs       BNRERR
+                    ldx       #$FE00
+                    lda       7,x
+                    cmpa      #$02
+                    bne       isItK
+                    leax      OUTSTR2,pcr
+                    ldy       #STRLEN2
+                    lda       #1
+                    os9       I$Writln
+                    bcs       BNRERR
+                    bra       CONT
+isItK           cmpa      #$12
+                    bne       isItK2
+                    leax      OUTSTR3,pcr
+                    ldy       #STRLEN3
+                    lda       #1
+                    os9       I$Writln
+                    bcs       BNRERR
+                    bra       CONT
+isItK2          cmpa      #$16
+                    bne       isItJrJr
+                    leax      OUTSTR4,pcr
+                    ldy       #STRLEN4
+                    lda       #1
+                    os9       I$Writln
+                    bcs       BNRERR
+                    bra       CONT
+isItJrJr            cmpa      #$1A
+                    bne       BNRERR
+                    leax      OUTSTR5,pcr
+                    ldy       #STRLEN5
+                    lda       #1
+                    os9       I$Writln
+                    bcs       BNRERR
+CONT                leax      BASL2,pcr
+                    ldy       #BASLEN2
+                    lda       #1
+                    os9       I$Write
+                    bcs       BNRERR
+BNRDONE                ldb       #0
+BNRERR               lbra      COMAND
+OUTSTR              fcb       $1b,$32,$07,$1c,$13,$1c,$11,$1c,$11
+                    fcb       $1c,$11,$1c,$11,$1c,$11,$1c,$05
+                    fcb       $1b,$32,$06,$20,$20,$1b,$32,$08,$1c,$10,$1c,$11
+                    fcb       $1c,$11,$1c,$11,$1c,$0a,$1b,$32,$06,$20,$20
+                    fcb       $1b,$32,$04,$1c,$03,$1c,$11,$1c,$11,$1c,$11,$1c
+                    fcb       $11,$1c,$11,$1c,$05
+                    fcb       $1b,$32,$06,$20,$1b,$32,$0e,$1c,$11,$1c,$12,$1b,$32,$06
+                    fcb       $20,$1b,$32,$05,$1c,$03,$1c,$11,$1c,$11,$1c,$11,$1c,$11
+                    fcb       $1c,$05
+                    fcb       $1b,$32,$06,$20,$20,$1b,$32,$0f,$1c,$10,$1c,$11
+                    fcb       $1c,$11,$1c,$11,$1c,$11,$1c,$11,$1c,$0a
+                    fcb       $1b,$32,$06,$20,$20
+                    fcb       $1b,$32,$01,$1c,$03,$1c,$11,$1c,$11,$1c,$11,$1c,$11
+                    fcb       $1c,$05
+                    fcb       $1b,$32,$06,$20,$20,$20,$20,$20,$20,$20,$20
+                    fcb       $1b,$32,$01
+STRLEN              equ       *-OUTSTR
+OUTSTR2             fcc       " Wildbits/Jr"
+                    fcb       $0D
+STRLEN2             equ       *-OUTSTR2
+OUTSTR3             fcc       "  Wildbits/K"
+                    fcb       $0D
+STRLEN3             equ       *-OUTSTR3
+OUTSTR4             fcc       "Wildbits/K2"
+                    fcb       $0D
+STRLEN4             equ       *-OUTSTR4
+OUTSTR5             fcc       "Wildbits/Jr2"
+                    fcb       $0D
+STRLEN5             equ       *-OUTSTR5
+BASL2               fcb       $1b,$32,$07,$1c,$13,$1c,$11,$1b,$32,$06,$20,$20
+                    fcb       $20,$1b,$32,$07,$1c,$13,$1c,$11,$1b,$32,$06,$20
+                    fcb       $1b,$32,$08,$1c,$10,$1c,$11,$1c,$15,$1b,$32,$06,$20
+                    fcb       $1b,$32,$08,$1c,$09,$1c,$11,$1c,$0a,$1b,$32,$06,$20
+                    fcb       $1b,$32,$04,$1c,$11,$1c,$12,$1b,$32,$06,$20,$20
+                    fcb       $20,$20,$20,$20,$1b,$32,$0e,$1c,$11,$1c,$12,$1b
+                    fcb       $32,$06,$20,$1b,$32,$05,$1c,$11,$1c,$12,$1b,$32
+                    fcb       $06,$20,$20,$20,$20,$20,$20,$1b,$32,$0f
+                    fcb       $1c,$11,$1c,$0c,$1b,$32,$06,$20,$1b,$32,$0f,$1c,$10
+                    fcb       $1c,$15,$1c,$0f,$1c,$11,$1b,$32,$06,$20,$20,$1b,$32
+                    fcb       $01,$1c,$11,$1c,$12
+                    fcb       $1b,$32,$06,$20,$20,$1b,$32,$01,$1c,$13,$1c,$11
+                    fcb       $1b,$32,$06,$20,$20,$20,$20,$20,$20,$20
+                    fcb       $20,$20,$20,$20,$20,$20,$20,$20,$20,$20
+                    fcb       $20,$20,$20,$20,$20,$20,$20,$20,$20,$20
+                    fcb       $20,$20,$20
+                    fcb       $1b,$32,$07,$1c,$13,$1c,$11,$1c,$11,$1c
+                    fcb       $11,$1c,$11,$1c,$11,$1c,$0b
+                    fcb       $1b,$32,$06,$20,$1b,$32,$08,$1c,$11,$1c,$11,$1c,$11
+                    fcb       $1c,$11,$1c,$11,$1c,$11,$1c,$11
+                    fcb       $1b,$32,$06,$20,$1b,$32,$04
+                    fcb       $1c,$04,$1c,$11,$1c,$11,$1c,$11,$1c,$11
+                    fcb       $1c,$11,$1c,$05,$1b,$32
+                    fcb       $06,$20,$1b,$32,$0e,$1c,$11,$1c,$12,$1b,$32,$06
+                    fcb       $20,$1b,$32,$05,$1c,$11,$1c,$12,$1b,$32,$06,$20
+                    fcb       $20,$20,$20,$20,$20,$1b,$32,$0f,$1c,$11,$1c,$12
+                    fcb       $1b,$32,$0f,$1c,$10,$1c,$11,$1c,$15,$1c,$13,$1c,$11
+                    fcb       $1b,$32,$06,$20,$20,$1b,$32,$01,$1c,$04,$1c,$11,$1c,$11
+                    fcb       $1c,$11,$1c,$11,$1c,$11,$1b,$32,$06,$20,$20,$20,$20,$20
+                    fcb       $20,$20,$20,$20,$20,$1b,$32,$01,$40,$44
+                    fcb       $72,$50,$69,$74,$72,$65,$1b,$32,$06,$20,$20
+                    fcb       $20,$20,$20,$20,$20,$20,$20,$20,$20,$20
+                    fcb       $1b,$32,$07,$1c,$13,$1c,$11,$1b,$32,$06,$20,$20
+                    fcb       $20,$1b,$32,$07,$1c,$13,$1c,$11,$1b,$32,$06,$20
+                    fcb       $1b,$32,$08,$1c,$11,$1c,$11,$1b,$32,$06,$20,$20
+                    fcb       $20,$1b,$32,$08,$1c,$11,$1c,$11,$1b,$32,$06,$20
+                    fcb       $20,$20,$20,$20,$20,$1b,$32,$04,$1c,$13,$1c,$11
+                    fcb       $1b,$32,$06,$20,$1b,$32,$0e,$1c,$11,$1c,$12,$1b
+                    fcb       $32,$06,$20,$1b,$32,$05,$1c,$11,$1c,$12,$1b,$32
+                    fcb       $06,$20,$20,$20,$20,$20,$20,$1b,$32,$0f
+                    fcb       $1c,$11,$1c,$0e,$1c,$10,$1c,$15,$1b,$32,$06,$20
+                    fcb       $1b,$32,$0f,$1c,$0d,$1c,$11,$1b,$32,$06,$20,$20
+                    fcb       $20,$20,$20,$20,$1b,$32,$01,$1c,$13,$1c,$11
+                    fcb       $1b,$32,$06,$20,$20,$20,$20,$20,$1b,$32,$01,$40,$4a,$46
+                    fcb       $65,$64,$20,$40,$4E,$69,$74,$72,$6f,$62,$6f,$74,$69
+                    fcb       $63,$73,$1b,$32,$06
+                    fcb       $20,$20,$20,$20,$20,$20,$20
+                    fcb       $1b,$32,$07,$1c,$13,$1c,$11,$1c,$11,$1c
+                    fcb       $11,$1c,$11,$1c,$11,$1c,$06
+                    fcb       $1b,$32,$06,$20,$1b,$32,$08,$1c,$11,$1c,$15
+                    fcb       $1b,$32,$06,$20,$20,$20,$1b,$32,$08,$1c,$09
+                    fcb       $1c,$11,$1b,$32,$06,$20,$1b,$32,$04,$1c,$07,$1c,$11
+                    fcb       $1c,$11,$1c,$11,$1c,$11,$1c,$11,$1c,$06
+                    fcb       $1b,$32,$06,$20,$1b
+                    fcb       $32,$0e,$1c,$11,$1c,$12,$1b,$32,$06,$20,$1b,$32
+                    fcb       $05,$1c,$04,$1c,$11,$1c,$11,$1c,$11,$1c,$11,$1c,$06
+                    fcb       $1b,$32,$06
+                    fcb       $20,$20,$1b,$32,$0f,$1c,$09,$1c,$11,$1c,$11,$1c,$11
+                    fcb       $1c,$11,$1c,$11,$1c,$15,$1b,$32,$06,$20,$20,$1b,$32
+                    fcb       $01,$1c,$07,$1c,$11,$1c,$11,$1c,$11,$1c,$11,$1c,$06
+                    fcb       $1b,$32,$06,$20,$20,$20,$20,$20,$20,$20,$20,$1b,$32
+                    fcb       $01,$40,$4d,$61,$74,$74,$20,$4d,$61,$73
+                    fcb       $73,$69,$65,$1b,$32,$01
+BASLEN2             equ       *-BASL2
+NEWLN               fcb       $1b,$33,$06,$0c,$0d
+NEWLNLEN            equ	*-NEWLN
+				endc
+***************
+ ifne INCLUDED&EDITOR (RunB has no options)
+* Subroutine L2OPTS
+*   Parse l2b09run options ahead of the file name
+*
+*   -b=<kb>    Bank procedure code: keep loaded procedures in a
+*              far store of <kb> kilobytes (whole 8K blocks),
+*              mapped into an 8K code window when they run.
+*   -t=<path>  Program terminal.  Standard input and output
+*              (paths 0 and 1) are moved to <path> so the
+*              program, and anything it SHELLs, uses it.
+*              Commands and the debugger keep the original
+*              standard input (CMDIN) and standard error.
+
+* Passed: (Y)=Shell parameter ptr
+* Returns: (Y)=Updated past options
+* Exits to OS-9 with the error code on a bad option or path
+
+L2OPTS lda ,Y+
+ cmpa #V$SPAC skip spaces
+ beq L2OPTS
+ cmpa #'-
+ bne L2OPT9 ..not an option; done
+ ldd ,Y++ get option letter and '='
+ anda #^('a-'A) upper case
+ cmpd #'T*256+'=
+ bne L2OPT2
+ bsr L2TERM
+ bcc L2OPTS
+ bra L2OPTX
+L2OPT2 cmpd #'B*256+'=
+ bne L2OPTE ..unknown option
+ ldb #1 the far store (l2b09ovl's L2STOR)
+ bsr L2OVSC
+ bcs L2OPTX
+ bsr L2WIN then the code window, with the overlay gone
+ bcc L2OPTS
+L2OPTX pshs B
+ lbsr L2FREE give back a far store already set up
+ puls B
+ OS9 F$Exit report error to parent
+L2OPTE ldb #E$IllArg illegal argument
+ bra L2OPTX
+L2OPT9 leay -1,Y back up to first non-option char
+ ifeq L2B09CC (l2b09cc: no banner)
+ lda  ,Y nothing follows: command mode, which starts
+ cmpa #V$CR with the banner (in l2b09ovl; not shown if
+ bne L2OPT8 there is no slot for it)
+ ldb #2
+ bsr L2OVSC
+ endc
+L2OPT8 rts
+
+* L2OVSC: at start-up, call l2b09ovl's entry B with (Y), then unlink
+* it.  Returns the entry's (Y) and carry; carry set, (B)=error if the
+* overlay cannot be linked or loaded.
+L2OVSC pshs B,Y
+ lbsr L2OVLK (Y)=entry, (U)=module
+ bcs L2OVC8
+ ldb  ,S the entry number (F$Link returned its own B)
+ lda #3 (each entry is a LBRA)
+ mul
+ leax D,Y
+ ldy 1,S
+ stu 1,S module, for the unlink
+ jsr  ,X
+ tfr CC,A
+ ldu 1,S
+ sty 1,S
+ sta  ,S
+ OS9 F$UnLink
+ puls A,Y
+ tfr A,CC
+ rts
+L2OVC8 leas 1,S
+ puls Y,PC (carry)
+
+* L2WIN: -b: reserve the code window, while it is the highest free
+* slot (only l2b09run's own code is above it), so it never moves;
+* carry set, (B)=error on failure
+L2WIN ldd FARBAS
+ lbsr J$L2MW
+ bcs L2WIN9
+ ldd #L2BLSZ
+ cmpx #-L2BLSZ in the top slot?
+ bne L2WIN8
+ ldd #L2TOPU ..yes; only its lower part is ours
+L2WIN8 std WINLIM
+ andcc #$FE
+L2WIN9 rts
+
+* Move paths 0 and 1 to the program terminal at (Y)
+L2TERM clra
+ OS9 I$Dup copy of standard input
+ bcs L2TER9
+ sta CMDIN becomes the home command input
+ clra
+ OS9 I$Close free path 0
+ leax ,Y
+ lda #UPDAT. open terminal; lowest free path is 0
+ OS9 I$Open
+ bcs L2TER9
+ leay ,X updated past pathname
+ lda #1
+ OS9 I$Close free path 1
+ clra
+ OS9 I$Dup terminal becomes path 1 too
+L2TER9 rts
+ endc
+
+***************
+* Subroutine L2GARD
+*   F$MapBlk returns the highest free slot.  When l2b09run's code
+*   does not reach the top slot (F$Link keeps a module out of it
+*   if the module would run into $FD00), that slot is free, but its
+*   top pages are fixed (not affected by the DAT), so a subroutine
+*   module's window there (farmem, graphics) would write into them.
+*   The code window (-b) may use it, within WINLIM; otherwise keep
+*   the top slot filled with a second mapping of our own first
+*   data block (GRDBLK), which nothing touches.  The far data
+*   window takes its place when mapped (far blocks never use
+*   their top part) and gives it back when unmapped.  F$Exit frees
+*   only the data blocks, so the extra mapping needs no clean-up.
+
+L2GARD pshs D,X,Y,U
+ ldd G.WSPA room for a process descriptor copy?
+ addd G.WSPS
+ subd G.PRCA
+ cmpa #512/256
+ blo L2GAR9
+ OS9 F$ID (A)=our process ID
+ bcs L2GAR9
+ ldx G.PRCA the empty procedure area
+ OS9 F$GPrDsc
+ bcs L2GAR9
+ ldx P$DATImg,X our first data block
+ ldb #1
+ OS9 F$MapBlk
+ bcs L2GAR9
+ cmpu #-L2BLSZ top slot?
+ bne L2GAR8
+ stx GRDBLK ..yes; keep it filled
+ bra L2GAR9
+L2GAR8 equ *
+ ldb #1 no; the code is there already
+ OS9 F$ClrBlk
+L2GAR9 puls D,X,Y,U,PC
+
+***************
+* Subroutine L2FREE
+*   Release the code window and the far procedure store
+
+L2FREE pshs D,X,U
+ ldd FARBAS
+ beq L2FRE9 ..no store
+ ldd WINBLK
+ beq L2FRE1 ..nothing mapped
+ ldu WINADR
+ ldb #1
+ OS9 F$ClrBlk
+L2FRE1 ldx FARBAS
+ ldb FARCNT
+ OS9 F$DelRAM
+ clr FARBAS
+ clr FARBAS+1
+ clr WINBLK
+ clr WINBLK+1
+L2FRE9 puls D,X,U,PC
+
+***************
+ ifne L2B09CC
+* CCPRM <procedure> <arguments>  (from l2b09run's RUN)
+*   Compile and bind the arguments, as INTERP does, and send them:
+*   %ICODE, 2 bytes of length, the bound I-Code (length 0: errors,
+*   which are shown here).
+
+CCPRM leas -L2FKSZ,S room for a stand-in procedure header
+ lbsr L2CCPR (X)=our copy of the procedure, (Y)=past its name
+ bcc L2CCP1
+* Not ours: a module (PACKed, or loaded from the shell).  Its arguments
+* are compiled and bound all the same; the binder only marks errors in
+* the procedure's P.STAT, and messages show its name, so a header that
+* holds the name stands in for it.
+ pshs B,Y
+ leau 3,S
+ ldb #L2FKSZ
+L2CCP0 clr ,U+
+ decb
+ bne L2CCP0
+ ldd #P.NAME
+ std 3+M$NAME,S
+ puls B,Y
+ pshs Y
+ negb
+ leax B,Y the name (J$NAME marked its last char)
+ leau 2+P.NAME,S
+L2CCQ0 lda ,X+
+ sta ,U+
+ bpl L2CCQ0
+ puls Y
+ leax  ,S
+L2CCP1 stx I.APRC
+ lbsr J$CPRM Call parameter list
+ ldy I.STBG
+ ldb  ,Y
+ cmpb #T.ERRL Error?
+ beq L2CCPF
+ sty I.ICBG
+ sty I.ICPT
+ ldx ICDPTR
+ stx I.ICLM
+ stx I.STBG
+ ldd G.VARS
+ pshs D,Y
+ ldx I.APRC
+ ldb P.STAT,X its own status stays as it was
+ pshs B
+ clr P.STAT,X
+ lbsr J$BPRM Bind parameters
+ ldx I.APRC
+ lda P.STAT,X
+ puls B
+ stb P.STAT,X
+ ldx I.ICBG
+ ldd I.ICLM
+ subd I.ICBG
+ rora ANY Errors in run stmt?
+ bcc L2CCP7
+ ldd #0
+L2CCP7 lbsr L2SNDI
+ puls D,Y
+ std G.VARS
+ sty I.STBG
+ leas L2FKSZ,S
+ clra
+ rts
+L2CCPF ldd #0
+ bsr L2SNDI
+ leas L2FKSZ,S
+ clra
+ rts
+L2CCP8 ldd #0
+ bsr L2SNDI
+ clra
+ rts
+L2FKSZ equ P.NAME+40 a header with room for a name
+
+* CCSTM <procedure> <statement>  (from l2b09run's debugger)
+*   Compile and bind the statement against our copy of the
+*   procedure, as DIREXQ does in the debugger, and send it as above.
+
+CCSTM lbsr L2CCPR
+ bcs L2CCP8
+ lbsr J$L2RS banked? map it
+ bcs L2CCP8
+ stx I.APRC as SETGLB, for the compiler and the binder
+ ldd P.SYMB,X
+ addd I.APRC
+ std I.SYMT
+ ldd P.DSCB,X
+ addd I.APRC
+ std I.DSCR
+ std I.ICLM
+ ldd P.PGMB,X
+ addd I.APRC
+ std I.ICBG
+ inc DEBUGGER compile as the debugger does
+ lbsr J$CMPL Compile the line
+ lbsr SVCRIT
+ ldx I.STBG
+ lbsr CHKERR an error line?
+ beq L2CCS7
+ stx I.ICBG
+ stx I.ICPT
+ leay  ,X
+ ldx ICDPTR
+ stx I.ICLM
+ stx I.STBG
+ lbsr L2BSTM Bind compiled statement; (A)=binder errors
+ tsta
+ bne L2CCS7
+ ldx I.ICBG
+ ldd I.ICLM
+ subd I.ICBG
+ bra L2CCS6
+L2CCS7 ldd #0
+L2CCS6 bsr L2SNDI
+ lbsr RSCRIT
+ clr DEBUGGER
+ clra
+ rts
+
+* L2CCPR: the procedure named at (Y), in our directory
+* Returns: (X)=Its address, (Y)=Past the name, (B)=The name's length;
+*          carry set if unknown
+L2CCPR lbsr J$NAME
+ pshs B,Y (DIRSCH destroys B)
+ lbsr DIRSCH
+ puls B,Y
+ leay B,Y past the name (J$NAME: (B)=its length; keeps C)
+ bcs L2CCR8
+ ldx  ,X
+L2CCR8 rts
+
+* L2SNDI: %ICODE, (D) as 2 bytes, then (D) bytes at (X), to stdout
+L2SNDI pshs D,X
+ leax L2ICTX,PCR
+ ldy #7
+ lda #1
+ OS9 I$Write
+ leax  ,S
+ ldy #2
+ lda #1
+ OS9 I$Write
+ ldy  ,S
+ beq L2SND9
+ ldx 2,S
+ lda #1
+ OS9 I$Write
+L2SND9 puls D,X,PC
+
+L2ICTX fcc "%ICODE"
+ fcb V$CR
+L2ASTX fcc "%ASK"
+ fcb V$CR
+ endc
+
+***************
+ ifne L2B09CC
+* l2b09cc (docs/COMPILER.md): the same program as l2b09run, built
+* with L2B09CC, so that it compiles exactly as l2b09run does.  Its
+* messages (%CERR, %BERR, listings) go to stderr as before; stdout
+* carries each procedure LOAD has bound, as a line
+*   %PROC <bytes> <name>
+* followed by exactly that many bytes (the procedure as it is in the
+* workspace), and a line %DONE whenever it is ready for a command.
+
+* Subroutine L2SEND: write the procedure just bound (I.APRC)
+L2SEND pshs D,X,Y,U
+ lbsr NEWLIN
+ leax L2PRTX,PCR
+ lbsr STRSPC
+ ldx I.APRC
+ ldd P.SIZE,X
+ lbsr ItoA
+ lda #V$SPAC
+ lbsr PUTCHR
+ ldx I.APRC
+ ldd M$NAME,X
+ leax D,X
+ lbsr CPYSTR
+ bsr L2WRLN the line
+ ldx I.APRC
+ ldy P.SIZE,X
+ lda #1
+ OS9 I$Write then the bytes
+ puls D,X,Y,U,PC
+
+* Subroutine L2DONE: %DONE on stdout
+L2DONE pshs D,X,Y,U
+ leax L2DNTX,PCR
+ lbsr NEWLIN
+ lbsr CPYSTR
+ bsr L2WRLN
+ puls D,X,Y,U,PC
+
+* L2WRLN: the I/O buffer and a CR to stdout, then reset the buffer
+L2WRLN lbsr PUTCR
+ ldx I.IOBG
+ ldd I.IOPT
+ subd I.IOBG
+ tfr D,Y
+ lda #1
+ OS9 I$WritLn
+ lbra NEWLIN
+
+L2PRTX fcs "%PROC"
+L2DNTX fcs "%DONE"
+ endc
+
+ ifne INCLUDED&EDITOR (RunB loads nothing)
+L2BNK0 puls D,X,Y,U,PC L2BANK's early exit, in reach of short branches
+
+
+***************
+* Subroutine L2BANK
+*   After LOAD binds a procedure, move it to the far store and
+*   leave a stub in the workspace.  Skipped when banking is off,
+*   for procedures with errors, and for procedures over 8K or
+*   that no longer fit in the store (they stay in the workspace).
+
+L2BANK pshs D,X,Y,U
+ ifne L2B09CC
+ lbsr L2SEND l2b09cc: the procedure goes to stdout
+ endc
+ ldd FARBAS
+ beq L2BNK0 ..banking off
+ ldx I.APRC the procedure just bound
+ lda P.STAT,X
+ bita #1+P.BANK errors, or already banked?
+ bne L2BNK0
+ ldd G.PRCA must be the top procedure
+ addd G.PRCS
+ pshs D
+ tfr X,D
+ addd P.SIZE,X
+ cmpd ,S++
+ bne L2BNK0
+ ldd P.SIZE,X
+ cmpd WINLIM
+ bhi L2BNK0 ..bigger than the window
+ addd FAROFS
+ cmpd WINLIM
+ bls L2BNK1 ..fits in the current block
+ lda FARIDX
+ inca next block
+ cmpa FARCNT
+ bhs L2BNK0 ..store full
+ sta FARIDX
+ clr FAROFS
+ clr FAROFS+1
+L2BNK1 clra
+ ldb FARIDX
+ addd FARBAS (D)=far block
+ pshs D
+ lbsr J$L2MW (X)=window
+ bcs L2BNKE
+ ldd FAROFS
+ leau D,X destination
+ ldx I.APRC
+ ldy P.SIZE,X
+L2BNK2 lda ,X+ copy the procedure
+ sta ,U+
+ leay -1,Y
+ bne L2BNK2
+ ldx I.APRC turn the original into a stub
+ ldb P.NAMS,X
+ leay P.NAME,X
+ leay B,Y (Y)=stub tail
+ puls D
+ std  ,Y far block
+ ldd FAROFS
+ std 2,Y offset
+ ldd P.SIZE,X
+ addd FAROFS
+ std FAROFS
+ leay 4,Y end of stub
+ tfr Y,D
+ pshs X
+ subd ,S++ (D)=stub size
+ pshs D
+ ldd P.SIZE,X
+ subd  ,S (D)=bytes given back
+ pshs D
+ ldd 2,S
+ std P.SIZE,X
+ lda P.STAT,X
+ ora #P.BANK
+ sta P.STAT,X
+ ldd G.PRCS
+ subd  ,S
+ std G.PRCS
+ ldd G.VARS
+ addd  ,S
+ std G.VARS
+ ldd I.STBG
+ subd  ,S
+ std I.STBG
+ leas 4,S
+L2BNK9 puls D,X,Y,U,PC
+L2BNKE leas 2,S
+ bra L2BNK9
+
+***************
+* Subroutine L2INSR
+*   LOAD's INSERT, plus a "%CERR <code> <proc> <line>" event
+*   when the line compiled to an error line
+
+* Passed: (Y)=Source line; (D)=I.ICPT=End of I-Code
+
+L2INSR pshs D,X where this line goes
+ lbsr INSERT
+ ldx ,S
+ lbsr CHKERR did it compile to an error line?
+ bne L2INS9 ..no
+ pshs Y
+ ldb LSTERR
+ tfr X,Y
+ leax <L2CERR,PCR
+ lbsr L2EVNT
+ puls Y
+L2INS9 puls D,X,PC
+L2CERR fcs "%CERR"
+ endc
+
+***************
+ ifne L2B09RT
+* l2b09run without the compiler (docs/COMPILER.md, steps 3 and 4).
+* l2b09cc, forked at start-up (L2CCST), compiles for it: LOAD, the
+* arguments of RUN, the debugger's statements and PACK go to it, and
+* KILL, MEM, CHD and CHX are passed on after they are done here, so
+* that its copies of the procedures and its settings stay the same
+* as ours.  Its messages reach the editor directly (its stderr is
+* ours); on stdout it answers with lines, read by L2CCLP:
+*   %PROC <bytes> <name>  then the procedure: put it in the workspace
+*   %ICODE                then 2 bytes of length and that much bound
+*                         I-Code (none: errors), into free space
+*   %ASK                  it asks (a file to rewrite): pass on a line
+*   %DONE                 the command is finished
+
+* LOAD <file>, PACK [...]: done by the compiler
+LOAD lbsr L2BPZ procedures move: breakpoints go
+ leax L2LDTX,PCR
+ ldb #5
+ bra L2FWDX
+DUMP leax L2PKTX,PCR
+ ldb #4
+ bra L2FWDX
+* KILL, MEM, CHD, CHX: done here, then passed on
+L2KILL pshs Y
+ lbsr KILLER
+ leax L2KLTX,PCR
+ bra L2FWD2
+L2MEM lbsr CHGMEM
+ bcs L2FWD9 ..What?
+ lbsr NEWLIN "mem <our size now>" (CHGMEM's own output has
+ leax L2MMTX,PCR overwritten the command line)
+ lbsr CPYSTR
+ ldd G.WSPS
+ lbsr ItoA
+ lbsr PUTCR
+ ldy I.IOBG
+ clrb
+ bra L2FWDX
+L2CHD pshs Y
+ lbsr CHDDIR
+ leax L2CDTX,PCR
+ bra L2FWD4
+L2CHX pshs Y
+ lbsr CHXDIR
+ leax L2CXTX,PCR
+L2FWD4 ldb #3
+ bra L2FWD1
+L2FWD2 ldb #4
+L2FWD1 puls Y
+L2FWDX lbsr L2FWD
+ lbcs ERREXT
+ clra
+ rts
+
+***************
+* Subroutine L2FWD
+*   Send the compiler (X), (B) bytes, then the line at (Y) to its
+*   CR, and read its answers until %DONE (L2CCLP).
+* Returns: as L2CCLP
+
+L2FWD pshs Y
+ tst L2CCP
+ bne L2FWD5
+ ldb #E$PNNF not running: as if not found
+ coma
+ puls Y,PC
+L2FWD5 clra
+ tfr D,Y
+ lbsr L2CCWR the word
+ puls X
+ bcs L2FWD9
+ pshs X the line: J$NAME may have marked a name's
+L2FWD6 lda  ,X last char, and the compiler would read
+ anda #$7F it as the end of the name
+ sta ,X+
+ cmpa #V$CR
+ bne L2FWD6
+ puls X
+ ldy #256
+ lda L2CCP
+ lsra
+ lsra
+ lsra
+ lsra
+ OS9 I$WritLn the rest of the line
+ bcc L2CCLP
+L2FWD9 rts
+
+***************
+* Subroutine L2CCLP
+*   Read the compiler's answers until %DONE.
+* Returns: (X)=Bytes of %ICODE received at I.STBG (0 = none);
+*          carry set, (B)=error (32: no room) on failure
+
+L2CCLP ldx #0
+ pshs X 2,S=%ICODE bytes
+ pshs X 0,S=error
+L2CL1 ldx I.IOBG a line from the compiler
+ ldy #256
+ lbsr L2CCRL
+ lbcs L2CLER
+ lda 1,X
+ cmpa #'P %PROC
+ beq L2CLPR
+ cmpa #'I %ICODE
+ lbeq L2CLIC
+ cmpa #'A %ASK
+ bne L2CLDN ..%DONE
+ lda CMDIN pass on a line of our input
+ ldy #256
+ OS9 I$ReadLn
+ lbcs L2CLER
+ lda L2CCP
+ lsra
+ lsra
+ lsra
+ lsra
+ OS9 I$WritLn
+ lbcs L2CLER
+ bra L2CL1
+L2CLDN ldb  ,S
+ ldx 2,S
+ leas 4,S
+ tstb
+ beq L2CLD9
+ coma error
+ rts
+L2CLD9 clra
+ rts
+
+L2CLPR leay 6,X past "%PROC "
+L2CL2 lda ,Y+ past the size
+ cmpa #V$SPAC
+ bne L2CL2
+ lbsr J$NAME the name, its last char marked as in a directory
+ pshs Y
+ lbsr DIRSCH an old one?
+ bcs L2CL3
+ lbsr L2KIL1 ..kill it
+L2CL3 ldx I.STBG the module header, into free space
+ ldy #4
+ lbsr L2CCRD
+ lbcs L2CLE2
+ ldd 2,X its size
+ lbsr L2CLRM room for it?
+ bhi L2CL7 ..no; read it away
+ subd #4
+ tfr D,Y
+ leax 4,X the rest
+ lbsr L2CCRD
+ lbcs L2CLE2
+ ldy ,S++ the name
+ lbsr DIRSCH (X)=its directory entry, or the end
+ lbcc L2CL1 (still there: KILLER refused it)
+ tfr X,D
+ cmpb #-2 directory full?
+ beq L2CL81
+ ldu I.STBG the procedure
+ stu  ,X
+ ldd P.SIZE,U
+ pshs D
+ addd G.PRCS
+ std G.PRCS
+ ldd G.VARS
+ subd  ,S
+ std G.VARS
+ ldd I.STBG
+ addd ,S++
+ std I.STBG
+ stu I.APRC
+ lbsr L2BANK -b: to the far store
+ lbra L2CL1
+L2CL7 ldd 2,X no room: read the rest away
+ subd #4
+ bsr L2CLDR
+ lbcs L2CLE2
+L2CL8 leas 2,S
+L2CL81 ldb #M$MFUL
+ stb  ,S remembered, reported at %DONE
+ lbra L2CL1
+
+L2CLIC ldx I.STBG %ICODE: its length, then the I-Code
+ ldy #2
+ lbsr L2CCRD
+ bcs L2CLER
+ ldd  ,X
+ std 2,S
+ beq L2CL9 ..none: errors (the compiler showed them)
+ bsr L2CLRM
+ bhi L2CLI7
+ tfr D,Y
+ lbsr L2CCRD
+ bcs L2CLER
+L2CL9 lbra L2CL1
+L2CLI7 clr 2,S no room
+ clr 3,S
+ bsr L2CLDR
+ bcs L2CLER
+ bra L2CL81
+
+L2CLE2 leas 2,S
+L2CLER stb  ,S the pipe failed: stop
+ lbra L2CLDN
+
+* L2KIL1: kill the procedure of directory entry (X), as KILLER does
+*   for a list (KILLER would parse the name again)
+L2KIL1 clr I.APRC
+ clr I.APRC+1
+ ldu I.OPBG the list KILL0 takes, below the opstack
+ clr -4,U
+ clr -3,U
+ stx -2,U
+ lbra KILL0
+
+* L2CLRM: (D)=bytes: is there room for them (and 256 more)?  "bhi"
+*   if not; keeps (D)
+L2CLRM pshs D
+ addd #256
+ cmpd G.VARS
+ puls D,PC
+
+* L2CLDR: read (D) bytes away, 256 at a time
+L2CLDR ldx I.IOBG
+ ldy #256
+ cmpd #256
+ bhs L2CLD1
+ tfr D,Y
+L2CLD1 pshs D
+ bsr L2CCRD
+ puls D
+ bcs L2CLD8
+ pshs Y
+ subd ,S++
+ bne L2CLDR
+L2CLD8 rts
+
+* L2CCWR: (X),(Y) to the compiler; L2CCRL/L2CCRD: a line, or (Y) bytes
+L2CCWR lda L2CCP
+ lsra
+ lsra
+ lsra
+ lsra
+ OS9 I$Write
+ rts
+L2CCRL lda L2CCP
+ anda #$0F
+ OS9 I$ReadLn
+ rts
+L2CCRD lda L2CCP
+ anda #$0F
+ pshs Y
+ OS9 I$Read
+ bcs L2CCR9
+ cmpy  ,S all of it?
+ beq L2CCR9
+ ldb #E$EOF ..no
+ coma
+L2CCR9 leas 2,S
+ rts
+
+***************
+* Subroutine L2PRM  (RUN)
+*   The arguments of RUN <procedure>(...), at (Y): none is the
+*   I-Code T.EOL; otherwise the compiler compiles and binds them.
+*   They go to I.STBG, with I.ICBG, I.ICPT, I.ICLM around them.
+* Returns: carry set if they had errors
+
+L2PRM clr DEBUGGER (as CMPRAM did: a RUN after Q in the debugger)
+L2PRM0 lda ,Y+
+ cmpa #V$SPAC
+ beq L2PRM0
+ leay -1,Y
+ ldx I.STBG
+ cmpa #V$CR no arguments?
+ bne L2PRM1
+ lda #T.EOL
+ sta  ,X
+ ldd #1
+ bra L2PRM2
+L2PRM1 leax L2PRTX,PCR "ccprm <procedure> <arguments>"
+ bsr L2SNDN
+ bcs L2PRM9
+ tfr X,D
+ subd #1
+ bcs L2PRM9 ..none: errors
+ addd #1
+L2PRM2 ldx I.STBG
+ stx I.ICBG
+ stx I.ICPT
+ leax D,X
+ stx I.ICLM
+ andcc #$FE
+L2PRM9 rts
+
+***************
+* Subroutine L2STM  (debugger: PRINT, LET ... at I.IOBG)
+*   The compiler compiles and binds the statement against its copy
+*   of the active procedure: "ccstm <procedure> <statement>".
+* Returns: (D)=Bytes of bound I-Code at I.STBG; 0 = errors
+
+L2STM leax L2STTX,PCR "ccstm <procedure> <statement>"
+ ldy I.IOBG
+ bsr L2SNDN
+ bcs L2STM8
+ tfr X,D
+ rts
+L2STM8 lbsr PRTERR
+ clra
+ clrb
+ rts
+
+* L2SNDN: send the compiler (X) (6 bytes), the active procedure's
+*   name and a space, then the line at (Y), and read its answers
+*   (L2FWD)
+L2SNDN leas -40,S
+ leau ,S
+ ldb #6
+L2STM1 lda ,X+
+ sta ,U+
+ decb
+ bne L2STM1
+ ldx I.APRC
+ leax P.NAME,X
+L2STM2 lda ,X+
+ bita #$80
+ pshs CC
+ anda #$7F
+ sta ,U+
+ puls CC
+ beq L2STM2
+ lda #V$SPAC
+ sta ,U+
+ tfr U,D
+ leax ,S
+ pshs X
+ subd ,S++
+ lbsr L2FWD
+ leas 40,S (keeps the carry)
+ rts
+
+* PRT4HX, as in the binder (LIST's offsets): (D) as 4 hex digits at (X)
+L2P4HX bsr L2P2HX
+ tfr B,A
+L2P2HX pshs A
+ lsra
+ lsra
+ lsra
+ lsra
+ bsr L2PHX
+ puls A
+ anda #$0F
+L2PHX adda #'0
+ cmpa #'9
+ bls L2PHX1
+ adda #7
+L2PHX1 sta ,X+
+ rts
+
+***************
+* Subroutine L2CCST  (at start-up)
+*   Start l2b09cc with our workspace size and -b: pipe A becomes its
+*   stdin, pipe B its stdout; its stderr is ours.  We keep a path
+*   to each pipe (L2CCP).  On failure L2CCP stays 0, and LOAD gives
+*   ERROR #216.
+
+L2CCST lbsr NEWLIN its parameters, in the I/O buffer
+ ldd FARBAS
+ beq L2CCS1
+ leax L2BOTX,PCR "-b="
+ lbsr CPYSTR
+ lda FARCNT
+ ldb #8 kilobytes
+ mul
+ lbsr ItoA
+L2CCS1 lbsr PUTCR
+ clra set our paths 0 and 1 aside
+ OS9 I$Dup
+ bcs L2CCS9
+ pshs A
+ lda #1
+ OS9 I$Dup
+ pshs A 1,S=our 0, ,S=our 1
+ clra pipe A as path 0
+ bsr L2CCPP
+ bcs L2CCSB
+ lsla
+ lsla
+ lsla
+ lsla
+ sta L2CCP
+ lda #1 pipe B as path 1
+ bsr L2CCPP
+ bcs L2CCSB
+ ora L2CCP
+ sta L2CCP
+ leax L2CCNM,PCR
+ ldu I.IOBG
+ ldd I.IOPT
+ subd I.IOBG
+ tfr D,Y
+ lda G.WSPS our workspace size, in pages
+ inca
+ tfr A,B
+ clra
+ OS9 F$Fork
+ bcs L2CCSB
+ ldx I.STBG its first %DONE: it is up
+ ldy #256
+ lbsr L2CCRL
+L2CCSB tfr CC,A put our own paths back
+ pshs D
+ clra
+ OS9 I$Close
+ lda 3,S
+ OS9 I$Dup
+ lda 3,S
+ OS9 I$Close
+ lda #1
+ OS9 I$Close
+ lda 2,S
+ OS9 I$Dup
+ lda 2,S
+ OS9 I$Close
+ puls D
+ leas 2,S
+ tfr A,CC
+ bcc L2CCS8
+ clr L2CCP failed: not started
+L2CCS8 lbra NEWLIN
+L2CCS9 rts
+
+* L2CCPA: is path (A) one of our pipes to the compiler?  Z set if so
+*   (HALT closes the program's paths, not these)
+L2CCPA pshs A
+ lda L2CCP
+ anda #$0F
+ cmpa  ,S
+ beq L2CCA9
+ lda L2CCP
+ lsra
+ lsra
+ lsra
+ lsra
+ cmpa  ,S
+L2CCA9 puls A,PC
+
+* L2CCPP: close path (A), open a pipe there, and return a copy of it
+L2CCPP pshs A
+ OS9 I$Close
+ leax L2PIPE,PCR
+ lda #UPDAT.
+ OS9 I$Open
+ puls A
+ bcs L2CCP9
+ OS9 I$Dup
+L2CCP9 rts
+
+L2CCNM fcc "l2b09cc"
+ fcb V$CR
+L2PIPE fcc "/pipe"
+ fcb V$CR
+L2LDTX fcc "load " (a space: at start-up the file name has none)
+* the others are followed by the rest of their command line, as typed
+* ("pack*", "kill*", " <name>")
+L2PKTX fcc "pack"
+L2KLTX fcc "kill"
+L2MMTX fcs "mem "
+L2CDTX fcc "chd"
+L2CXTX fcc "chx"
+L2PRTX fcc "ccprm "
+L2STTX fcc "ccstm "
+L2BOTX fcs "-b="
+ endc
+
+* End of Command routines
+
+ use editor
